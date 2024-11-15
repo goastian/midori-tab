@@ -1,0 +1,20 @@
+{
+    "manifest_version": 2,
+    "name": "Midori NewTab",
+    "version": "0.5",
+    "description": "Midori NewTab is a new lightweight, fast multi-browser tab that protects your privacy",
+    "permissions": [],
+    "background": {
+        "scripts": ["background.js"],
+        "persistent": true
+    },
+    "icons": {
+        "48": "icon.png"
+    },
+    "browser_action": {
+        "default_icon": "icon.png"
+    },
+    "chrome_url_overrides": {
+        "newtab": "index.html"
+    }
+}
