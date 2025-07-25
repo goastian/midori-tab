@@ -1,0 +1,130 @@
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+:root[data-theme = 'light'] {
+  --bg-color: #fff;
+  --bg-secondary: #dfdfdf;
+  --text-color: #202020;
+  --border-color: rgba(0, 0, 0, .2);
+
+  --bg-blur: rgba(255, 255, 255, .4);
+  
+  --blue: #2e72ac;
+  --green: #269D73;
+
+  --gradient-orange: linear-gradient(135deg, #ff7b7f, #ff595e, #e0484c);
+  --gradient-green: linear-gradient(135deg, #8dc63f, #d4ff88);
+  --gradient-deal: linear-gradient(135deg, #00b9b5, #a6f7f5);
+  --gradient-purple: linear-gradient(135deg, #be1c7d, #f78fc3);
+
+  --orange: #ff595e;
+
+}
+
+:root[data-theme = 'dark'] {
+  --bg-color: #202020;
+  --bg-secondary: #808080;
+  --text-color: #fff;
+  --border-color: rgba(0, 0, 0, .2);
+  
+  --blue: #0d86d3;
+  --green: #269D73;
+
+  --bg-blur: rgba(20, 20, 20, .4);
+
+  --gradient-orange: linear-gradient(135deg, #e0484c, #ff595e, #8b2c2f);
+  --gradient-green: linear-gradient(135deg, #8dc63f, #3a5311);
+  --gradient-deal: linear-gradient(135deg, #00b9b5, #004f4d);
+  --gradient-purple: linear-gradient(135deg, #be1c7d, #4b1037);
+
+  --orange: #ff595e;
+
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  background-color: var(--bg-color);
+}
+
+.bg-orange {
+  background: var(--gradient-orange);
+}
+
+.bg-green {
+  background: var(--gradient-green);
+}
+
+.bg-deal {
+  background: var(--gradient-deal);
+}
+
+.bg-purple {
+  background: var(--gradient-purple);
+}
+
+.bg {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: .5s ease-in-out background;
+}
+
+.no-bg {
+  background-color: transparent;
+}
+
+.text-color {
+  color: var(--text-color);
+}
+
+.white {
+  color: #fff !important;
+}
+
+.flex {
+  display: flex;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.align-center {
+  align-items: center;
+}
+
+.align-end {
+  align-items: end;
+}
+
+.self-end {
+  align-self: end;
+}
+
+.ga-1 {
+  gap: 1rem;
+}
+
+.ga-2 {
+  gap: 2rem;
+}
+
+@media (max-width: 1330) {
+  html {
+    font-size: 14px;
+  }
+}

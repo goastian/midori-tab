@@ -1,65 +1,29 @@
 {
-  "name": "mue",
+  "name": "midori-newtab",
   "private": true,
-  "author": "The Mue Authors (https://github.com/mue/mue/graphs/contributors)",
-  "description": "Fast, open and free-to-use new tab page for modern browsers.",
-  "repository": {
-    "url": "github:mue/mue"
-  },
-  "homepage": "https://muetab.com",
-  "bugs": "https://github.com/mue/mue/issues/new?assignees=&labels=bug&template=bug-report.md&title=%5BBUG%5D",
-  "license": "BSD-3-Clause",
-  "version": "7.1.2",
-  "dependencies": {
-    "@eartharoid/i18n": "1.2.1",
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.0",
-    "@floating-ui/react-dom": "2.1.2",
-    "@fontsource/lexend-deca": "5.0.14",
-    "@fontsource/montserrat": "5.0.19",
-    "@muetab/react-sortable-hoc": "^2.0.1",
-    "@mui/material": "6.3.0",
-    "@sentry/react": "^8.47.0",
-    "embla-carousel-autoplay": "8.5.1",
-    "embla-carousel-react": "8.5.1",
-    "fast-blurhash": "^1.1.4",
-    "image-conversion": "^2.1.1",
-    "mue": "file:",
-    "react": "^18.3.1",
-    "react-best-gradient-color-picker": "^3.0.11",
-    "react-clock": "5.1.0",
-    "react-dom": "^18.3.1",
-    "react-icons": "^5.4.0",
-    "react-modal": "3.16.3",
-    "react-toastify": "10.0.6",
-    "use-debounce": "^10.0.4"
-  },
-  "devDependencies": {
-    "@commitlint/cli": "^19.6.1",
-    "@commitlint/config-conventional": "^19.6.0",
-    "@eartharoid/deep-merge": "^0.0.2",
-    "@vitejs/plugin-react-swc": "^3.7.2",
-    "adm-zip": "0.5.16",
-    "eslint": "^8.57.1",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-config-react-app": "^7.0.1",
-    "husky": "^9.1.7",
-    "prettier": "^3.4.2",
-    "sass": "^1.83.0",
-    "stylelint": "^16.12.0",
-    "stylelint-config-standard-scss": "^14.0.0",
-    "stylelint-scss": "^6.10.0",
-    "vite": "6.0.6",
-    "vite-plugin-progress": "^0.0.7"
-  },
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:host": "vite --host",
-    "translations": "cd scripts && node updatetranslations.js",
-    "build": "vite build",
-    "pretty": "prettier --write \"./**/*.{js,jsx,json,scss,css}\"",
-    "lint": "eslint \"./src/**/*.{js,jsx}\" && stylelint \"./src/**/*.{scss,css}\"",
-    "lint:fix": "eslint \"./src/**/*.{js,jsx}\" --fix && stylelint \"./src/**/*.{scss,css}\" --fix",
-    "postinstall": "husky"
+    "build:manifest:chrome": "node build-manifest.js manifest/chrome.json",
+    "build:manifest:firefox": "node build-manifest.js manifest/firefox.json",
+    "build-chome": "npm run build:manifest:chrome vite build --watch",
+    "build-firefox": "npm run build:manifest:firefox && vite build --watch",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@iconify/vue": "^5.0.0",
+    "axios": "^1.11.0",
+    "gridstack": "^12.2.2",
+    "pinia": "^3.0.3",
+    "pinia-plugin-persistedstate": "^4.4.1",
+    "vue": "^3.5.17",
+    "zen-wdg": "^2.2.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.0",
+    "vite": "^7.0.4",
+    "vite-plugin-static-copy": "^3.1.1",
+    "vite-plugin-web-extension": "^4.4.5"
   }
 }

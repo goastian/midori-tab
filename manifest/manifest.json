@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "zen",
+  "description": "",
+  "version": "1.0.0",
+  "author": "Im-Jota",
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_icon": {
+      "16": "icons/128.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  }
+}
