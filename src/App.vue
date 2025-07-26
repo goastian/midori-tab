@@ -29,6 +29,12 @@
     watch: {
       'widgets.state': function() {
         this.gridKey = Date.now()
+      },
+
+      'tabStore.mode': function (value){
+        if(value == "Productivity"){
+          this.widgets.loadWidgets();
+        }
       }
     },
 
