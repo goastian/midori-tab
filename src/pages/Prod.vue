@@ -90,7 +90,7 @@ export default {
 .grid-stack-item-content {
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: start;
 }
 
 .grid-stack-item.active {
