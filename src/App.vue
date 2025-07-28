@@ -2,7 +2,8 @@
   <div class="viewport" :class="{ 'bg-cl' : tabStore.theme !== 'light' }">
     <img :src="backgroundImage" class="background" v-if="tabStore.background.type == 'Unsplash'" />
     <Minimalist v-if="tabStore.mode == 'Minimalist'" />
-    <Production v-else :key="gridKey"/>
+    <Informative v-if="tabStore.mode == 'Informative'" />
+    <Production v-if="tabStore.mode == 'Productivity'" :key="gridKey"/>
     <Settings :style="{color: textColor }" />
   </div>
 </template>
@@ -40,6 +41,7 @@
 
     components: {
       Minimalist: defineAsyncComponent(() => import('./pages/Min.vue')),
+      Informative: defineAsyncComponent(() => import('./pages/Info.vue')),
       Production: defineAsyncComponent(() => import('./pages/Prod.vue')),
       Settings: defineAsyncComponent(() => import('./components/Settings.vue')),
     },
@@ -171,11 +173,14 @@
 }
 
 .background {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  position: absolute;
   z-index: -3;
   object-fit: cover;
+  pointer-events: none;
 }
 
 .bg-cl::after {
