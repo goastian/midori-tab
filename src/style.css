@@ -6,6 +6,7 @@
 
 :root[data-theme = 'light'] {
   --bg-color: #fff;
+  --bg-glass: rgba(255, 255, 255, 0.1);
   --bg-secondary: #dfdfdf;
   --text-color: #202020;
   --border-color: rgba(0, 0, 0, .2);
@@ -26,6 +27,7 @@
 
 :root[data-theme = 'dark'] {
   --bg-color: #202020;
+  --bg-glass: rgba(18, 18, 18, 0.4);
   --bg-secondary: #808080;
   --text-color: #fff;
   --border-color: rgba(0, 0, 0, .2);
