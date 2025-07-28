@@ -55,8 +55,7 @@ export default {
         BSetting: defineAsyncComponent(() => import('../components/BSetting.vue')),
         Logo: defineAsyncComponent(() => import('../components/Logo.vue')),
         ZSearchWidget: defineAsyncComponent(() => import('zen-wdg').then(m => m.ZSearchWidget)),
-        //ZMarkedWidget: defineAsyncComponent(() => import('zen-wdg').then(m => m.ZMarkedWidget)),
-        ZMarkedWidget: defineAsyncComponent(() => import('../../../zen-wdg/src/widgets/z-marked-widget.vue')),
+        ZMarkedWidget: defineAsyncComponent(() => import('zen-wdg').then(m => m.ZMarkedWidget))
     },
 
     created() {
