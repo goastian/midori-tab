@@ -77,6 +77,7 @@ export default {
 <style scoped>
 .grid-stack {
   width: 100%;
+  font-size: 13px;
 }
 
 .grid-stack-item {
