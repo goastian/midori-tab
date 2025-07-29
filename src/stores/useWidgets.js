@@ -55,6 +55,7 @@ const useWidgets = defineStore("widgets", {
             local: false,
             props: {
               theme: setting.theme,
+              small: true
             },
           },
           {
