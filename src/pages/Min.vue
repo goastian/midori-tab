@@ -14,7 +14,7 @@
                 </div>
 
                 <div class="shortcuts">
-                    <ZMarkedWidget theme="dark" />
+                    <ZMarkedWidget :theme="tab.theme" small useStorage/>
                 </div>
             </div>
         </div>
@@ -24,10 +24,12 @@
 <script>
 import { defineAsyncComponent } from 'vue';
 import img from '../assets/favicon.png';
+import useTabStore from '../stores/useTabStore';
 export default {
     data() {
         return {
             img,
+            tab: useTabStore()
         }
     },
     components: {
@@ -51,6 +53,7 @@ export default {
     align-items: center;
     justify-content: center;
     padding: 1rem 2rem;
+    font-size: 13px;
 }
 
 .top {
