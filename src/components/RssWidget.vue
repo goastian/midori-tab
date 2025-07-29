@@ -73,8 +73,6 @@
 </template>
 
 <script>
-import RssService from '../services/RssService.js';
-
 export default {
   name: 'RssWidget',
   data() {
@@ -84,7 +82,6 @@ export default {
       feedItems: [],
       loading: false,
       error: null,
-      rssService: new RssService(),
       availableFeeds: [
         {
           name: 'BBC News',
@@ -157,8 +154,9 @@ export default {
       this.feedUrl = currentFeed.url;
       
       try {
-        const feedData = await this.rssService.fetchRssFeed(this.feedUrl);
-        this.feedTitle = feedData.title;
+        const feedData = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${this.feedUrl}`)
+                        .then(res => res.json())
+        this.feedTitle = feedData.feed.title;
         this.feedItems = feedData.items;
       } catch (error) {
         this.error = error.message;
@@ -234,9 +232,12 @@ export default {
 
 <style scoped>
 .rss-widget {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-  border-radius: 12px;
-  padding: 16px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-color);
+  border-radius: 1rem;
   height: 100%;
   overflow: hidden;
   display: flex;
@@ -250,9 +251,9 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  padding: 1rem;
 }
 
 .feed-selector {
@@ -475,16 +476,18 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 1rem;
 }
 
 .news-item {
+  height: 100%;
+  min-height: 140px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-color);
   border-radius: 8px;
   border-left: 3px solid #4ecdc4;
   transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .news-item::before {
@@ -513,7 +516,6 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 8px;
 }
 
 .news-title {

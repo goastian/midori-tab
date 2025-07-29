@@ -7,17 +7,17 @@
         <span v-else>↻</span>
       </button>
     </div>
-    
+
     <div v-if="loading" class="loading">
       <div class="spinner"></div>
       <p>Cargando noticias de Astian...</p>
     </div>
-    
+
     <div v-else-if="error" class="error">
       <p>{{ error }}</p>
       <button @click="loadFeed" class="retry-btn">Reintentar</button>
     </div>
-    
+
     <div v-else class="feed-content">
       <div v-for="item in feedItems" :key="item.id" class="news-item astian-item">
         <div class="news-header">
@@ -38,8 +38,6 @@
 </template>
 
 <script>
-import RssService from '../services/RssService.js';
-
 export default {
   name: 'AstianRssWidget',
   data() {
@@ -48,23 +46,23 @@ export default {
       feedTitle: 'Astian News',
       feedItems: [],
       loading: false,
-      error: null,
-      rssService: new RssService()
+      error: null
     }
   },
-  
+
   mounted() {
     this.loadFeed();
   },
-  
+
   methods: {
     async loadFeed() {
       this.loading = true;
       this.error = null;
-      
+
       try {
-        const feedData = await this.rssService.fetchRssFeed(this.feedUrl);
-        this.feedTitle = feedData.title;
+        const feedData = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${this.feedUrl}`)
+          .then(res => res.json())
+        this.feedTitle = feedData.feed.title;
         this.feedItems = feedData.items;
       } catch (error) {
         this.error = error.message;
@@ -73,11 +71,11 @@ export default {
         this.loading = false;
       }
     },
-    
+
     refreshFeed() {
       this.loadFeed();
     },
-    
+
     openLink(url) {
       if (window.chrome && chrome.tabs) {
         chrome.tabs.create({ url: url });
@@ -85,7 +83,7 @@ export default {
         window.open(url, '_blank');
       }
     },
-    
+
     truncateText(text, maxLength) {
       if (!text) return '';
       if (text.length <= maxLength) return text;
@@ -97,9 +95,12 @@ export default {
 
 <style scoped>
 .astian-rss-widget {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  background: var(--bg-glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-color);
   border-radius: 12px;
-  padding: 16px;
   height: 100%;
   overflow: hidden;
   display: flex;
@@ -111,9 +112,9 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
   padding-bottom: 8px;
   border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  padding: 1rem;
 }
 
 .widget-header h3 {
@@ -166,8 +167,13 @@ export default {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .error {
@@ -196,16 +202,17 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 1rem;
 }
 
 .astian-item {
+  min-height: 120px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-color);
   border-radius: 8px;
   border-left: 3px solid #4ecdc4;
   transition: all 0.3s ease;
   position: relative;
-  overflow: hidden;
 }
 
 .astian-item::before {
@@ -221,13 +228,12 @@ export default {
 }
 
 .astian-item:hover {
-  background: rgba(255, 255, 255, 0.1);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .astian-item:hover::before {
-  transform: scaleX(1);
+  transform: scaleX(.95);
 }
 
 .news-header {
@@ -306,4 +312,4 @@ export default {
 .feed-content::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #44a08d, #4ecdc4);
 }
-</style> 
+</style>
