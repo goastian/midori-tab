@@ -52,6 +52,7 @@ html {
 
 body {
   background-color: var(--bg-color);
+  font-family: 'Inter', sans-serif;
 }
 
 .bg-orange {

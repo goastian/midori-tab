@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import { createPinia } from 'pinia'
 import persistedState from 'pinia-plugin-persistedstate';
+import '@fontsource/inter/400.css';
 
 import './style.css'
 import 'zen-wdg/zen-wdg.css'
