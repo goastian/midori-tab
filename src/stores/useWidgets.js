@@ -57,6 +57,26 @@ const useWidgets = defineStore("widgets", {
               theme: setting.theme,
             },
           },
+          {
+            id: 6,
+            x: 8,
+            y: 0,
+            w: 4,
+            h: 6,
+            name: "rss-news",
+            component: "RssWidget",
+            local: true,
+          },
+          {
+            id: 7,
+            x: 0,
+            y: 7,
+            w: 4,
+            h: 5,
+            name: "astian-news",
+            component: "AstianRssWidget",
+            local: true,
+          },
         ];
       }
     },
