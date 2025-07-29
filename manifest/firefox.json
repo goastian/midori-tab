@@ -1,3 +1,6 @@
 {
-
+  "background": {
+    "scripts": ["background.js"],
+    "type": "module"
+  }
 }
