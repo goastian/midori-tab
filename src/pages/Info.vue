@@ -24,14 +24,14 @@
                 <template v-for="(item, index) in news">
                     <a class="itemNewCard" @click="openLink(item.link)">
                         <div class="itemTop">
-                            <img :src="item.image" />
+                            <img :src="item.thumbnail" />
                         </div>
                         <div class="itemContainer">
                             <h3 class="itemTitle">{{ item.title }}</h3>
                             <p class="itemDescription">{{ item.description }}</p>
                         </div>
                         <div class="itemFooter">
-                            <span>{{ item.date }}</span>
+                            <span>{{ item.pubDate }}</span>
                         </div>
                     </a>
                 </template>
@@ -63,30 +63,11 @@ export default {
     },
 
     methods: {
-        loadNews() {
-            fetch('https://feeds.bbci.co.uk/news/rss.xml')
-                .then(response => response.text())
-                .then(str => (new window.DOMParser()).parseFromString(str, "text/xml"))
-                .then(data => {
-                    const items = data.querySelectorAll("item");
-                    this.news = [...items].slice(0, 5).map(item => {
-                        const title = item.querySelector("title")?.textContent || "";
-                        const link = item.querySelector("link")?.textContent || "";
-                        const description = item.querySelector("description")?.textContent || "";
-                        const date = item.querySelector("pubDate")?.textContent || "";
-
-                        // Buscar imagen en <media:thumbnail> o <media:content>
-                        const mediaThumbnail = item.getElementsByTagName("media:thumbnail")[0];
-                        const mediaContent = item.getElementsByTagName("media:content")[0];
-
-                        const image = mediaThumbnail?.getAttribute("url") ||
-                            mediaContent?.getAttribute("url") || "";
-
-                        return { title, link, description, image, date };
-                    });
-                    console.log(this.news); // Aquí puedes usar esto para llenar tu HTML
-                })
-                .catch(err => console.error("Error cargando el feed RSS:", err));
+        async loadNews() {
+            const feedData = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=https://feeds.bbci.co.uk/news/rss.xml`)
+                .then(res => res.json())
+            this.feedTitle = feedData.feed.title;
+            this.news = feedData.items;
         },
 
         openLink(url) {
@@ -105,6 +86,7 @@ export default {
     justify-content: start;
     padding: 1rem 2rem;
     gap: 2rem;
+    font-size: 13px;
 }
 
 .top {
@@ -204,7 +186,7 @@ export default {
     text-overflow: ellipsis;
     width: 100%;
     display: block;
-    font-size: 1rem;
+    font-size: .9rem;
     font-weight: bold;
 }
 
@@ -219,7 +201,7 @@ export default {
     max-height: calc(1.5em * 4);
     /* fuerza altura máxima de 4 líneas */
     color: #ccc;
-    font-size: 0.95rem;
+    font-size: 0.8rem;
 }
 
 .itemFooter {
