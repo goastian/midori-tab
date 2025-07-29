@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.6",
     "@iconify/vue": "^5.0.0",
     "axios": "^1.11.0",
     "gridstack": "^12.2.2",
