@@ -1,5 +1,5 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "midori-tab",
   "description": "",
   "version": "1.0.0",
@@ -8,8 +8,19 @@
     "newtab": "index.html"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "https://feeds.bbci.co.uk/*",
+    "https://astian.org/*",
+    "https://blog.mozilla.org/*",
+    "https://github.blog/*",
+    "https://api.allorigins.win/*"
   ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ],
+    "persistent": false
+  },
   "action": {
     "default_icon": {
       "16": "icons/128.png",
