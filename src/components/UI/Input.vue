@@ -49,7 +49,10 @@ export default {
 <style scoped>
 input {
   padding: .5rem 1rem;
-  border: none;
+  background-color: var(--bg-glass);
+  color: var(--text-color);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  height: 35px;
 }
 
 .full-width {
@@ -61,7 +64,7 @@ input:focus {
 }
 
 .round {
-  border-radius: .2rem;
+  border-radius: .5rem;
 }
 
 .rounded {
