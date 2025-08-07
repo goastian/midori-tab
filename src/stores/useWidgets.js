@@ -12,7 +12,6 @@ const useWidgets = defineStore("widgets", {
       const wid = localStorage.getItem('widgets')
       if (!wid) {
         const setting = useTabStore();
-        console.log(setting.theme);
         this.widgets = [
           {
             id: 1,
@@ -55,7 +54,8 @@ const useWidgets = defineStore("widgets", {
             local: false,
             props: {
               theme: setting.theme,
-              small: true
+              small: true,
+              useStorage: true,
             },
           },
           {
