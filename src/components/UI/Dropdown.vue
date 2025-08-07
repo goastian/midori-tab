@@ -72,19 +72,22 @@ export default {
 .dropdown {
   position: relative;
   display: inline-block;
+  width: 100%;
 }
 
 .dropdown-button {
+  width: 100%;
+  height: 35px;
   padding: 0.5rem 1rem;
-  border: 1px solid #ccc;
-  background-color: var(--bg-color);
+  background-color: var(--bg-glass);
   color: var(--text-color);
+  border: none;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: .5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-width: 160px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .arrow {
@@ -103,8 +106,9 @@ export default {
   z-index: 20;
   background: var(--bg-color);
   color: var(--text-color);
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  box-shadow: 1px 1px 1px solid var(--bg-glass);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: .5rem;
   margin-top: 0.25rem;
   width: 100%;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
