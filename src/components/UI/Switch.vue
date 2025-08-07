@@ -1,5 +1,5 @@
 <template>
-  <div class="container">
+  <div class="container" :class="{'active' : state}">
     <div
       class="switch"
       :class="[ state ? 'right' : 'left']"
@@ -35,6 +35,10 @@
   cursor: pointer;
 }
 
+.container.active {
+  background: var(--blue);
+}
+
 .switch {
   position: absolute;
   width: 20px;
@@ -53,6 +57,5 @@
 
 .switch.right {
   left: 27px;
-  background: var(--bg-color);
 }
 </style>
