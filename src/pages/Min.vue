@@ -10,11 +10,11 @@
             
             <div class="contentMain">
                 <div class="search">
-                    <ZSearchWidget searchTarget="same" :logo="img" />
+                    <ZSearchWidget :searchTarget="tab.openLink" :logo="img" />
                 </div>
 
                 <div class="shortcuts">
-                    <ZMarkedWidget :theme="tab.theme" small useStorage/>
+                    <ZMarkedWidget :theme="tab.theme" small useStorage :open="tab.openLink"/>
                 </div>
             </div>
         </div>
