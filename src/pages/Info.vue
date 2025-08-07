@@ -14,24 +14,23 @@
                 </div>
 
                 <div class="shortcuts">
-                    <ZMarkedWidget theme="dark" :small="false" />
+                    <ZMarkedWidget theme="dark" :small="true" useStorage />
                 </div>
             </div>
         </div>
+
         <div class="news">
             <h2>Latest News</h2>
             <div class="containerNewsCard">
                 <template v-for="(item, index) in news">
-                    <a class="itemNewCard" @click="openLink(item.link)">
-                        <div class="itemTop">
+                    <a class="news-item" @click="openLink(item.link)">
+                        <div class="news-background">
                             <img :src="item.thumbnail" />
                         </div>
-                        <div class="itemContainer">
-                            <h3 class="itemTitle">{{ item.title }}</h3>
-                            <p class="itemDescription">{{ item.description }}</p>
-                        </div>
-                        <div class="itemFooter">
-                            <span>{{ item.pubDate }}</span>
+                        <div class="news-info">
+                            <span class="news-date">{{ item.pubDate }}</span>
+                            <h3 class="news-title">{{ item.title }}</h3>
+                            <p class="news-description">{{ item.description }}</p>
                         </div>
                     </a>
                 </template>
@@ -41,6 +40,7 @@
 </template>
 
 <script>
+import img from '../assets/favicon.png';
 import { defineAsyncComponent } from 'vue';
 import useTabStore from '../stores/useTabStore';
 export default {
@@ -48,6 +48,7 @@ export default {
         return {
             news: [],
             tab: useTabStore(),
+            img,
         }
     },
 
@@ -67,7 +68,18 @@ export default {
             const feedData = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=https://feeds.bbci.co.uk/news/rss.xml`)
                 .then(res => res.json())
             this.feedTitle = feedData.feed.title;
-            this.news = feedData.items;
+            if (this.feedTitle == 'BBC News') {
+                this.news = feedData.items.map(it => {
+                    const updatedUrl = it.thumbnail.replace(/\/(\d{2,4})\//, `/1920/`);
+
+                    console.log("Original:", it.thumbnail);
+                    console.log("Mejorado:", updatedUrl);
+                    return {
+                        ...it,
+                        thumbnail: updatedUrl
+                    };
+                });
+            }
         },
 
         openLink(url) {
@@ -99,7 +111,6 @@ export default {
 
 .content {
     width: 100%;
-    height: 500px;
     min-width: 480px;
     max-width: 900px;
     display: flex;
@@ -107,7 +118,7 @@ export default {
     align-items: center;
     justify-content: start;
     gap: 1rem;
-    padding: 3rem 0 7rem 0;
+    margin-bottom: 4rem;
 }
 
 .contentTop {
@@ -131,10 +142,10 @@ export default {
     width: 100%;
     min-width: 200px;
     max-width: 1400px;
-    background: var(--bg-glass);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(10px) saturate(180%);
+    -webkit-backdrop-filter: blur(10px) saturate(180%);
+    background-color: var(--bg-glass);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     padding: 2rem;
     border-radius: 1rem;
     color: var(--text-color);
@@ -145,70 +156,59 @@ export default {
 
 .containerNewsCard {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1rem;
 }
 
-.itemNewCard {
+.news-item {
     padding: .8rem;
-    background-color: var(--bg-color);
+    backdrop-filter: blur(10px) saturate(180%);
+    -webkit-backdrop-filter: blur(10px) saturate(180%);
+    background-color: var(--bg-glass);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     color: var(--text-color);
     text-decoration: none;
     border-radius: 1rem;
     display: flex;
     flex-direction: column;
-    gap: .7rem;
     cursor: pointer;
+    gap: .4rem;
+    transition: .8s;
 }
 
-.itemTop {
-    width: 100%;
-    border-radius: .7rem;
-    overflow: hidden;
-    height: 200px;
+.news-item:hover {
+    background-color: var(--bg-blur);
+    transform: scale(1.03);
 }
 
-.itemTop>img {
+.news-background > img {
     width: 100%;
-    height: 100%;
+    border-radius: .8rem;
 }
 
-.itemContainer {
-    width: 100%;
+.news-info {
     display: flex;
     flex-direction: column;
     gap: .4rem;
 }
 
-.itemContainer>.itemTitle {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.news-date {
+    font-size: .7rem;
+    color: var(--text-color-secondary);
+}
+
+.news-title {
+    font-size: 1rem;
+}
+
+.news-description {
     width: 100%;
-    display: block;
-    font-size: .9rem;
-    font-weight: bold;
-}
-
-.itemContainer>.itemDescription {
+    font-size: .8rem;
     display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;  
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: normal;
-    line-height: 1.5;
-    max-height: calc(1.5em * 4);
-    /* fuerza altura máxima de 4 líneas */
-    color: #ccc;
-    font-size: 0.8rem;
 }
 
-.itemFooter {
-    background-color: var(--bg-secondary);
-    padding: 1rem;
-    border-radius: .6rem;
-    display: flex;
-    flex-direction: column;
-}
 </style>
