@@ -19,7 +19,7 @@
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.4.1",
     "vue": "^3.5.17",
-    "zen-wdg": "^2.2.4"
+    "zen-wdg": "^2.2.6"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",
