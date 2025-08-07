@@ -102,7 +102,7 @@ button {
 }
 
 .bound {
-  border-radius: .2rem;
+  border-radius: .6rem;
 }
 
 .bounded {
