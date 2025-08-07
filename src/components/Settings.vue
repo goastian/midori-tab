@@ -8,38 +8,67 @@
     </template>
     <div class="contentDialog">
       <div class="main">
-        <div v-if="tab === 0" class="column ga-1">
-          <div class="flex justify-between align-center">
-            <span>Shortcuts</span>
-            <Switch @click="settings.changeShortcuts()" :state="settings.shortcuts" />
+        <div v-if="tab === 0" class="column">
+          
+          <div class="section-main">
+            <div class="section-dialog">
+              <div class="flex justify-between align-center item">
+                <span>Shortcuts</span>
+                <div>
+                  <Switch @click="settings.changeShortcuts()" :state="settings.shortcuts" />
+                </div>
+              </div>
+              <div class="flex justify-between align-center item">
+                <span>Open Search in:</span>
+                <div>
+                  <Dropdown v-model="settings.openLink" :options="openLinks"/>
+                </div>
+              </div>
+              
+              <div class="flex justify-between align-center item">
+                <span>Tab Name:</span>
+                <div>
+                  <Input placeholder="New Tab" :value="settings.tabName" v-model="title" round full/>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="flex justify-between align-center">
-            <span>Open Search in:</span>
-            <Dropdown v-model="settings.openLink" :options="openLinks"/>
-          </div>
-
-          <div class="flex justify-between align-center">
-            <span>Tab Name:</span>
-            <Input placeholder="New Tab" :value="settings.tabName" v-model="title" round />
-          </div>
+        
         </div>
 
         <div v-if="tab === 1" class="settings">
-          <div class="flex justify-between align-center">
-            <span>Background</span>
-            <Dropdown v-model="background.type" :options="backgrounds" @change="changeBackground()" />
+          <div class="section-main">
+            <div class="section-dialog">
+              <div class="flex justify-between align-center item">
+                <span>Background</span>
+                <div>
+                  <Dropdown v-model="background.type" :options="backgrounds" @change="changeBackground()" />
+                </div>
+              </div>
+              <div class="flex justify-between align-center item">
+                <span>Dark Mode</span>
+                <div>
+                  <Switch @click="settings.setTheme()" :state="settings.theme == 'dark'" />
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="flex justify-between align-center">
-            <span>Dark Mode</span>
-            <Switch @click="settings.setTheme()" :state="settings.theme == 'dark'" />
-          </div>
-          <div class="flex justify-between align-center">
-            <span>Select a mode</span>
-            <Dropdown v-model="settings.mode" :options="modes" @change="changeBackground()" />
-          </div>
-          <div class="flex justify-between align-center" v-if="settings.mode == 'Productivity'">
-            <span>Personalize</span>
-            <Switch @click="widgets.changeState" :state="widgets.state == true" />
+          <div class="separator"></div>
+          <div class="section-main">
+            <div class="section-dialog">
+              <div class="flex justify-between align-center item">
+                <span>Select a mode</span>
+                <div>
+                  <Dropdown v-model="settings.mode" :options="modes" @change="changeBackground()" />
+                </div>
+              </div>
+              <div class="flex justify-between align-center item" v-if="settings.mode == 'Productivity'">
+                <span>Personalize</span>
+                <div>
+                  <Switch @click="widgets.changeState" :state="widgets.state == true" />
+                </div>
+              </div>
+            </div>
           </div>
           
 
@@ -150,28 +179,23 @@ export default {
 </script>
 
 <style scoped>
-.contentDialog {
-  padding: 0 1rem;
-}
-
 .nav {
   background-color: var(--bg-secondary);
-  border-radius: .4rem;
-  padding: .2rem .3rem;
+  border-radius: .8rem;
+  padding: .2rem .2rem;
   display: flex;
   justify-content: space-around;
   gap: .3rem;
 }
 
 .main {
-  padding: 1.5rem 0;
+  padding: 1rem 0;
   font-size: .87rem;
 }
 
 .settings {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
 }
 
 .card {
@@ -182,5 +206,42 @@ export default {
 
 .card.active {
   box-shadow: 0 0 4px var(--text-color);
+}
+
+.section-main {
+  padding: 0 .8rem;
+}
+
+.section-dialog {
+  background-color: var(--bg-glass);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: .8rem;
+  padding: .4rem;
+}
+
+.separator {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.3);
+  height: 1px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.item {
+  padding: .4rem;
+  border-radius: .8rem;
+  height: 50px;
+}
+
+.item span {
+  font-size: .8rem;
+  font-weight: 100;
+}
+
+.item > div {
+  width: 100%;
+  max-width: 180px;
+  display: flex;
+  justify-content: end;
 }
 </style>
