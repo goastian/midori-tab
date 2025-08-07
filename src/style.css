@@ -8,10 +8,12 @@
   --bg-color: #fff;
   --bg-glass: rgba(255, 255, 255, 0.1);
   --bg-secondary: #dfdfdf;
+  --bg-glass-secondary: rgba(220, 220, 220, 0.4);
   --text-color: #202020;
+  --text-color: #404040;
   --border-color: rgba(0, 0, 0, .2);
 
-  --bg-blur: rgba(255, 255, 255, .4);
+  --bg-blur: rgba(180, 180, 180, .7);
   
   --blue: #2e72ac;
   --green: #269D73;
@@ -26,16 +28,18 @@
 }
 
 :root[data-theme = 'dark'] {
-  --bg-color: #202020;
-  --bg-glass: rgba(18, 18, 18, 0.4);
+  --bg-color: #303030;
+  --bg-glass: rgba(18, 18, 18, 0.3);
   --bg-secondary: #808080;
+  --bg-glass-secondary: rgba(38, 38, 38, 0.4);
   --text-color: #fff;
+  --text-color: #dfdfdf;
   --border-color: rgba(0, 0, 0, .2);
   
   --blue: #0d86d3;
   --green: #269D73;
 
-  --bg-blur: rgba(20, 20, 20, .4);
+  --bg-blur: rgba(10, 10, 10, .5);
 
   --gradient-orange: linear-gradient(135deg, #e0484c, #ff595e, #8b2c2f);
   --gradient-green: linear-gradient(135deg, #8dc63f, #3a5311);
