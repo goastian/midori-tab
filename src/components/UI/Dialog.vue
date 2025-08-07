@@ -3,35 +3,37 @@
     class="containerDialog"
     :class="{'show' : show}"
     @click="closeModal"
-  >
+  ></div>
     <div 
       class="dialog"
       :class="{'show' : show}"
       @click.stop
     >
+    <div class="container-header">
       <div class="header">
         <div class="title">
           <h2>{{ title}}</h2>
         </div>
         <Button
-          @click="closeModal"
-          icon="iconamoon:close-thin"
-          class="text-color"
-          size="22px"
-          flat
-          bound
+        @click="closeModal"
+        icon="iconamoon:close-thin"
+        class="text-color"
+        size="22px"
+        flat
+        bound
         />
         <div class="icon">
           <Icon :icon="icon"  width="80" height="80" />
         </div>
       </div>
+    </div>
+
       <div class="nav">
         <slot name="nav">
         </slot>
       </div>
       <slot></slot>
     </div>
-  </div>
 </template>
 
 <script>
@@ -61,6 +63,10 @@
     methods: {
       closeModal() {
         this.$emit('open')
+      },
+
+      openModel() {
+        this.$emit('open')
       }
     },
   }
@@ -71,33 +77,38 @@
   position: fixed;
   top: 0;
   right: 0;
-  width: 0%;
+  width: 100%;
   height: 100vh;
-  background-color: transparent;
   overflow: hidden;
   box-sizing: border-box;
-  transition: .3s ease-in-out background, 1s ease-in-out width;
+  font-size: 14px;
+  background-color: rgba(0, 0, 0, 0);
+  opacity: 0;
+  transition: background-color 0.3s ease, opacity 0.3s ease;
+  visibility: hidden;
 }
 
 .containerDialog.show {
-  width: 100%;
-  background-color: rgba(0, 0, 0, .4);
-  transition: 3s ease-in-out background, .6s ease-in-out width;
+  visibility: visible;
+  opacity: 1;
+  background-color: rgba(10, 10, 10, .4);
 }
 
 .dialog {
   width: 100%;
   min-width: 250px;
-  max-width: 490px;
+  max-width: 400px;
   height: calc(100% - .8rem);
-  position: absolute;
+  position: fixed;
   right: -400px;
-  background-color: var(--bg-color);
+  background-color: var(--bg-blur);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   color: var(--text-color);
-  border-radius: .6rem;
-  padding: .3rem;
+  border-radius: 1rem;
   margin: .4rem 0;
-  transition: 1s ease-in-out;
+  transition: 1s;
   display: flex;
   flex-direction: column;
   gap: .5rem;
@@ -107,6 +118,11 @@
   right: .4rem;
 }
 
+.container-header {
+  padding: .3rem;
+  height:180px;
+}
+
 .header {
   display: flex;
   flex-direction: column;
@@ -114,16 +130,15 @@
   background-image: url('https://images.unsplash.com/photo-1482192505345-5655af888cc4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzY2MDh8MHwxfHJhbmRvbXx8fHx8fHx8fDE3NDYwNTMxMDR8&ixlib=rb-4.0.3&q=80&w=1080');
   background-size: cover;
   background-position: center;
-  padding: .5rem;
-  border-radius: .4rem;
+  border-radius: .8rem;
   height: 100%;
-  min-height: 20px;
-  max-height: 200px;
   position: relative;
 }
 
 .header > button {
-  place-self: end;
+  position: absolute;
+  top: 10px;
+  right: 10px;
 }
 
 .title {
@@ -145,6 +160,7 @@
 
 .title > h2 {
   font-size: 1rem;
+  font-weight: 500;
 }
 
 .icon {
@@ -155,7 +171,7 @@
   height: 94px;
   background-color: var(--green);
   color: white;
-  border-radius: .4rem;
+  border-radius: .8rem;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -164,8 +180,9 @@
 .nav {
   width: 100%;
   min-width: 20px;
-  max-width: 330px;
+  max-width: 260px;
   align-self: end;
+  margin-right: .3rem;
 }
 
 </style>
