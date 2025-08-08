@@ -1,6 +1,11 @@
 <template>
   <div class="viewport" :class="{ 'bg-cl' : tabStore.theme !== 'light' }">
     <img :src="backgroundImage" class="background" v-if="tabStore.background.type == 'Unsplash'" />
+    <div class="credits" v-if="tabStore.background.type == 'Unsplash'">
+      📷 Photo by 
+      <a :href="imageAuthorLink" target="_blank" rel="noopener noreferrer">{{ imageAuthor }}</a> 
+      on <a :href="imageLink" target="_blank" rel="noopener noreferrer">Unsplash</a>
+    </div>
     <Minimalist v-if="tabStore.mode == 'Minimalist'" />
     <Informative v-if="tabStore.mode == 'Informative'" />
     <Production v-if="tabStore.mode == 'Productivity'" :key="gridKey"/>
@@ -23,7 +28,10 @@
         textColor: "black",
         tabStore: useTabStore(),
         widgets: useWidgets(),
-        gridKey: Date.now()
+        gridKey: Date.now(),
+        imageAuthor: "",
+        imageAuthorLink: "",
+        imageLink: "",
       }
     },
 
@@ -63,8 +71,10 @@
         try {
           const uns = new UnsService();
           await uns.setImagen();
-          const imageUrl = uns.getUrl();
-          this.backgroundImage = imageUrl;
+          this.backgroundImage = uns.getUrl();
+          this.imageAuthor = uns.getAuthor();
+          this.imageAuthorLink = uns.getAuthorLink();
+          this.imageLink = uns.getImageLink();
           
           // Si el fondo es una imagen, calcular su luminosidad
           if (this.backgroundImage) {
@@ -183,16 +193,25 @@
   pointer-events: none;
 }
 
-.bg-cl::after {
-  content: '';
-  width: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+.credits {
+  position: fixed;
   bottom: 0;
-  background-color: rgba(0, 0, 0, .12);
-  z-index: -2; /* Asegura que la capa esté por encima de la imagen pero debajo del texto */
+  left: 0;
+  font-size: .8rem;
+  color: white;
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  background-color: rgba(20, 20, 20, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: .4rem .6rem;
+  border-radius: 0 4px 0 0;
+  z-index: 3;
+}
+
+.credits a {
+  color: white;
+  text-decoration: underline;
 }
 
 .logo {
