@@ -86,6 +86,7 @@
   opacity: 0;
   transition: background-color 0.3s ease, opacity 0.3s ease;
   visibility: hidden;
+  z-index: 5;
 }
 
 .containerDialog.show {
@@ -112,6 +113,7 @@
   display: flex;
   flex-direction: column;
   gap: .5rem;
+  z-index: 6;
 }
 
 .dialog.show {
