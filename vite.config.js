@@ -1,5 +1,4 @@
 import { viteStaticCopy } from 'vite-plugin-static-copy'
-import webExtension from 'vite-plugin-web-extension'
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { resolve } from 'path'
@@ -21,9 +20,10 @@ export default defineConfig({
     })
   ],
   define: {
-    'process.env': {}
+    'process.env': {},
   },
   build: {
+    minify: 'esbuild',
     rollupOptions: {
       input: {
         popup: resolve(__dirname, 'index.html'),
