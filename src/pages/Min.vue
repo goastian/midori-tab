@@ -10,7 +10,7 @@
             
             <div class="contentMain">
                 <div class="search">
-                    <ZSearchWidget :searchTarget="tab.openLink" :logo="img" />
+                    <ZSearchWidget :searchTarget="tab.openLink" />
                 </div>
 
                 <div class="shortcuts">
@@ -95,6 +95,7 @@ export default {
 
 .contentMain > .search {
     width: 100%;
+    z-index: 2;
 }
 
 .contentMain > .shortcuts {
