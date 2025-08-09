@@ -8,99 +8,192 @@ const CACHE_INDEX = 'unsplash_cache_index';
 const screenWidth = window.innerWidth;
 
 class UnsplashService {
-  __url = '';
-  __autor = '';
-  __autorLink = '';
-  __imageLink = '';
-  __total = 10;
+  #url = '';
+  #author = '';
+  #authorLink = '';
+  #imageLink = '';
+  #total = 10;
 
   getUrl() {
-    return this.__url;
+    return this.#url;
   }
 
   getAuthor() {
-    return this.__autor;
+    return this.#author;
   }
 
   getAuthorLink() {
-    return this.__autorLink;
+    return this.#authorLink;
   }
 
   getImageLink() {
-    return this.__imageLink;
+    return this.#imageLink;
   }
 
   async setImagen() {
-    const now = Date.now();
-    const expiry = Number(localStorage.getItem(CACHE_EXPIRY)) || 0;
-    const index = Number(localStorage.getItem(CACHE_INDEX)) || 0;
-    const cachedList = JSON.parse(localStorage.getItem(CACHE_KEY_LIST) || '[]');
+    try {
+      const now = Date.now();
+      const expiry = Number(localStorage.getItem(CACHE_EXPIRY)) || 0;
+      const index = Number(localStorage.getItem(CACHE_INDEX)) || 0;
+      const cachedList = JSON.parse(localStorage.getItem(CACHE_KEY_LIST) || '[]');
 
-    const cache = await caches.open(CACHE_NAME);
+      const cache = await caches.open(CACHE_NAME);
 
-    if (now < expiry && cachedList.length > 0) {
-      const current = cachedList[index % cachedList.length];
-      const response = await cache.match(current.url);
-      if (response) {
-        const blob = await response.blob();
-        this.__url = URL.createObjectURL(blob);
-        this.__autor = current.author;
-        this.__autorLink = current.authorLink;
-        this.__imageLink = current.imagePage;
-
-        // Siguiente imagen para la próxima vez
-        localStorage.setItem(CACHE_INDEX, String((index + 1) % cachedList.length));
-        return;
+      /**
+       * Check if cache is still valid
+       */
+      if (now < expiry && cachedList.length > 0) {
+        const current = cachedList[index % cachedList.length];
+        const response = await cache.match(current.url);
+        if (response) {
+          await this.#loadFromCache(response, current);
+          localStorage.setItem(CACHE_INDEX, String((index + 1) % cachedList.length));
+          return;
+        }
       }
-    }
 
-    // 🚀 Caché expirado o vacío → traer nuevas imágenes
-    const { data } = await axios.get(`https://api.unsplash.com/photos`, {
-      params: {
-        client_id: import.meta.env.VITE_UNSPLASH_API,
-        per_page: this.__total,
-        page: 1,
-        orientation: 'landscape',
-        query: 'landscape',
+      /**
+       * 🚀 first loading image
+       */
+      const singleImage = await this.#fetchSingleImage();
+      if (singleImage) {
+        const blob = await this.#fetchAndCacheImage(singleImage.url);
+        if (blob) {
+          this.#url = URL.createObjectURL(blob);
+          this.#author = singleImage.author;
+          this.#authorLink = singleImage.authorLink;
+          this.#imageLink = singleImage.imagePage;
+        }
       }
-    });
 
-    const newList = [];
+      /**
+       * 🧠 In the background: preload the rest of the images.
+       */
+      this.#precacheImages();
 
-    for (const photo of data) {
-      const imageUrl = `${photo.urls.regular}?w=${screenWidth}&fit=crop&auto=format&q=80`;
-
-      newList.push({
-        url: imageUrl,
-        author: photo.user.name,
-        authorLink: photo.user.links.html,
-        imagePage: photo.links.html,
-      });
-
-      const response = await fetch(imageUrl);
-      if (response.ok) {
-        const blob = await response.blob();
-        await cache.put(imageUrl, new Response(blob));
-      }
-    }
-
-    // Guardar datos
-    localStorage.setItem(CACHE_KEY_LIST, JSON.stringify(newList));
-    localStorage.setItem(CACHE_INDEX, '1'); // siguiente
-    localStorage.setItem(CACHE_EXPIRY, String(now + 24 * 60 * 60 * 1000)); // 24h
-
-    // Usar el primero ahora
-    const first = newList[0];
-    const response = await cache.match(first.url);
-    if (response) {
-      const blob = await response.blob();
-      this.__url = URL.createObjectURL(blob);
-      this.__autor = first.author;
-      this.__autorLink = first.authorLink;
-      this.__imageLink = first.imagePage;
+    } catch (error) {
+      console.error('Error al establecer la imagen:', error);
     }
   }
 
+  /**
+   * Get images from cache if valid
+   */
+  async #loadFromCache(response, meta) {
+    const blob = await response.blob();
+    this.#url = URL.createObjectURL(blob);
+    this.#author = meta.author;
+    this.#authorLink = meta.authorLink;
+    this.#imageLink = meta.imagePage;
+  }
+
+  async #fetchSingleImage() {
+    try {
+      const { data } = await axios.get('https://api.unsplash.com/photos/random', {
+        params: {
+          client_id: import.meta.env.VITE_UNSPLASH_API,
+          orientation: 'landscape',
+          query: 'landscape',
+        }
+      });
+
+      const imageUrl = `${data.urls.regular}?w=${screenWidth}&fit=crop&auto=format&q=80`;
+
+      return {
+        url: imageUrl,
+        author: data.user.name,
+        authorLink: data.user.links.html,
+        imagePage: data.links.html,
+      };
+    } catch (error) {
+      console.error('Error al obtener una imagen aleatoria de Unsplash:', error);
+      return null;
+    }
+  }
+
+  async #fetchAndCacheImage(url) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const blob = await response.blob();
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(url, new Response(blob));
+        return blob;
+      }
+    } catch (error) {
+      console.warn(`Error al cachear la imagen: ${url}`, error);
+    }
+    return null;
+  }
+
+  async #precacheImages() {
+    try {
+      const { data } = await axios.get('https://api.unsplash.com/photos', {
+        params: {
+          client_id: import.meta.env.VITE_UNSPLASH_API,
+          per_page: this.#total,
+          page: 1,
+          orientation: 'landscape',
+          query: 'landscape',
+        }
+      });
+
+      const now = Date.now();
+      const newList = [];
+      const newUrls = [];
+      const cache = await caches.open(CACHE_NAME);
+
+      for (const photo of data) {
+        const imageUrl = `${photo.urls.regular}?w=${screenWidth}&fit=crop&auto=format&q=80`;
+
+        newList.push({
+          url: imageUrl,
+          author: photo.user.name,
+          authorLink: photo.user.links.html,
+          imagePage: photo.links.html,
+        });
+
+        newUrls.push(imageUrl);
+
+        try {
+          const response = await fetch(imageUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            await cache.put(imageUrl, new Response(blob));
+          }
+        } catch (error) {
+          console.warn(`Error cacheando imagen: ${imageUrl}`, error);
+        }
+      }
+
+      /**
+       * Clear old cache.
+       */
+      await this.#cleanOldUnsplashImages(cache, newUrls);
+
+      /**
+       * save info in localStorage
+       */
+      localStorage.setItem(CACHE_KEY_LIST, JSON.stringify(newList));
+      localStorage.setItem(CACHE_INDEX, '1');
+      localStorage.setItem(CACHE_EXPIRY, String(now + 24 * 60 * 60 * 1000)); // 24h
+    } catch (error) {
+      console.error('Error en la precarga de imágenes:', error);
+    }
+  }
+
+  async #cleanOldUnsplashImages(cache, validUrls) {
+    const keys = await cache.keys();
+    for (const request of keys) {
+      if (!validUrls.includes(request.url)) {
+        await cache.delete(request);
+      }
+    }
+  }
+
+  /**
+   * Clear cache manually.
+   */
   async clearCache() {
     await caches.delete(CACHE_NAME);
     localStorage.removeItem(CACHE_KEY_LIST);
