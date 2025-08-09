@@ -11,10 +11,6 @@ export default defineConfig({
         {
           src: 'manifest/manifest.json',
           dest: '.'
-        },
-        {
-          src: 'src/background.js',
-          dest: '.'
         }
       ]
     })
@@ -26,6 +22,7 @@ export default defineConfig({
     minify: 'esbuild',
     rollupOptions: {
       input: {
+        background: 'src/background.js',
         popup: resolve(__dirname, 'index.html'),
       },
       output: {
