@@ -8,7 +8,12 @@
     "newtab": "index.html"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "identity",
+    "storage",
+    "webRequest",
+    "webNavigation",
+    "tabs"
   ],
   "host_permissions": [
     "https://api.rss2json.com/*"
