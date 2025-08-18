@@ -95,6 +95,7 @@ button {
   justify-content: center;
   gap: .5rem;
   transition: .5s ease-in-out background;
+  color: var(--text-color);
 }
 
 .w-full {
