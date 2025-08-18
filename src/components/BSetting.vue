@@ -4,6 +4,7 @@
     icon="material-symbols-light:settings-outline-rounded" 
     iconSize="1.4rem"
     class="bg"
+    flat
     bound
   />
 </template>
