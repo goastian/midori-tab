@@ -107,34 +107,19 @@ class Authentification {
   async logout() {
     const tokenClass = new Token();
     const token = await tokenClass.getDecryptedToken();
-    chrome.storage.local.get(['server'], async (storage) => {
-      if (storage?.server) {
-        const res = await fetch(`${import.meta.env.VITE_PASSPORT_DOMAIN_SERVER}/api/v1/users/vpn/devices/${storage.server.id}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Accept: 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-        });
-
-        if (res) {
-          chrome.storage.local.remove(['server', 'store']);
-          const response = await fetch(`${import.meta.env.VITE_PASSPORT_SERVER}/api/gateway/logout`, {
-            method: 'POST',
-            headers: {
-              Accept: 'application/json',
-              Authorization: `Bearer ${token}`
-            }
-          })
-          if (response.ok) {
-            tokenClass.clearToken();
-            chrome.storage.local.clear();
-            window.close();
-          }
-        }
+    chrome.storage.local.remove(['server', 'store']);
+    const response = await fetch(`${import.meta.env.VITE_PASSPORT_SERVER}/api/gateway/logout`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`
       }
     })
+    if (response.ok) {
+      tokenClass.clearToken();
+      //chrome.storage.local.clear();
+    }
+        
   }
 }
 
