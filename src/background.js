@@ -8,7 +8,6 @@ const handlers = {
 //routes
 chrome.webNavigation.onCommitted.addListener(async (details) => {
   const url = new URL(details.url);
-  console.log(url)
   let hostUrl = import.meta.env.VITE_PASSPORT_PROXY_SERVER;
   let limpia = hostUrl.replace(/^https?:\/\//, '');
   if (url.hostname === limpia && url.pathname === "/callback") {
