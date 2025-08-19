@@ -8,7 +8,10 @@ const handlers = {
 //routes
 chrome.webNavigation.onCommitted.addListener(async (details) => {
   const url = new URL(details.url);
-  if (url.hostname === "proxy.astian.xyz" && url.pathname === "/callback") {
+  console.log(url)
+  let hostUrl = import.meta.env.VITE_PASSPORT_PROXY_SERVER;
+  let limpia = hostUrl.replace(/^https?:\/\//, '');
+  if (url.hostname === limpia && url.pathname === "/callback") {
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     if (code && state) {
