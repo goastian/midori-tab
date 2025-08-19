@@ -16,7 +16,8 @@
     "tabs"
   ],
   "host_permissions": [
-    "https://api.rss2json.com/*"
+    "https://api.rss2json.com/*",
+    "https://api.unsplash.com/*"
   ],
   "action": {
     "default_icon": {
