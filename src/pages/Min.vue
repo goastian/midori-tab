@@ -1,7 +1,7 @@
 <template>
     <div class="containerMin">
         <div class="top">
-            <b-setting :style="{ color: textColor }" />
+            <v-options />
         </div>
         <div class="content">
             <div class="contentTop">
@@ -29,18 +29,17 @@ export default {
     data() {
         return {
             img,
-            tab: useTabStore()
+            tab: useTabStore(),
         }
     },
     components: {
-        BSetting: defineAsyncComponent(() => import('../components/BSetting.vue')),
+        VOptions: defineAsyncComponent(() => import('../components/VOptions.vue')),
         Logo: defineAsyncComponent(() => import('../components/Logo.vue')),
         ZSearchWidget: defineAsyncComponent(() => import('zen-wdg').then(m => m.ZSearchWidget)),
         ZMarkedWidget: defineAsyncComponent(() => import('zen-wdg').then(m => m.ZMarkedWidget)),
     },
 
-    mounted() {
-
+    created() {
     },
 }
 </script>
