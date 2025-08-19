@@ -1,14 +1,15 @@
 {
   "name": "midori-newtab",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev:chrome": "npm run build:manifest:chrome && vite build --watch",
+    "dev:firefox": "npm run build:manifest:firefox && vite build --watch",
     "build:manifest:chrome": "node build-manifest.js manifest/chrome.json",
     "build:manifest:firefox": "node build-manifest.js manifest/firefox.json",
-    "build-chome": "npm run build:manifest:chrome vite build --watch",
-    "build-firefox": "npm run build:manifest:firefox && vite build --watch",
+    "build:chome": "npm run build:manifest:chrome vite build",
+    "build:firefox": "npm run build:manifest:firefox && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -22,9 +23,13 @@
     "zen-wdg": "^2.2.7"
   },
   "devDependencies": {
+    "@types/chrome": "^0.1.3",
+    "@types/firefox-webext-browser": "^120.0.4",
     "@vitejs/plugin-vue": "^6.0.0",
+    "typescript": "^5.9.2",
     "vite": "^7.0.4",
     "vite-plugin-static-copy": "^3.1.1",
-    "vite-plugin-web-extension": "^4.4.5"
+    "vite-plugin-web-extension": "^4.4.5",
+    "vue-tsc": "^3.0.5"
   }
 }

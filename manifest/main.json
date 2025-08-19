@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "midori-tab",
   "description": "",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "author": "Im-Jota",
   "chrome_url_overrides": {
     "newtab": "index.html"
