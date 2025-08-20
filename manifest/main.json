@@ -10,7 +10,6 @@
   "permissions": [
     "storage",
     "identity",
-    "storage",
     "webRequest",
     "webNavigation",
     "tabs"
