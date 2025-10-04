@@ -5,7 +5,7 @@ Midori Tab replaces the default new tab experience with a fast, privacy-friendly
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 [![Built by Astian](https://img.shields.io/badge/Built%20by-Astian-brightgreen.svg)](https://astian.org)
-[![Midori Browser](https://img.shields.io/badge/Midori-Browser-00b894.svg)](https://midori-browser.org)
+[![Midori Browser](https://img.shields.io/badge/Midori-Browser-00b894.svg)](https://astian.org/midori-browser)
 [Midori Tab](https://ads.fund/token/0xadf23815aa9f95b19e62d3aa588df5c2d41d4999)
 
 ---
