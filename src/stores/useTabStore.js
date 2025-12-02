@@ -10,7 +10,7 @@ const useTabStore = defineStore('tabStore', {
       class: 'bg-orange',
     },
     shortcuts: true,
-    state: true,
+    state: false,
     openLink: 'Self Tab',
     mode: 'Minimalist',
   }),
@@ -76,6 +76,7 @@ const useTabStore = defineStore('tabStore', {
   persist: {
     enable: true,
     storage: localStorage,
+    paths: ['tabName', 'theme', 'background', 'shortcuts', 'openLink', 'mode'],
   }
 })
 
