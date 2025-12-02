@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "midori-tab",
   "description": "",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "author": "Im-Jota",
   "chrome_url_overrides": {
     "newtab": "index.html"
@@ -12,11 +12,37 @@
     "identity",
     "webRequest",
     "webNavigation",
-    "tabs"
+    "tabs",
+    "history",
+    "bookmarks",
+    "scripting"
   ],
   "host_permissions": [
     "https://api.rss2json.com/*",
-    "https://api.unsplash.com/*"
+    "https://api.unsplash.com/*",
+    "<all_urls>"
+  ],
+  "commands": {
+    "toggle-command-palette": {
+      "suggested_key": {
+        "default": "Ctrl+Alt+Space",
+        "mac": "Command+Alt+Space"
+      },
+      "description": "Abrir paleta de comandos"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content-script.js"
+      ],
+      "run_at": "document_end",
+      "all_frames": false
+    }
   ],
   "action": {
     "default_icon": {
@@ -29,5 +55,16 @@
     "16": "icons/16.png",
     "48": "icons/48.png",
     "128": "icons/128.png"
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "midoritabs@astian.org",
+      "strict_min_version": "109.0"
+    }
   }
 }

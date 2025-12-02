@@ -1,12 +1,11 @@
 {
   "background": {
-    "scripts": ["background.js"],
-    "type": "module"
+    "scripts": ["background.js"]
   },
   "browser_specific_settings": {
     "gecko": {
       "id": "midoritabs@astian.org",
-      "strict_min_version": "114.0"
+      "strict_min_version": "109.0"
     }
   }
 }
