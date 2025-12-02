@@ -10,6 +10,7 @@
     <Informative v-if="tabStore.mode == 'Informative'" />
     <Production v-if="tabStore.mode == 'Productivity'" :key="gridKey"/>
     <Settings :style="{color: textColor }" />
+    <CommandPalette />
   </div>
 </template>
 
@@ -18,6 +19,10 @@
   import useTabStore from './stores/useTabStore.js';
   import UnsService from './services/UnsService.js';
   import useWidgets from './stores/useWidgets.js';
+  import useCommandsStore from './stores/useCommandsStore.js';
+  import CommandPalette from './components/CommandPalette.vue';
+  import { useCommands } from './composables/useCommands.js';
+  import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts.js';
 
   export default {
     data() {
@@ -25,10 +30,11 @@
         loaded: true,
         canvas: null,
         backgroundImage: "",
-        textColor: "black",
+        textColor: 'white',
         tabStore: useTabStore(),
         widgets: useWidgets(),
-        gridKey: Date.now(),
+        gridKey: 0,
+        keyboardShortcutsCleanup: null,
         imageAuthor: "",
         imageAuthorLink: "",
         imageLink: "",
@@ -52,6 +58,7 @@
       Informative: defineAsyncComponent(() => import('./pages/Info.vue')),
       Production: defineAsyncComponent(() => import('./pages/Prod.vue')),
       Settings: defineAsyncComponent(() => import('./components/Settings.vue')),
+      CommandPalette,
     },
 
     mounted() {
@@ -59,6 +66,21 @@
       this.loadSettings();
       if(this.tabStore.mode == "Productivity") {
         this.widgets.loadWidgets();
+      }
+      
+      // Inicializar commandsStore si no existe
+      const commandsStore = useCommandsStore();
+      if (!commandsStore.shortcuts.openCommandPalette) {
+        commandsStore.resetAllShortcuts();
+      }
+      
+      this.setupKeyboardShortcuts();
+    },
+
+    beforeUnmount() {
+      // Limpiar event listeners
+      if (this.keyboardShortcutsCleanup) {
+        this.keyboardShortcutsCleanup();
       }
     },
 
@@ -143,6 +165,46 @@
           return (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
         }
         return 0.5; // Retornar un valor medio por defecto si no se puede calcular
+      },
+
+      setupKeyboardShortcuts() {
+        const { toggleCommandPalette } = useCommands();
+        const commandsStore = useCommandsStore();
+        
+        // Configurar atajos de teclado desde el store
+        const shortcuts = [];
+
+        // Atajo para abrir paleta de comandos
+        if (commandsStore.shortcuts.openCommandPalette.enabled) {
+          const paletteShortcut = commandsStore.shortcuts.openCommandPalette;
+          shortcuts.push({
+            key: paletteShortcut.key,
+            ctrl: paletteShortcut.ctrl,
+            alt: paletteShortcut.alt,
+            shift: paletteShortcut.shift,
+            callback: (e) => {
+              toggleCommandPalette();
+            },
+            allowInInput: false,
+          });
+        }
+
+        // Atajo para abrir configuración
+        if (commandsStore.shortcuts.openSettings.enabled) {
+          const settingsShortcut = commandsStore.shortcuts.openSettings;
+          shortcuts.push({
+            key: settingsShortcut.key,
+            ctrl: settingsShortcut.ctrl,
+            alt: settingsShortcut.alt,
+            shift: settingsShortcut.shift,
+            callback: (e) => {
+              this.tabStore.updateState();
+            },
+            allowInInput: false,
+          });
+        }
+        const result = useKeyboardShortcuts(shortcuts);
+        this.keyboardShortcutsCleanup = result.cleanup;
       },
 
     }

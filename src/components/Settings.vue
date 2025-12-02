@@ -91,6 +91,44 @@
             </div>
           </div>
         </div>
+
+        <div v-if="tab === 2" class="shortcuts-tab">
+          <div class="section-main">
+            <h3 class="section-title">⌨️ Atajos de Teclado</h3>
+            <p class="section-description">
+              Personaliza los atajos de teclado para acceder rápidamente a las funciones.
+            </p>
+            
+            <ShortcutEditor
+              title="Abrir Paleta de Comandos"
+              :shortcut="commandsStore.shortcuts.openCommandPalette"
+              shortcutName="openCommandPalette"
+              @update="updateShortcut"
+              @reset="resetShortcut"
+            />
+
+            <ShortcutEditor
+              title="Abrir Configuración"
+              :shortcut="commandsStore.shortcuts.openSettings"
+              shortcutName="openSettings"
+              @update="updateShortcut"
+              @reset="resetShortcut"
+            />
+
+            <div class="shortcuts-info">
+              <p class="info-text">
+                💡 <strong>Consejo:</strong> Haz clic en el cuadro del atajo y presiona la combinación de teclas que deseas usar.
+              </p>
+              <p class="info-text">
+                ⚠️ <strong>Nota:</strong> Debes usar al menos una tecla modificadora (Ctrl, Alt, Shift).
+              </p>
+            </div>
+
+            <button @click="resetAllShortcuts" class="reset-all-btn">
+              Resetear Todos los Atajos
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </Dialog>
@@ -102,8 +140,10 @@ import Dialog from './UI/Dialog.vue';
 import Switch from './UI/Switch.vue';
 import Dropdown from './UI/Dropdown.vue';
 import Input from './UI/Input.vue';
+import ShortcutEditor from './ShortcutEditor.vue';
 import useTabStore from '../stores/useTabStore.js';
 import useWidgets from '../stores/useWidgets.js';
+import useCommandsStore from '../stores/useCommandsStore.js';
 
 export default {
   data() {
@@ -112,6 +152,7 @@ export default {
       tab: 0,
       settings: useTabStore(),
       widgets: useWidgets(),
+      commandsStore: useCommandsStore(),
       background: {
         type: null,
         default: true,
@@ -128,6 +169,10 @@ export default {
           title: 'Visual',
           icon: "material-symbols-light:palette-outline",
         },
+        {
+          title: 'Atajos',
+          icon: "material-symbols:keyboard-outline",
+        },
       ],
       openLinks: ['Self Tab', 'New Tab'],
       gradients: ['bg-orange', 'bg-green', 'bg-deal', 'bg-purple'],
@@ -142,6 +187,7 @@ export default {
     Switch,
     Input,
     Dropdown,
+    ShortcutEditor,
   },
 
   mounted() {
@@ -173,6 +219,32 @@ export default {
         this.background.class = clas;
       }
       this.settings.changeBackground(this.background);
+    },
+
+    updateShortcut(shortcutName, shortcutConfig) {
+      this.commandsStore.updateShortcut(shortcutName, shortcutConfig);
+      // Recargar la página para aplicar los nuevos atajos
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    },
+
+    resetShortcut(shortcutName) {
+      this.commandsStore.resetShortcut(shortcutName);
+      // Recargar la página para aplicar los atajos reseteados
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    },
+
+    resetAllShortcuts() {
+      if (confirm('¿Estás seguro de que quieres resetear todos los atajos a sus valores por defecto?')) {
+        this.commandsStore.resetAllShortcuts();
+        // Recargar la página para aplicar los atajos reseteados
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      }
     },
   }
 }
@@ -243,5 +315,62 @@ export default {
   max-width: 180px;
   display: flex;
   justify-content: end;
+}
+
+.shortcuts-tab {
+  padding: 1rem 0;
+}
+
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 0.5rem;
+}
+
+.section-description {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.shortcuts-info {
+  background: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1.5rem 0;
+}
+
+.info-text {
+  color: var(--text-color);
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+  line-height: 1.5;
+}
+
+.info-text strong {
+  font-weight: 600;
+}
+
+.reset-all-btn {
+  width: 100%;
+  padding: 0.8rem 1.5rem;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  margin-top: 1rem;
+}
+
+.reset-all-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.6);
+  transform: translateY(-2px);
 }
 </style>
