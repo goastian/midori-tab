@@ -8,7 +8,7 @@
     "dev:firefox": "npm run build:manifest:firefox && vite build --watch",
     "build:manifest:chrome": "node build-manifest.js manifest/chrome.json",
     "build:manifest:firefox": "node build-manifest.js manifest/firefox.json",
-    "build:chome": "npm run build:manifest:chrome vite build",
+    "build:chrome": "npm run build:manifest:chrome vite build",
     "build:firefox": "npm run build:manifest:firefox && vite build",
     "preview": "vite preview"
   },
