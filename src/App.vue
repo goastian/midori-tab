@@ -9,7 +9,7 @@
     <Minimalist v-if="tabStore.mode == 'Minimalist'" />
     <Informative v-if="tabStore.mode == 'Informative'" />
     <Production v-if="tabStore.mode == 'Productivity'" :key="gridKey"/>
-    <Settings :style="{color: textColor }" />
+    <SettingsModal />
     <CommandPalette />
   </div>
 </template>
@@ -57,7 +57,7 @@
       Minimalist: defineAsyncComponent(() => import('./pages/Min.vue')),
       Informative: defineAsyncComponent(() => import('./pages/Info.vue')),
       Production: defineAsyncComponent(() => import('./pages/Prod.vue')),
-      Settings: defineAsyncComponent(() => import('./components/Settings.vue')),
+      SettingsModal: defineAsyncComponent(() => import('./components/SettingsModal.vue')),
       CommandPalette,
     },
 
