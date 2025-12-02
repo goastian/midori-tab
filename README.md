@@ -29,6 +29,7 @@ Midori Tab replaces the default new tab experience with a fast, privacy-friendly
 
 Midori Tab brings a new level of personalization and performance to your browsing experience:
 
+- 🎯 **Global Command Palette** – Access commands, search history, bookmarks, and open apps from **ANYWHERE** with `Ctrl+Alt+Space`. Works on any website, not just the new tab!
 - 🧩 **Customizable Interface** – Personalize your new tab with themes, widgets, and shortcuts.  
 - ⚡ **Lightweight & Fast** – Optimized for performance and low resource usage.  
 - 🪶 **Modern Stack** – Built using **Vue**, **TypeScript**, and **Vite**.  
