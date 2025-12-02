@@ -105,7 +105,7 @@
             const data = pixels.data;
             let r = 0, g = 0, b = 0;
             
-            // Recorremospadding los píxeles para obtener el promedio de R, G, B
+            // Recorremos padding los píxeles para obtener el promedio de R, G, B
             for (let i = 0; i < data.length; i += 4) {
               r += data[i];     // Red
               g += data[i + 1]; // Green
@@ -129,7 +129,7 @@
         this.textColor = luminance < 0.5 ? 'white' : 'black';
       },
 
-      // Función para campaddingbiar el color del texto si el fondo es un color sólido
+      // Función para cambiar el color del texto si el fondo es un color sólido
       updateTextColorForSolidBackground(color) {
         const luminance = this.calculateLuminanceForColor(color);
         this.textColor = luminance < 0.5 ? 'white' : 'black';
