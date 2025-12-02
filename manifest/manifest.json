@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "midori-tab",
-  "description": "A lightweight, fast, and productivity-oriented new tab.",
+  "description": "",
   "version": "1.0.5",
   "author": "Im-Jota",
   "chrome_url_overrides": {
@@ -29,17 +29,5 @@
     "16": "icons/16.png",
     "48": "icons/48.png",
     "128": "icons/128.png"
-  },
-  "background": {
-    "scripts": [
-      "background.js"
-    ],
-    "type": "module"
-  },
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "midoritabs@astian.org",
-      "strict_min_version": "114.0"
-    }
   }
 }
