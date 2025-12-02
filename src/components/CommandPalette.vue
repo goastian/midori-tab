@@ -53,6 +53,26 @@
 
           <!-- Default State -->
           <div v-else-if="!searchQuery" class="default-state">
+            <!-- Comandos personalizados del usuario -->
+            <div v-if="customCommands.length > 0" class="custom-commands-section">
+              <div class="section-header">
+                <span class="section-icon">⭐</span>
+                <h3 class="section-title">Tus Atajos</h3>
+              </div>
+              <div class="custom-commands-list">
+                <div
+                  v-for="cmd in customCommands.slice(0, 6)"
+                  :key="cmd.id"
+                  class="mini-command custom"
+                  @click="executeCommand(cmd)"
+                >
+                  <span>{{ cmd.icon || '🔗' }}</span>
+                  <span>{{ cmd.name }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Categorías predefinidas -->
             <div class="categories-grid">
               <div
                 v-for="category in categoryGroups"
@@ -99,8 +119,9 @@
 </template>
 
 <script>
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, computed } from 'vue';
 import { useCommands } from '../composables/useCommands.js';
+import useCommandsStore from '../stores/useCommandsStore.js';
 
 export default {
   name: 'CommandPalette',
@@ -120,7 +141,11 @@ export default {
       executeSelected,
     } = useCommands();
 
+    const commandsStore = useCommandsStore();
     const searchInput = ref(null);
+    
+    // Obtener comandos personalizados del store
+    const customCommands = computed(() => commandsStore.customCommands);
 
     // Categorías con sus labels e iconos
     const categoryGroups = [
@@ -178,6 +203,7 @@ export default {
       isSearching,
       searchInput,
       categoryGroups,
+      customCommands,
       handleSearch,
       executeCommand,
       closeCommandPalette,
@@ -391,6 +417,36 @@ export default {
   max-height: 450px;
 }
 
+.custom-commands-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.section-icon {
+  font-size: 1.2rem;
+}
+
+.section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.custom-commands-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
 .categories-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -450,6 +506,16 @@ export default {
 .mini-command:hover {
   background: rgba(255, 255, 255, 0.12);
   transform: translateX(4px);
+}
+
+.mini-command.custom {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.mini-command.custom:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 .spinner {

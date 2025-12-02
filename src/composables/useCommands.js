@@ -367,6 +367,27 @@ export function useCommands() {
     );
   };
 
+  // Buscar comandos personalizados
+  const searchCustomCommands = (query) => {
+    const commandsStore = useCommandsStore();
+    const lowerQuery = query.toLowerCase();
+    const openInNewTab = commandsStore.settings.openInNewTab;
+    
+    return commandsStore.customCommands
+      .filter(cmd => 
+        cmd.name.toLowerCase().includes(lowerQuery) ||
+        cmd.url.toLowerCase().includes(lowerQuery) ||
+        (cmd.description && cmd.description.toLowerCase().includes(lowerQuery)) ||
+        (cmd.keywords && cmd.keywords.some(keyword => keyword.toLowerCase().includes(lowerQuery)))
+      )
+      .map(cmd => ({
+        ...cmd,
+        action: () => {
+          openUrl(cmd.url, { newTab: openInNewTab });
+        },
+      }));
+  };
+
   // Búsqueda combinada
   const performSearch = async (query) => {
     if (!query || query.trim() === '') {
@@ -378,8 +399,9 @@ export function useCommands() {
     selectedIndex.value = 0;
 
     try {
-      const [commands, history, bookmarks, tabs] = await Promise.all([
+      const [commands, customCommands, history, bookmarks, tabs] = await Promise.all([
         Promise.resolve(searchCommands(query)),
+        Promise.resolve(searchCustomCommands(query)),
         searchHistory(query),
         searchBookmarks(query),
         searchTabs(query),
@@ -388,6 +410,7 @@ export function useCommands() {
       // Combinar y ordenar resultados
       const allResults = [
         ...commands.map(cmd => ({ ...cmd, score: 100 })),
+        ...customCommands.map(cmd => ({ ...cmd, score: 95 })), // Alta prioridad para comandos personalizados
         ...bookmarks.map(bm => ({ ...bm, score: 80 })),
         ...tabs.map(tab => ({ ...tab, score: 70 })),
         ...history.map(hist => ({ ...hist, score: 50 })),
@@ -407,8 +430,17 @@ export function useCommands() {
 
   // Ejecutar comando seleccionado
   const executeCommand = (command) => {
-    if (command && command.action) {
-      command.action();
+    if (command) {
+      // Si tiene action, ejecutarla
+      if (command.action) {
+        command.action();
+      } 
+      // Si es un comando personalizado sin action pero con URL
+      else if (command.url && command.custom) {
+        const commandsStore = useCommandsStore();
+        const openInNewTab = commandsStore.settings.openInNewTab;
+        openUrl(command.url, { newTab: openInNewTab });
+      }
       closeCommandPalette();
     }
   };
@@ -485,5 +517,6 @@ export function useCommands() {
     searchBookmarks,
     searchTabs,
     searchCommands,
+    searchCustomCommands,
   };
 }
