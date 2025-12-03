@@ -43,6 +43,7 @@
 import img from '../assets/favicon.png';
 import { defineAsyncComponent } from 'vue';
 import useTabStore from '../stores/useTabStore';
+import rssCacheService from '../services/RssCacheService.js';
 export default {
     data() {
         return {
@@ -65,20 +66,28 @@ export default {
 
     methods: {
         async loadNews() {
-            const feedData = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=https://feeds.bbci.co.uk/news/rss.xml`)
-                .then(res => res.json())
-            this.feedTitle = feedData.feed.title;
-            if (this.feedTitle == 'BBC News') {
-                this.news = feedData.items.map(it => {
-                    const updatedUrl = it.thumbnail.replace(/\/(\d{2,4})\//, `/1920/`);
-
-                    console.log("Original:", it.thumbnail);
-                    console.log("Mejorado:", updatedUrl);
-                    return {
-                        ...it,
-                        thumbnail: updatedUrl
-                    };
-                });
+            try {
+                // Usar servicio de caché optimizado
+                const feedData = await rssCacheService.getFeed('https://feeds.bbci.co.uk/news/rss.xml');
+                
+                this.feedTitle = feedData.feed.title;
+                
+                if (feedData.fromCache) {
+                    console.log(`✅ BBC News loaded from cache (${Math.round(feedData.cacheAge / 1000)}s old)`);
+                }
+                
+                if (this.feedTitle == 'BBC News') {
+                    this.news = feedData.items.map(it => {
+                        // Optimizar URL de thumbnail a 1920px
+                        const updatedUrl = it.thumbnail ? it.thumbnail.replace(/\/(\d{2,4})\//, `/1920/`) : '';
+                        return {
+                            ...it,
+                            thumbnail: updatedUrl
+                        };
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading BBC News:', error);
             }
         },
 

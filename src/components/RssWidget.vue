@@ -73,6 +73,8 @@
 </template>
 
 <script>
+import rssCacheService from '../services/RssCacheService.js';
+
 export default {
   name: 'RssWidget',
   data() {
@@ -146,7 +148,7 @@ export default {
   },
   
   methods: {
-    async loadFeed() {
+    async loadFeed(forceRefresh = false) {
       this.loading = true;
       this.error = null;
       
@@ -154,10 +156,16 @@ export default {
       this.feedUrl = currentFeed.url;
       
       try {
-        const feedData = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${this.feedUrl}`)
-                        .then(res => res.json())
+        // Usar servicio de caché optimizado
+        const feedData = await rssCacheService.getFeed(this.feedUrl, forceRefresh);
+        
         this.feedTitle = feedData.feed.title;
         this.feedItems = feedData.items;
+        
+        // Log si viene de caché (solo en desarrollo)
+        if (feedData.fromCache) {
+          console.log(`✅ RSS loaded from cache (${Math.round(feedData.cacheAge / 1000)}s old)`);
+        }
       } catch (error) {
         this.error = error.message;
         console.error('Error loading RSS feed:', error);
@@ -209,7 +217,8 @@ export default {
     },
     
     refreshFeed() {
-      this.loadFeed();
+      // Forzar actualización ignorando caché
+      this.loadFeed(true);
     },
     
     openLink(url) {
