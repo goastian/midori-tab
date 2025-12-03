@@ -1,8 +1,5 @@
 <template>
     <div class="containerInfo">
-        <div class="top">
-            <b-setting :style="{ color: textColor }" />
-        </div>
         <div class="content">
             <div class="contentTop">
                 <Logo />
@@ -35,6 +32,10 @@
                     </a>
                 </template>
             </div>
+        </div>
+        
+        <div class="bottom">
+            <b-setting :style="{ color: textColor }" />
         </div>
     </div>
 </template>
@@ -110,12 +111,11 @@ export default {
     font-size: 13px;
 }
 
-.top {
-    width: 100%;
-    height: 10%;
-    display: flex;
-    justify-content: end;
-    align-items: center;
+.bottom {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    z-index: 100;
 }
 
 .content {

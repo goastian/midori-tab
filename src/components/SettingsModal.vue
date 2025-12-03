@@ -1,8 +1,9 @@
 <template>
   <Teleport to="body">
-    <Transition name="fade">
+    <Transition name="slide-up">
       <div v-if="settings.state" class="settings-overlay" @click="closeSettings">
-        <div class="settings-modal" @click.stop>
+        <Transition name="modal-slide">
+          <div v-if="settings.state" class="settings-modal" @click.stop>
           <!-- Header -->
           <div class="settings-header">
             <div class="header-content">
@@ -14,23 +15,34 @@
             </button>
           </div>
 
-          <!-- Navigation Tabs -->
-          <div class="settings-nav">
-            <button
-              v-for="(item, index) in navs"
-              :key="index"
-              @click="changeTab(index)"
-              :class="['nav-btn', { active: index === tab }]"
-            >
-              <span class="nav-icon">{{ item.emoji }}</span>
-              <span class="nav-text">{{ item.title }}</span>
-            </button>
-          </div>
+          <!-- Main Content Area -->
+          <div class="settings-body">
+            <!-- Sidebar Navigation -->
+            <aside class="settings-sidebar">
+              <nav class="sidebar-nav">
+                <button
+                  v-for="(item, index) in navs"
+                  :key="index"
+                  @click="changeTab(index)"
+                  :class="['sidebar-item', { active: index === tab }]"
+                >
+                  <span class="sidebar-icon">{{ item.emoji }}</span>
+                  <div class="sidebar-content">
+                    <span class="sidebar-title">{{ item.title }}</span>
+                    <span class="sidebar-description">{{ item.description }}</span>
+                  </div>
+                </button>
+              </nav>
+            </aside>
 
-          <!-- Content -->
-          <div class="settings-content">
+            <!-- Content Panel -->
+            <div class="settings-content">
             <!-- General Tab -->
             <div v-if="tab === 0" class="settings-section">
+              <div class="section-header">
+                <h3 class="section-title-main">General</h3>
+                <p class="section-subtitle">Customize your dashboard</p>
+              </div>
               <div class="setting-item">
                 <div class="setting-info">
                   <span class="setting-label">Shortcuts</span>
@@ -58,6 +70,10 @@
 
             <!-- Visual Tab -->
             <div v-if="tab === 1" class="settings-section">
+              <div class="section-header">
+                <h3 class="section-title-main">Visual</h3>
+                <p class="section-subtitle">Themes and appearance</p>
+              </div>
               <div class="setting-item">
                 <div class="setting-info">
                   <span class="setting-label">Fondo</span>
@@ -152,6 +168,7 @@
               <CustomShortcutsManager />
             </div>
           </div>
+          </div>
 
           <!-- Footer -->
           <div class="settings-footer">
@@ -159,7 +176,8 @@
               <kbd>ESC</kbd> Cerrar
             </div>
           </div>
-        </div>
+          </div>
+        </Transition>
       </div>
     </Transition>
   </Teleport>
@@ -204,18 +222,22 @@ export default {
         {
           title: 'General',
           emoji: '⚙️',
+          description: 'Customize your dashboard',
         },
         {
           title: 'Visual',
           emoji: '🎨',
+          description: 'Themes and appearance',
         },
         {
           title: 'Atajos',
           emoji: '⌨️',
+          description: 'Keyboard shortcuts',
         },
         {
           title: 'Personalizados',
           emoji: '🔗',
+          description: 'Custom shortcuts',
         },
       ],
       openLinks: ['Self Tab', 'New Tab'],
@@ -305,26 +327,27 @@ export default {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-end;
+  justify-content: flex-start;
   z-index: 9999;
-  animation: fadeIn 0.2s ease;
+  padding: 0;
 }
 
 .settings-modal {
-  width: 90%;
-  max-width: 700px;
-  max-height: 85vh;
+  width: 900px;
+  max-width: 90vw;
+  height: 90vh;
   background: var(--bg-glass, rgba(255, 255, 255, 0.1));
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -10px 60px rgba(0, 0, 0, 0.3);
   overflow: hidden;
-  animation: slideDown 0.3s ease;
   display: flex;
   flex-direction: column;
+  margin-left: 1rem;
+  margin-bottom: 0;
 }
 
 .settings-header {
@@ -373,40 +396,73 @@ export default {
   transform: scale(1.05);
 }
 
-.settings-nav {
+.settings-body {
   display: flex;
-  gap: 0.5rem;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  overflow-x: auto;
+  flex: 1;
+  overflow: hidden;
 }
 
-.nav-btn {
+.settings-sidebar {
+  width: 240px;
+  background: rgba(0, 0, 0, 0.2);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-nav {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-direction: column;
+  padding: 0.5rem;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: transparent;
+  border: none;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   color: var(--text-color, white);
+  text-align: left;
+  margin-bottom: 0.25rem;
+}
+
+.sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-item.active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sidebar-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.sidebar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-title {
+  font-weight: 500;
   font-size: 0.9rem;
-  white-space: nowrap;
+  color: var(--text-color, white);
 }
 
-.nav-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.nav-btn.active {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.4);
-}
-
-.nav-icon {
-  font-size: 1.1rem;
+.sidebar-description {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.3;
 }
 
 .settings-content {
@@ -419,6 +475,23 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.section-header {
+  margin-bottom: 0.5rem;
+}
+
+.section-title-main {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text-color, white);
+  margin: 0 0 0.3rem 0;
+}
+
+.section-subtitle {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
 }
 
 .setting-item {
@@ -585,64 +658,87 @@ export default {
 }
 
 /* Scrollbar personalizado */
-.settings-content::-webkit-scrollbar {
+.settings-content::-webkit-scrollbar,
+.settings-sidebar::-webkit-scrollbar {
   width: 6px;
 }
 
-.settings-content::-webkit-scrollbar-track {
+.settings-content::-webkit-scrollbar-track,
+.settings-sidebar::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 3px;
 }
 
-.settings-content::-webkit-scrollbar-thumb {
+.settings-content::-webkit-scrollbar-thumb,
+.settings-sidebar::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 3px;
 }
 
-.settings-content::-webkit-scrollbar-thumb:hover {
+.settings-content::-webkit-scrollbar-thumb:hover,
+.settings-sidebar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
 
 /* Animaciones */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.slide-up-enter-active {
+  transition: opacity 0.3s ease;
 }
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.slide-up-leave-active {
+  transition: opacity 0.25s ease;
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
+.slide-up-enter-from,
+.slide-up-leave-to {
   opacity: 0;
+}
+
+.modal-slide-enter-active {
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-slide-leave-active {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modal-slide-enter-from {
+  transform: translateY(100%);
+}
+
+.modal-slide-leave-to {
+  transform: translateY(100%);
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .settings-modal {
-    width: 95%;
-    max-height: 90vh;
+    width: 100vw;
+    max-width: 100vw;
+    height: 95vh;
+    margin-left: 0;
+    border-radius: 16px 16px 0 0;
   }
 
-  .settings-nav {
+  .settings-body {
+    flex-direction: column;
+  }
+
+  .settings-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    max-height: 150px;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
     overflow-x: auto;
+    padding: 0.5rem;
+  }
+
+  .sidebar-item {
+    min-width: 140px;
   }
 
   .gradients-grid {

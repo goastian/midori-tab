@@ -1,10 +1,5 @@
 <template>
   <div class="containerProd">
-    <!-- Header con botón de configuración -->
-    <div class="top">
-      <b-setting />
-    </div>
-
     <!-- Indicador de modo edición -->
     <Transition name="slide-down">
       <div v-if="widgets.state" class="edit-mode-banner">
@@ -128,6 +123,11 @@
           </div>
         </div>
       </div>
+    </div>
+    
+    <!-- Botón de configuración en la esquina inferior izquierda -->
+    <div class="bottom">
+      <b-setting />
     </div>
   </div>
 </template>
@@ -366,14 +366,11 @@ export default {
   position: relative;
 }
 
-.top {
-  width: 100%;
-  height: 10%;
-  display: flex;
-  justify-content: end;
-  align-items: center;
-  margin-bottom: 1rem;
-  z-index: 50;
+.bottom {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 100;
 }
 
 /* ===== BANNER DE MODO EDICIÓN ===== */

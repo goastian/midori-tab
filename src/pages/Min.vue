@@ -1,8 +1,5 @@
 <template>
     <div class="containerMin">
-        <div class="top">
-            <v-options />
-        </div>
         <div class="content">
             <div class="contentTop">
                 <Logo />
@@ -17,6 +14,10 @@
                     <ZMarkedWidget :theme="tab.theme" small useStorage :open="tab.openLink"/>
                 </div>
             </div>
+        </div>
+        
+        <div class="bottom">
+            <v-options />
         </div>
     </div>
 </template>
@@ -55,12 +56,11 @@ export default {
     font-size: 13px;
 }
 
-.top {
-    width: 100%;
-    height: 10%;
-    display: flex;
-    justify-content: end;
-    align-items: center;
+.bottom {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    z-index: 100;
 }
 
 .content {
