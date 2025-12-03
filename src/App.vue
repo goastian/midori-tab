@@ -106,37 +106,68 @@
         }
       },
 
-      // Función para calcular la luminosidad de una imagen
+      // Función optimizada para calcular la luminosidad de una imagen
       calculateLuminance(imageUrl) {
         return new Promise((resolve) => {
           const img = new Image();
-          img.crossOrigin = 'Anonymous'; // Permitir CORS
+          img.crossOrigin = 'Anonymous';
           img.src = imageUrl;
+          
+          // Timeout para evitar bloqueos largos
+          const timeout = setTimeout(() => {
+            resolve(0.5); // Valor por defecto si tarda mucho
+          }, 3000);
+          
           img.onload = () => {
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-            const pixels = ctx.getImageData(0, 0, img.width, img.height);
-            const data = pixels.data;
-            let r = 0, g = 0, b = 0;
+            clearTimeout(timeout);
             
-            // Recorremos padding los píxeles para obtener el promedio de R, G, B
-            for (let i = 0; i < data.length; i += 4) {
-              r += data[i];     // Red
-              g += data[i + 1]; // Green
-              b += data[i + 2]; // Blue
+            // Usar requestIdleCallback para no bloquear el hilo principal
+            const calculate = () => {
+              const canvas = document.createElement("canvas");
+              const ctx = canvas.getContext("2d", { willReadFrequently: true });
+              
+              // OPTIMIZACIÓN: Reducir canvas a 100x100px (suficiente para muestreo)
+              const sampleSize = 100;
+              canvas.width = sampleSize;
+              canvas.height = sampleSize;
+              
+              // Dibujar imagen escalada
+              ctx.drawImage(img, 0, 0, sampleSize, sampleSize);
+              const pixels = ctx.getImageData(0, 0, sampleSize, sampleSize);
+              const data = pixels.data;
+              
+              let r = 0, g = 0, b = 0;
+              let sampleCount = 0;
+              
+              // OPTIMIZACIÓN: Muestrear solo cada 10 píxeles (10% de los píxeles)
+              for (let i = 0; i < data.length; i += 40) { // 40 = 4 bytes * 10 píxeles
+                r += data[i];     // Red
+                g += data[i + 1]; // Green
+                b += data[i + 2]; // Blue
+                sampleCount++;
+              }
+
+              // Calcular promedio
+              r = r / sampleCount;
+              g = g / sampleCount;
+              b = b / sampleCount;
+
+              // Cálculo de la luminosidad
+              const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+              resolve(luminance);
+            };
+            
+            // Usar requestIdleCallback si está disponible, sino ejecutar directamente
+            if ('requestIdleCallback' in window) {
+              requestIdleCallback(calculate, { timeout: 1000 });
+            } else {
+              setTimeout(calculate, 0);
             }
-
-            const totalPixels = data.length / 4;
-            r = r / totalPixels;
-            g = g / totalPixels;
-            b = b / totalPixels;
-
-            // Cálculo de la luminosidad
-            const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-            resolve(luminance);
+          };
+          
+          img.onerror = () => {
+            clearTimeout(timeout);
+            resolve(0.5); // Valor por defecto en caso de error
           };
         });
       },

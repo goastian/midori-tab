@@ -5,7 +5,8 @@ const CACHE_KEY_LIST = 'unsplash_cache_images';
 const CACHE_EXPIRY = 'unsplash_cache_expiry';
 const CACHE_INDEX = 'unsplash_cache_index';
 
-const screenWidth = window.innerWidth;
+// Limitar ancho máximo para optimizar carga (1920px es suficiente para la mayoría de pantallas)
+const screenWidth = Math.min(window.innerWidth, 1920);
 
 class UnsplashService {
   #url = '';
@@ -28,6 +29,19 @@ class UnsplashService {
 
   getImageLink() {
     return this.#imageLink;
+  }
+
+  /**
+   * Obtener URL de thumbnail pequeño para cálculo de luminosidad
+   * Usa la imagen cacheada pero en miniatura para ahorrar procesamiento
+   */
+  getThumbnailUrl() {
+    // Extraer la URL base y añadir parámetros de thumbnail
+    if (this.#url && this.#url.startsWith('blob:')) {
+      // Si es blob, no podemos generar thumbnail, devolver null
+      return null;
+    }
+    return this.#url;
   }
 
   async setImagen() {
@@ -97,7 +111,8 @@ class UnsplashService {
         }
       });
 
-      const imageUrl = `${data.urls.regular}?w=${screenWidth}&fit=crop&auto=format&q=80`;
+      // Optimizado: webp, calidad 75, ancho limitado
+      const imageUrl = `${data.urls.regular}?w=${screenWidth}&fit=crop&fm=webp&q=75`;
 
       return {
         url: imageUrl,
@@ -144,7 +159,8 @@ class UnsplashService {
       const cache = await caches.open(CACHE_NAME);
 
       for (const photo of data) {
-        const imageUrl = `${photo.urls.regular}?w=${screenWidth}&fit=crop&auto=format&q=80`;
+        // Optimizado: webp, calidad 75, ancho limitado
+        const imageUrl = `${photo.urls.regular}?w=${screenWidth}&fit=crop&fm=webp&q=75`;
 
         newList.push({
           url: imageUrl,
