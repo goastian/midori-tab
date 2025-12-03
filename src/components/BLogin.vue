@@ -121,9 +121,8 @@ export default {
     position: absolute;
     width: 150px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    background-color: var(--bg-color);
-    backdrop-filter: blur(10px) saturate(180%);
-    -webkit-backdrop-filter: blur(10px) saturate(180%);
+    background-color: rgba(20, 20, 20, 0.95);
+    /* Eliminado backdrop-filter - dropdown pequeño */
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: #fff;
     bottom: -130px;

@@ -102,9 +102,9 @@
   height: calc(100% - .8rem);
   position: fixed;
   right: -400px;
-  background-color: var(--bg-blur);
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  background-color: rgba(20, 20, 20, 0.95);
+  /* Eliminado backdrop-filter - panel lateral pequeño */
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: var(--text-color);
   border-radius: 1rem;

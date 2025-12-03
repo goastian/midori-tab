@@ -8,7 +8,7 @@
     </div>
     <Minimalist v-if="tabStore.mode == 'Minimalist'" />
     <Informative v-if="tabStore.mode == 'Informative'" />
-    <Production v-if="tabStore.mode == 'Productivity'" :key="gridKey"/>
+    <Production v-if="tabStore.mode == 'Productivity'"/>
     <SettingsModal />
     <CommandPalette />
   </div>
@@ -33,7 +33,6 @@
         textColor: 'white',
         tabStore: useTabStore(),
         widgets: useWidgets(),
-        gridKey: 0,
         keyboardShortcutsCleanup: null,
         imageAuthor: "",
         imageAuthorLink: "",
@@ -42,10 +41,6 @@
     },
 
     watch: {
-      'widgets.state': function() {
-        this.gridKey = Date.now()
-      },
-
       'tabStore.mode': function (value){
         if(value == "Productivity"){
           this.widgets.loadWidgets();

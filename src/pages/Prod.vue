@@ -161,12 +161,30 @@ export default {
     }
   },
 
+  watch: {
+    'widgets.state'(newState) {
+      // Actualizar el estado de edición del grid sin recargarlo
+      if (this.grid) {
+        this.grid.enableMove(newState);
+        this.grid.enableResize(newState);
+      }
+    }
+  },
+
   components: {
     BSetting: defineAsyncComponent(() => import('../components/BSetting.vue')),
   },
 
   mounted() {
     this.loadGrid()
+  },
+
+  beforeUnmount() {
+    // Limpiar el grid al desmontar el componente
+    if (this.grid) {
+      this.grid.destroy(false);
+      this.grid = null;
+    }
   },
 
   methods: {
@@ -203,18 +221,20 @@ export default {
       if (widget) {
         widget.visible = widget.visible === false ? true : false;
         this.widgets.updateWidget(widget);
-        this.$nextTick(() => {
-          this.reloadGrid();
-        });
+        // No necesitamos recargar el grid, Vue reactivamente actualiza visibleWidgets
       }
     },
 
     removeWidget(id) {
       if (confirm('¿Eliminar este widget?')) {
+        // Encontrar el elemento del DOM
+        const element = this.$el.querySelector(`[gs-id="${id}"]`);
+        if (element && this.grid) {
+          // Usar método incremental de GridStack
+          this.grid.removeWidget(element, false);
+        }
+        // Actualizar el store
         this.widgets.widgets = this.widgets.widgets.filter(w => w.id !== id);
-        this.$nextTick(() => {
-          this.reloadGrid();
-        });
       }
     },
 
@@ -241,10 +261,17 @@ export default {
         };
       }
       
+      // Añadir al store primero
       this.widgets.widgets.push(newWidget);
       
+      // Esperar a que Vue renderice el nuevo elemento
       this.$nextTick(() => {
-        this.reloadGrid();
+        // Encontrar el elemento recién añadido
+        const element = this.$el.querySelector(`[gs-id="${newId}"]`);
+        if (element && this.grid) {
+          // Hacer que GridStack lo maneje
+          this.grid.makeWidget(element);
+        }
       });
     },
 
@@ -252,62 +279,66 @@ export default {
       if (confirm('¿Restaurar el layout por defecto? Se perderán los cambios actuales.')) {
         localStorage.removeItem('widgets');
         this.widgets.loadWidgets();
+        // Destruir y recrear grid solo en este caso (cambio completo de layout)
         this.$nextTick(() => {
-          this.reloadGrid();
+          if (this.grid) {
+            this.grid.destroy(false);
+          }
+          this.loadGrid();
         });
       }
     },
 
     clearAllWidgets() {
       if (confirm('¿Eliminar todos los widgets? Esta acción no se puede deshacer.')) {
+        // Remover todos los widgets del grid
+        if (this.grid) {
+          this.grid.removeAll(false);
+        }
+        // Limpiar el store
         this.widgets.widgets = [];
-        this.$nextTick(() => {
-          this.reloadGrid();
-        });
       }
     },
 
-    reloadGrid() {
-      if (this.grid) {
-        this.grid.destroy(false);
-      }
-      this.loadGrid();
-    },
 
     loadGrid() {
       const screenHeight = window.innerHeight;
       const rows = 12;
       const cellHeight = Math.floor(screenHeight / rows);
-      this.grid = GridStack.init({
-        float: true,
-        cellHeight: cellHeight + 'px',
-        margin: '8px',
-        animate: true,
-        disableOneColumnMode: true,
-      });
+      
+      // Inicializar grid solo si no existe
+      if (!this.grid) {
+        this.grid = GridStack.init({
+          float: true,
+          cellHeight: cellHeight + 'px',
+          margin: '8px',
+          animate: true,
+          disableOneColumnMode: true,
+        });
 
+        // Configurar event listener solo una vez
+        this.grid.on('change', (event, el) => {
+          const nodes = this.grid.getGridItems();
+          // Buscar el nodo correspondiente al elemento actual (el)
+          const node = nodes.find(item => item === el[0].el).gridstackNode;
+
+          if (node) {
+            // Crear el objeto del widget actualizado
+            const widgetData = {
+              id: parseInt(node.id),
+              x: node.x,
+              y: node.y,
+              w: node.w,
+              h: node.h,
+            };
+            this.widgets.updateWidget(widgetData);
+          }
+        });
+      }
+
+      // Actualizar estado de edición sin recrear el grid
       this.grid.enableMove(this.widgets.state);
       this.grid.enableResize(this.widgets.state);
-
-      // Escuchar los cambios de posición y tamaño en los widgets
-      this.grid.on('change', (event, el) => {
-        // const node = grid.getNode(el);
-        const nodes = this.grid.getGridItems();
-
-        // Buscar el nodo correspondiente al elemento actual (el)
-        const node = nodes.find(item => item === el[0].el).gridstackNode;
-
-        // Crear el objeto del widget actualizado
-        const widgetData = {
-          id: parseInt(node.id),
-          x: node.x,
-          y: node.y,
-          w: node.w,
-          h: node.h,
-        };
-
-        this.widgets.updateWidget(widgetData);
-      })
     }
     ,
 
@@ -405,10 +436,10 @@ export default {
 }
 
 .toolbar-btn {
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
-  background-color: rgba(255, 255, 255, 0.1);
+  /* Eliminado backdrop-filter para mejor rendimiento */
+  background-color: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   color: var(--text-color);
   padding: 0.65rem 1.25rem;
   border-radius: 0.75rem;
@@ -564,10 +595,10 @@ export default {
 }
 
 .widget-card {
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
-  background-color: var(--bg-glass);
+  /* Eliminado backdrop-filter - ya está dentro de panel con blur */
+  background-color: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   border-radius: 0.75rem;
   padding: 1.25rem;
   cursor: pointer;
@@ -609,10 +640,10 @@ export default {
 }
 
 .active-widget-item {
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
-  background-color: var(--bg-glass);
+  /* Eliminado backdrop-filter - ya está dentro de panel con blur */
+  background-color: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
   display: flex;
@@ -694,6 +725,7 @@ export default {
   width: 100%;
   height: 100%;
   position: relative;
+  /* Mantener backdrop-filter aquí - es contenedor principal de widget */
   backdrop-filter: blur(10px) saturate(180%);
   -webkit-backdrop-filter: blur(10px) saturate(180%);
   background-color: var(--bg-glass);
@@ -733,10 +765,10 @@ export default {
 }
 
 .drag-handle {
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.9), rgba(68, 160, 141, 0.9));
+  /* Eliminado backdrop-filter - botón pequeño */
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.95), rgba(68, 160, 141, 0.95));
   border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 6px rgba(78, 205, 196, 0.3);
   color: white;
   padding: 0.35rem 0.6rem;
   border-radius: 0.5rem;
@@ -754,10 +786,10 @@ export default {
 }
 
 .widget-remove-btn {
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
-  background-color: rgba(255, 107, 107, 0.9);
+  /* Eliminado backdrop-filter - botón pequeño */
+  background-color: rgba(255, 107, 107, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 6px rgba(255, 107, 107, 0.3);
   color: white;
   width: 28px;
   height: 28px;

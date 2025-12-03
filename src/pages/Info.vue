@@ -162,10 +162,10 @@ export default {
 
 .news-item {
     padding: .8rem;
-    backdrop-filter: blur(10px) saturate(180%);
-    -webkit-backdrop-filter: blur(10px) saturate(180%);
-    background-color: var(--bg-glass);
+    /* Eliminado backdrop-filter - ya está dentro de .news con blur */
+    background-color: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     color: var(--text-color);
     text-decoration: none;
     border-radius: 1rem;
