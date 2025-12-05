@@ -278,10 +278,15 @@ async function searchAll(query) {
       type: 'SEARCH_HISTORY',
       query: query
     });
+    console.log('📜 History search response:', response);
     if (response && response.success && response.data) {
+      console.log('✅ History results:', response.data.length);
       results.push(...response.data);
+    } else {
+      console.warn('⚠️ History search failed:', response);
     }
   } catch (e) {
+    console.error('❌ History search error:', e);
   }
   
   // Marcadores
@@ -290,10 +295,15 @@ async function searchAll(query) {
       type: 'SEARCH_BOOKMARKS',
       query: query
     });
+    console.log('🔖 Bookmarks search response:', response);
     if (response && response.success && response.data) {
+      console.log('✅ Bookmarks results:', response.data.length);
       results.push(...response.data);
+    } else {
+      console.warn('⚠️ Bookmarks search failed:', response);
     }
   } catch (e) {
+    console.error('❌ Bookmarks search error:', e);
   }
   
   return results.slice(0, 10);
