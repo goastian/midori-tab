@@ -35,7 +35,7 @@
         </div>
         
         <div class="bottom">
-            <b-setting :style="{ color: textColor }" />
+            <b-setting />
         </div>
     </div>
 </template>
