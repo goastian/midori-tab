@@ -4,50 +4,35 @@
     box-sizing: border-box;
 }
 
-:root[data-theme = 'light'] {
-  --bg-color: #fff;
-  --bg-glass: rgba(255, 255, 255, 0.1);
-  --bg-secondary: #dfdfdf;
+/* Legacy aliases — mapean a design tokens de tokens.css
+   Estos aliases mantienen compatibilidad con componentes existentes
+   que usan --bg-color, --text-color, --bg-glass, etc. */
+:root[data-theme='light'] {
+  --bg-color: var(--color-bg);
+  --bg-glass: var(--glass-bg);
+  --bg-secondary: var(--color-bg-secondary);
   --bg-glass-secondary: rgba(220, 220, 220, 0.4);
-  --text-color: #202020;
-  --text-color: #404040;
-  --border-color: rgba(0, 0, 0, .2);
+  --text-color: var(--color-text);
+  --border-color: var(--color-border);
 
-  --bg-blur: rgba(180, 180, 180, .7);
-  
-  --blue: #2e72ac;
-  --green: #269D73;
-
-  --gradient-orange: linear-gradient(135deg, #ff7b7f, #ff595e, #e0484c);
-  --gradient-green: linear-gradient(135deg, #8dc63f, #d4ff88);
-  --gradient-deal: linear-gradient(135deg, #00b9b5, #a6f7f5);
-  --gradient-purple: linear-gradient(135deg, #be1c7d, #f78fc3);
+  --blue: var(--accent-blue);
+  --green: var(--midori-500);
 
   --orange: #ff595e;
-
 }
 
-:root[data-theme = 'dark'] {
-  --bg-color: #303030;
-  --bg-glass: rgba(18, 18, 18, 0.3);
-  --bg-secondary: #808080;
+:root[data-theme='dark'] {
+  --bg-color: var(--color-bg);
+  --bg-glass: var(--glass-bg);
+  --bg-secondary: var(--color-bg-secondary);
   --bg-glass-secondary: rgba(38, 38, 38, 0.4);
-  --text-color: #fff;
-  --text-color: #dfdfdf;
-  --border-color: rgba(0, 0, 0, .2);
-  
-  --blue: #0d86d3;
-  --green: #269D73;
+  --text-color: var(--color-text);
+  --border-color: var(--color-border);
 
-  --bg-blur: rgba(10, 10, 10, .5);
-
-  --gradient-orange: linear-gradient(135deg, #e0484c, #ff595e, #8b2c2f);
-  --gradient-green: linear-gradient(135deg, #8dc63f, #3a5311);
-  --gradient-deal: linear-gradient(135deg, #00b9b5, #004f4d);
-  --gradient-purple: linear-gradient(135deg, #be1c7d, #4b1037);
+  --blue: var(--accent-blue);
+  --green: var(--midori-500);
 
   --orange: #ff595e;
-
 }
 
 html {
@@ -55,8 +40,9 @@ html {
 }
 
 body {
-  background-color: var(--bg-color);
-  font-family: 'Inter', sans-serif;
+  background-color: var(--color-bg, #1a1a1a);
+  font-family: var(--font-sans);
+  color: var(--color-text);
 }
 
 .bg-orange {
@@ -130,7 +116,7 @@ body {
   gap: 2rem;
 }
 
-@media (max-width: 1330) {
+@media (max-width: 1330px) {
   html {
     font-size: 14px;
   }
