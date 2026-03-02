@@ -24,6 +24,7 @@ export default defineConfig({
       input: {
         background: 'src/background.js',
         'content-script': 'src/content-script.js',
+        'content-script-palette': 'src/content-script-palette.js',
         index: resolve(__dirname, 'index.html'),
       },
       output: {
