@@ -49,6 +49,17 @@
     "48": "icons/48.png",
     "128": "icons/128.png"
   },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "content-script-palette.js"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
+    }
+  ],
   "background": {
     "scripts": [
       "background.js"
