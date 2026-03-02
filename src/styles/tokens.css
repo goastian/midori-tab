@@ -1,0 +1,181 @@
+/* ============================================
+   MIDORI TAB — Design Tokens
+   Sistema de diseño centralizado
+   ============================================ */
+
+:root {
+  /* ── Midori Brand Colors ── */
+  --midori-50: #e6fbf4;
+  --midori-100: #b3f2de;
+  --midori-200: #80e9c8;
+  --midori-300: #4de0b2;
+  --midori-400: #26d99f;
+  --midori-500: #00b894;
+  --midori-600: #009975;
+  --midori-700: #007a5e;
+  --midori-800: #005c46;
+  --midori-900: #003d2f;
+
+  /* ── Accent Colors ── */
+  --accent-teal: #00cec9;
+  --accent-blue: #0984e3;
+  --accent-warning: #fdcb6e;
+  --accent-danger: #e17055;
+  --accent-success: #00b894;
+
+  /* ── Neutral Colors ── */
+  --neutral-50: #fafafa;
+  --neutral-100: #f5f5f5;
+  --neutral-200: #e5e5e5;
+  --neutral-300: #d4d4d4;
+  --neutral-400: #a3a3a3;
+  --neutral-500: #737373;
+  --neutral-600: #525252;
+  --neutral-700: #404040;
+  --neutral-800: #262626;
+  --neutral-900: #171717;
+
+  /* ── Typography ── */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 2rem;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ── Spacing ── */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  /* ── Border Radius ── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.24);
+  --shadow-glow: 0 0 20px rgba(0, 184, 148, 0.15);
+  --shadow-glow-strong: 0 0 30px rgba(0, 184, 148, 0.25);
+
+  /* ── Glass Effect (Midori signature) ── */
+  --glass-blur: 20px;
+  --glass-saturate: 180%;
+
+  /* ── Transitions ── */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Light Theme Tokens ── */
+:root[data-theme='light'] {
+  --color-primary: var(--midori-600);
+  --color-primary-hover: var(--midori-700);
+  --color-primary-subtle: var(--midori-50);
+
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f5f5f5;
+  --color-bg-elevated: #ffffff;
+  --color-surface: rgba(255, 255, 255, 0.85);
+
+  --color-text: var(--neutral-800);
+  --color-text-secondary: var(--neutral-500);
+  --color-text-muted: var(--neutral-400);
+
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-border-hover: rgba(0, 0, 0, 0.2);
+
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-bg-hover: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(0, 184, 148, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+
+  --bg-blur: rgba(245, 245, 245, 0.7);
+
+  --color-accent-bg: rgba(0, 184, 148, 0.08);
+  --color-accent-border: rgba(0, 184, 148, 0.2);
+
+  --gradient-orange: linear-gradient(135deg, #ff7b7f, #ff595e, #e0484c);
+  --gradient-green: linear-gradient(135deg, #8dc63f, #d4ff88);
+  --gradient-teal: linear-gradient(135deg, #00b9b5, #a6f7f5);
+  --gradient-purple: linear-gradient(135deg, #be1c7d, #f78fc3);
+  --gradient-midori: linear-gradient(135deg, var(--midori-400), var(--accent-teal));
+}
+
+/* ── Dark Theme Tokens ── */
+:root[data-theme='dark'] {
+  --color-primary: var(--midori-400);
+  --color-primary-hover: var(--midori-300);
+  --color-primary-subtle: rgba(0, 184, 148, 0.1);
+
+  --color-bg: #1a1a1a;
+  --color-bg-secondary: #262626;
+  --color-bg-elevated: #2a2a2a;
+  --color-surface: rgba(26, 26, 26, 0.85);
+
+  --color-text: var(--neutral-100);
+  --color-text-secondary: var(--neutral-400);
+  --color-text-muted: var(--neutral-500);
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(255, 255, 255, 0.15);
+
+  --glass-bg: rgba(0, 184, 148, 0.03);
+  --glass-bg-hover: rgba(0, 184, 148, 0.06);
+  --glass-border: rgba(0, 184, 148, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 184, 148, 0.08);
+
+  --bg-blur: rgba(10, 10, 10, 0.5);
+
+  --color-accent-bg: rgba(0, 184, 148, 0.08);
+  --color-accent-border: rgba(0, 184, 148, 0.2);
+
+  --gradient-orange: linear-gradient(135deg, #e0484c, #ff595e, #8b2c2f);
+  --gradient-green: linear-gradient(135deg, #8dc63f, #3a5311);
+  --gradient-teal: linear-gradient(135deg, #00b9b5, #004f4d);
+  --gradient-purple: linear-gradient(135deg, #be1c7d, #4b1037);
+  --gradient-midori: linear-gradient(135deg, var(--midori-600), var(--accent-teal));
+}
+
+/* ── Category Colors (consistentes en ambos temas) ── */
+:root {
+  --cat-productivity-bg: rgba(59, 130, 246, 0.15);
+  --cat-productivity-text: #60a5fa;
+  --cat-communication-bg: rgba(0, 184, 148, 0.15);
+  --cat-communication-text: #34d399;
+  --cat-development-bg: rgba(139, 92, 246, 0.15);
+  --cat-development-text: #a78bfa;
+  --cat-design-bg: rgba(236, 72, 153, 0.15);
+  --cat-design-text: #f472b6;
+  --cat-social-bg: rgba(251, 146, 60, 0.15);
+  --cat-social-text: #fb923c;
+  --cat-utilities-bg: rgba(156, 163, 175, 0.15);
+  --cat-utilities-text: #9ca3af;
+  --cat-history-bg: rgba(234, 179, 8, 0.15);
+  --cat-history-text: #facc15;
+  --cat-bookmarks-bg: rgba(245, 158, 11, 0.15);
+  --cat-bookmarks-text: #fbbf24;
+}
