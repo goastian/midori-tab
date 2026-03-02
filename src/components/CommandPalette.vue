@@ -5,7 +5,7 @@
         <div class="command-palette" @click.stop>
           <!-- Search Input -->
           <div class="search-container">
-            <span class="search-icon">🔍</span>
+            <Search class="search-icon" :size="20" :stroke-width="1.5" />
             <input
               ref="searchInput"
               v-model="searchQuery"
@@ -46,7 +46,7 @@
 
           <!-- Empty State -->
           <div v-else-if="searchQuery && !isSearching" class="empty-state">
-            <span class="empty-icon">🔍</span>
+            <SearchX class="empty-icon-svg" :size="48" :stroke-width="1" />
             <p>No se encontraron resultados</p>
             <small>Intenta buscar por nombre, URL o categoría</small>
           </div>
@@ -56,7 +56,7 @@
             <!-- Comandos personalizados del usuario -->
             <div v-if="customCommands.length > 0" class="custom-commands-section">
               <div class="section-header">
-                <span class="section-icon">⭐</span>
+                <Star class="section-icon-svg" :size="16" :stroke-width="2" />
                 <h3 class="section-title">Tus Atajos</h3>
               </div>
               <div class="custom-commands-list">
@@ -120,11 +120,13 @@
 
 <script>
 import { ref, watch, nextTick, computed } from 'vue';
+import { Search, SearchX, Star } from 'lucide-vue-next';
 import { useCommands } from '../composables/useCommands.js';
 import useCommandsStore from '../stores/useCommandsStore.js';
 
 export default {
   name: 'CommandPalette',
+  components: { Search, SearchX, Star },
   setup() {
     const {
       searchQuery,
@@ -238,14 +240,14 @@ export default {
 .command-palette {
   width: 90%;
   max-width: 640px;
-  background: var(--bg-glass, rgba(255, 255, 255, 0.1));
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  background: var(--glass-bg, rgba(0, 184, 148, 0.03));
+  backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturate, 180%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturate, 180%));
+  border: 1px solid var(--glass-border, rgba(0, 184, 148, 0.12));
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-xl, 0 20px 60px rgba(0, 0, 0, 0.3)), var(--shadow-glow, 0 0 20px rgba(0, 184, 148, 0.08));
   overflow: hidden;
-  animation: slideDown 0.3s ease;
+  animation: slideDown 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   max-height: 70vh;
   display: flex;
   flex-direction: column;
@@ -255,14 +257,15 @@ export default {
   display: flex;
   align-items: center;
   padding: 1rem 1.2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--glass-border, rgba(0, 184, 148, 0.1));
   gap: 0.8rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 184, 148, 0.02);
 }
 
 .search-icon {
-  font-size: 1.2rem;
-  opacity: 0.6;
+  color: var(--midori-400, #26d99f);
+  opacity: 0.7;
+  flex-shrink: 0;
 }
 
 .search-input {
@@ -308,8 +311,9 @@ export default {
 
 .result-item:hover,
 .result-item.selected {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 184, 148, 0.08);
   transform: translateX(4px);
+  border-left: 2px solid rgba(0, 184, 148, 0.4);
 }
 
 .result-icon {
@@ -395,10 +399,15 @@ export default {
   text-align: center;
 }
 
-.empty-icon {
-  font-size: 3rem;
+.empty-icon-svg {
+  color: var(--midori-400, #26d99f);
   margin-bottom: 1rem;
-  opacity: 0.5;
+  opacity: 0.4;
+}
+
+.section-icon-svg {
+  color: var(--midori-400, #26d99f);
+  flex-shrink: 0;
 }
 
 .empty-state p {
@@ -454,16 +463,17 @@ export default {
 }
 
 .category-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: rgba(0, 184, 148, 0.03);
+  border: 1px solid var(--glass-border, rgba(0, 184, 148, 0.08));
+  border-radius: var(--radius-md, 10px);
   padding: 1rem;
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal, 0.2s ease);
 }
 
 .category-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 184, 148, 0.06);
+  border-color: rgba(0, 184, 148, 0.2);
+  box-shadow: var(--shadow-glow, 0 0 12px rgba(0, 184, 148, 0.08));
 }
 
 .category-header {
@@ -504,7 +514,7 @@ export default {
 }
 
 .mini-command:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(0, 184, 148, 0.08);
   transform: translateX(4px);
 }
 
@@ -521,17 +531,17 @@ export default {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(255, 255, 255, 0.2);
-  border-top-color: white;
+  border: 3px solid rgba(0, 184, 148, 0.15);
+  border-top-color: var(--midori-400, #26d99f);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-bottom: 1rem;
 }
 
 .command-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--glass-border, rgba(0, 184, 148, 0.08));
   padding: 0.8rem 1.2rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 184, 148, 0.02);
 }
 
 .shortcuts-hint {
@@ -597,12 +607,12 @@ export default {
 
 .results-container::-webkit-scrollbar-thumb,
 .default-state::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 184, 148, 0.2);
   border-radius: 3px;
 }
 
 .results-container::-webkit-scrollbar-thumb:hover,
 .default-state::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 184, 148, 0.35);
 }
 </style>

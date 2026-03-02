@@ -4,7 +4,7 @@
     <Transition name="slide-down">
       <div v-if="widgets.state" class="edit-mode-banner">
         <div class="banner-content">
-          <span class="banner-icon">✏️</span>
+          <Pencil class="banner-icon-svg" :size="18" :stroke-width="2" />
           <span class="banner-text">Modo Edición Activo</span>
           <span class="banner-hint">Arrastra para mover • Redimensiona desde las esquinas • Click en + para añadir widgets</span>
         </div>
@@ -15,26 +15,26 @@
     <Transition name="slide-up">
       <div v-if="widgets.state" class="floating-toolbar">
         <button @click="showWidgetLibrary = !showWidgetLibrary" class="toolbar-btn primary" :class="{ 'active': showWidgetLibrary }">
-          <span class="btn-icon">➕</span>
+          <Plus class="btn-icon-svg" :size="16" :stroke-width="2" />
           <span class="btn-text">Añadir Widget</span>
         </button>
         
         <div class="toolbar-divider"></div>
         
         <button @click="resetLayout" class="toolbar-btn">
-          <span class="btn-icon">🔄</span>
+          <RotateCcw class="btn-icon-svg" :size="16" :stroke-width="2" />
           <span class="btn-text">Restaurar</span>
         </button>
         
         <button @click="clearAllWidgets" class="toolbar-btn danger">
-          <span class="btn-icon">🗑️</span>
+          <Trash2 class="btn-icon-svg" :size="16" :stroke-width="2" />
           <span class="btn-text">Limpiar</span>
         </button>
         
         <div class="toolbar-divider"></div>
         
         <button @click="widgets.changeState()" class="toolbar-btn success">
-          <span class="btn-icon">✓</span>
+          <Check class="btn-icon-svg" :size="16" :stroke-width="2" />
           <span class="btn-text">Finalizar</span>
         </button>
       </div>
@@ -44,8 +44,8 @@
     <Transition name="slide-left">
       <div v-if="widgets.state && showWidgetLibrary" class="widget-library-panel">
         <div class="library-header">
-          <h3>📦 Biblioteca de Widgets</h3>
-          <button @click="showWidgetLibrary = false" class="close-library-btn">✕</button>
+          <h3><Package class="library-icon-svg" :size="18" :stroke-width="2" /> Biblioteca de Widgets</h3>
+          <button @click="showWidgetLibrary = false" class="close-library-btn"><X :size="16" :stroke-width="2" /></button>
         </div>
         
         <div class="library-content">
@@ -127,16 +127,18 @@
     
     <!-- Botón de configuración en la esquina inferior izquierda -->
     <div class="bottom">
-      <b-setting />
+      <BSetting />
     </div>
   </div>
 </template>
 
 <script>
 import { defineAsyncComponent } from 'vue';
+import { Pencil, Plus, RotateCcw, Trash2, Check, Package, X } from 'lucide-vue-next';
 import useWidgets from '../stores/useWidgets.js';
 import useTabStore from '../stores/useTabStore.js';
-import { GridStack } from "gridstack";
+
+let GridStack = null;
 export default {
   data() {
     return {
@@ -173,9 +175,11 @@ export default {
 
   components: {
     BSetting: defineAsyncComponent(() => import('../components/BSetting.vue')),
+    Pencil, Plus, RotateCcw, Trash2, Check, Package, X,
   },
 
-  mounted() {
+  async mounted() {
+    await this.initGridStack();
     this.loadGrid()
   },
 
@@ -188,6 +192,14 @@ export default {
   },
 
   methods: {
+    async initGridStack() {
+      if (!GridStack) {
+        const module = await import('gridstack');
+        GridStack = module.GridStack;
+        await import('gridstack/dist/gridstack.css');
+      }
+    },
+
     getWidgetIcon(component) {
       const icons = {
         'ZSearchWidget': '🔍',
@@ -349,7 +361,6 @@ export default {
         return defineAsyncComponent(() => import('zen-wdg').then(m => m[name]));
       }
     },
-
   }
 }
 </script>
@@ -380,11 +391,11 @@ export default {
   left: 0;
   right: 0;
   z-index: 1000;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.95), rgba(68, 160, 141, 0.95));
+  backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturate, 180%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturate, 180%));
+  background: linear-gradient(135deg, var(--midori-500, rgba(0, 184, 148, 0.95)), var(--midori-600, rgba(0, 153, 123, 0.95)));
   border-bottom: 2px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 20px rgba(78, 205, 196, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 184, 148, 0.3);
   padding: 1rem 2rem;
 }
 
@@ -397,8 +408,9 @@ export default {
   flex-wrap: wrap;
 }
 
-.banner-icon {
-  font-size: 1.5rem;
+.banner-icon-svg {
+  color: white;
+  flex-shrink: 0;
 }
 
 .banner-text {
@@ -420,20 +432,19 @@ export default {
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background-color: var(--bg-glass);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 1rem;
+  backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturate, 180%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturate, 180%));
+  background: var(--glass-bg, rgba(0, 184, 148, 0.03));
+  border: 1px solid var(--glass-border, rgba(0, 184, 148, 0.12));
+  border-radius: var(--radius-lg, 1rem);
   padding: 0.75rem 1.5rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-xl, 0 8px 32px rgba(0, 0, 0, 0.2)), var(--shadow-glow, 0 0 20px rgba(0, 184, 148, 0.08));
 }
 
 .toolbar-btn {
-  /* Eliminado backdrop-filter para mejor rendimiento */
   background-color: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -457,26 +468,26 @@ export default {
 }
 
 .toolbar-btn.primary {
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.3), rgba(68, 160, 141, 0.3));
-  border-color: rgba(78, 205, 196, 0.5);
-  color: #4ecdc4;
+  background: linear-gradient(135deg, rgba(0, 184, 148, 0.25), rgba(0, 153, 123, 0.25));
+  border-color: rgba(0, 184, 148, 0.5);
+  color: var(--midori-400, #26d99f);
 }
 
 .toolbar-btn.primary:hover,
 .toolbar-btn.primary.active {
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.5), rgba(68, 160, 141, 0.5));
-  border-color: rgba(78, 205, 196, 0.8);
+  background: linear-gradient(135deg, rgba(0, 184, 148, 0.4), rgba(0, 153, 123, 0.4));
+  border-color: rgba(0, 184, 148, 0.7);
 }
 
 .toolbar-btn.success {
-  background: linear-gradient(135deg, rgba(46, 213, 115, 0.3), rgba(34, 166, 90, 0.3));
-  border-color: rgba(46, 213, 115, 0.5);
-  color: #2ed573;
+  background: linear-gradient(135deg, rgba(0, 184, 148, 0.3), rgba(0, 153, 123, 0.3));
+  border-color: rgba(0, 184, 148, 0.5);
+  color: var(--midori-300, #66e3be);
 }
 
 .toolbar-btn.success:hover {
-  background: linear-gradient(135deg, rgba(46, 213, 115, 0.5), rgba(34, 166, 90, 0.5));
-  border-color: rgba(46, 213, 115, 0.8);
+  background: linear-gradient(135deg, rgba(0, 184, 148, 0.45), rgba(0, 153, 123, 0.45));
+  border-color: rgba(0, 184, 148, 0.7);
 }
 
 .toolbar-btn.danger {
@@ -490,8 +501,8 @@ export default {
   border-color: rgba(255, 107, 107, 0.8);
 }
 
-.btn-icon {
-  font-size: 1.1rem;
+.btn-icon-svg {
+  flex-shrink: 0;
 }
 
 .btn-text {
@@ -501,7 +512,7 @@ export default {
 .toolbar-divider {
   width: 1px;
   height: 2rem;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--glass-border, rgba(0, 184, 148, 0.15));
   margin: 0 0.5rem;
 }
 
@@ -513,11 +524,11 @@ export default {
   width: 380px;
   height: 100vh;
   z-index: 999;
-  backdrop-filter: blur(30px) saturate(180%);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  background-color: var(--bg-glass);
-  border-left: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: -4px 0 32px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(30px) saturate(var(--glass-saturate, 180%));
+  -webkit-backdrop-filter: blur(30px) saturate(var(--glass-saturate, 180%));
+  background: var(--glass-bg, rgba(0, 184, 148, 0.03));
+  border-left: 1px solid var(--glass-border, rgba(0, 184, 148, 0.12));
+  box-shadow: -4px 0 32px rgba(0, 0, 0, 0.2), var(--shadow-glow, 0 0 20px rgba(0, 184, 148, 0.06));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -525,11 +536,11 @@ export default {
 
 .library-header {
   padding: 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid var(--glass-border, rgba(0, 184, 148, 0.1));
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.1), rgba(68, 160, 141, 0.1));
+  background: linear-gradient(135deg, rgba(0, 184, 148, 0.06), rgba(0, 153, 123, 0.06));
 }
 
 .library-header h3 {
@@ -537,6 +548,14 @@ export default {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.library-icon-svg {
+  color: var(--midori-400, #26d99f);
+  flex-shrink: 0;
 }
 
 .close-library-btn {
@@ -592,25 +611,24 @@ export default {
 }
 
 .widget-card {
-  /* Eliminado backdrop-filter - ya está dentro de panel con blur */
-  background-color: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 0.75rem;
+  background-color: rgba(0, 184, 148, 0.04);
+  border: 1px solid var(--glass-border, rgba(0, 184, 148, 0.1));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-md, 0.75rem);
   padding: 1.25rem;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  transition: all 0.3s ease;
+  transition: all var(--transition-normal, 0.3s ease);
 }
 
 .widget-card:hover {
-  background-color: var(--bg-blur);
-  border-color: rgba(78, 205, 196, 0.5);
+  background-color: rgba(0, 184, 148, 0.08);
+  border-color: rgba(0, 184, 148, 0.35);
   transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 184, 148, 0.15);
 }
 
 .widget-card-icon {
@@ -637,11 +655,10 @@ export default {
 }
 
 .active-widget-item {
-  /* Eliminado backdrop-filter - ya está dentro de panel con blur */
-  background-color: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  border-radius: 0.5rem;
+  background-color: rgba(0, 184, 148, 0.04);
+  border: 1px solid var(--glass-border, rgba(0, 184, 148, 0.08));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-sm, 0.5rem);
   padding: 0.75rem 1rem;
   display: flex;
   align-items: center;
@@ -650,8 +667,8 @@ export default {
 }
 
 .active-widget-item:hover {
-  background-color: var(--bg-blur);
-  border-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(0, 184, 148, 0.08);
+  border-color: rgba(0, 184, 148, 0.2);
 }
 
 .widget-icon {
@@ -722,32 +739,31 @@ export default {
   width: 100%;
   height: 100%;
   position: relative;
-  /* Mantener backdrop-filter aquí - es contenedor principal de widget */
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
-  background-color: var(--bg-glass);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 1rem;
+  backdrop-filter: blur(var(--glass-blur, 10px)) saturate(var(--glass-saturate, 180%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 10px)) saturate(var(--glass-saturate, 180%));
+  background: var(--glass-bg, rgba(0, 184, 148, 0.03));
+  border: 1px solid var(--glass-border, rgba(0, 184, 148, 0.1));
+  border-radius: var(--radius-lg, 1rem);
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all var(--transition-normal, 0.3s ease);
 }
 
 .grid-stack-item-content:hover {
-  background-color: var(--bg-blur);
+  background: rgba(0, 184, 148, 0.05);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), var(--shadow-glow, 0 0 10px rgba(0, 184, 148, 0.06));
 }
 
 .grid-stack-item.editable .grid-stack-item-content {
-  border: 2px dashed rgba(78, 205, 196, 0.5);
-  background-color: rgba(78, 205, 196, 0.05);
+  border: 2px dashed rgba(0, 184, 148, 0.4);
+  background: rgba(0, 184, 148, 0.03);
   cursor: move;
 }
 
 .grid-stack-item.editable:hover .grid-stack-item-content {
-  border-color: rgba(78, 205, 196, 0.8);
-  background-color: rgba(78, 205, 196, 0.1);
-  box-shadow: 0 4px 16px rgba(78, 205, 196, 0.3);
+  border-color: rgba(0, 184, 148, 0.7);
+  background: rgba(0, 184, 148, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 184, 148, 0.2);
 }
 
 /* ===== CONTROLES DE WIDGET ===== */
@@ -762,28 +778,26 @@ export default {
 }
 
 .drag-handle {
-  /* Eliminado backdrop-filter - botón pequeño */
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.95), rgba(68, 160, 141, 0.95));
+  background: linear-gradient(135deg, var(--midori-500, rgba(0, 184, 148, 0.95)), var(--midori-600, rgba(0, 153, 123, 0.95)));
   border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 2px 6px rgba(78, 205, 196, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 184, 148, 0.3);
   color: white;
   padding: 0.35rem 0.6rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-sm, 0.5rem);
   font-size: 1rem;
   font-weight: 700;
   cursor: move;
   letter-spacing: -2px;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast, 0.15s ease);
 }
 
 .drag-handle:hover {
-  background: linear-gradient(135deg, rgba(78, 205, 196, 1), rgba(68, 160, 141, 1));
+  background: linear-gradient(135deg, var(--midori-400, #26d99f), var(--midori-500, #00b894));
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 184, 148, 0.45);
 }
 
 .widget-remove-btn {
-  /* Eliminado backdrop-filter - botón pequeño */
   background-color: rgba(255, 107, 107, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 2px 6px rgba(255, 107, 107, 0.3);
@@ -877,13 +891,13 @@ export default {
 
 .library-content::-webkit-scrollbar-thumb,
 .grid-stack::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 184, 148, 0.2);
   border-radius: 3px;
 }
 
 .library-content::-webkit-scrollbar-thumb:hover,
 .grid-stack::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 184, 148, 0.35);
 }
 
 /* ===== RESPONSIVE ===== */
