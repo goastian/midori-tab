@@ -119,7 +119,7 @@
               </div>
             </Transition>
             <!-- Componente dinámico -->
-            <component :is="loadWidget(item.component, item.local)" v-bind="item.props" />
+            <component :is="loadWidget(item.component, item.local)" v-bind="{ ...item.props, locale: i18nStore.locale }" />
           </div>
         </div>
       </div>
@@ -137,6 +137,7 @@ import { defineAsyncComponent } from 'vue';
 import { Pencil, Plus, RotateCcw, Trash2, Check, Package, X } from 'lucide-vue-next';
 import useWidgets from '../stores/useWidgets.js';
 import useTabStore from '../stores/useTabStore.js';
+import useI18nStore from '../stores/useI18nStore.js';
 
 let GridStack = null;
 export default {
@@ -144,6 +145,7 @@ export default {
     return {
       grid: null,
       widgets: useWidgets(),
+      i18nStore: useI18nStore(), // Add it to data() so it's reactive in template
       showWidgetLibrary: false,
       availableWidgets: [
         { name: 'Búsqueda', icon: '🔍', component: 'ZSearchWidget', local: false, w: 6, h: 1 },
