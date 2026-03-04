@@ -1,16 +1,16 @@
 <template>
   <div class="custom-shortcuts-manager">
     <div class="header">
-      <h3 class="title">🔗 Atajos Personalizados</h3>
+      <h3 class="title">🔗 {{ i18n.t.customShortcuts.title }}</h3>
       <p class="description">
-        Crea atajos rápidos para tus sitios web y aplicaciones favoritas.
+        {{ i18n.t.customShortcuts.description }}
       </p>
     </div>
 
     <!-- Botón para añadir nuevo atajo -->
     <button @click="showAddForm = !showAddForm" class="add-btn">
       <span class="icon">{{ showAddForm ? '✕' : '＋' }}</span>
-      {{ showAddForm ? 'Cancelar' : 'Añadir Atajo Personalizado' }}
+      {{ showAddForm ? i18n.t.customShortcuts.cancel : i18n.t.customShortcuts.addBtn }}
     </button>
 
     <!-- Formulario para añadir atajo -->
@@ -19,12 +19,12 @@
         <div class="form-group">
           <label>
             <span class="label-icon">📝</span>
-            Nombre del Atajo
+            {{ i18n.t.customShortcuts.name }}
           </label>
           <input
             v-model="newCommand.name"
             type="text"
-            placeholder="Ej: Mi Dashboard"
+            :placeholder="i18n.t.customShortcuts.namePlaceholder"
             class="form-input"
             @keydown.enter="addCustomCommand"
           />
@@ -33,12 +33,12 @@
         <div class="form-group">
           <label>
             <span class="label-icon">🔗</span>
-            URL
+            {{ i18n.t.customShortcuts.url }}
           </label>
           <input
             v-model="newCommand.url"
             type="url"
-            placeholder="https://ejemplo.com"
+            :placeholder="i18n.t.customShortcuts.urlPlaceholder"
             class="form-input"
             @keydown.enter="addCustomCommand"
           />
@@ -47,12 +47,12 @@
         <div class="form-group">
           <label>
             <span class="label-icon">📄</span>
-            Descripción (opcional)
+            {{ i18n.t.customShortcuts.descriptionLabel }}
           </label>
           <input
             v-model="newCommand.description"
             type="text"
-            placeholder="Descripción breve"
+            :placeholder="i18n.t.customShortcuts.descriptionPlaceholder"
             class="form-input"
             @keydown.enter="addCustomCommand"
           />
@@ -62,7 +62,7 @@
           <div class="form-group emoji-form-group">
             <label>
               <span class="label-icon">😀</span>
-              Emoji/Icono
+              {{ i18n.t.customShortcuts.emojiIcon }}
             </label>
             <div class="icon-selector-wrapper">
               <input
@@ -103,16 +103,16 @@
           <div class="form-group">
             <label>
               <span class="label-icon">🏷️</span>
-              Categoría
+              {{ i18n.t.customShortcuts.category }}
             </label>
             <select v-model="newCommand.category" class="form-select">
-              <option value="custom">Personalizado</option>
-              <option value="productivity">Productividad</option>
-              <option value="communication">Comunicación</option>
-              <option value="development">Desarrollo</option>
-              <option value="design">Diseño</option>
-              <option value="social">Social</option>
-              <option value="utilities">Utilidades</option>
+              <option value="custom">{{ i18n.t.customShortcuts.catCustom }}</option>
+              <option value="productivity">{{ i18n.t.customShortcuts.catProductivity }}</option>
+              <option value="communication">{{ i18n.t.customShortcuts.catCommunication }}</option>
+              <option value="development">{{ i18n.t.customShortcuts.catDevelopment }}</option>
+              <option value="design">{{ i18n.t.customShortcuts.catDesign }}</option>
+              <option value="social">{{ i18n.t.customShortcuts.catSocial }}</option>
+              <option value="utilities">{{ i18n.t.customShortcuts.catUtilities }}</option>
             </select>
           </div>
         </div>
@@ -120,31 +120,31 @@
         <div class="form-group">
           <label>
             <span class="label-icon">🔍</span>
-            Palabras Clave (separadas por comas)
+            {{ i18n.t.customShortcuts.keywords }}
           </label>
           <input
             v-model="keywordsInput"
             type="text"
-            placeholder="dashboard, trabajo, proyecto"
+            :placeholder="i18n.t.customShortcuts.keywordsPlaceholder"
             class="form-input"
             @keydown.enter="addCustomCommand"
           />
-          <small class="hint">Ayuda a encontrar el atajo más rápido en la búsqueda</small>
+          <small class="hint">{{ i18n.t.customShortcuts.keywordsHint }}</small>
         </div>
 
         <div class="form-actions">
           <button @click="addCustomCommand" class="save-btn" :disabled="!isFormValid">
             <span class="icon">✓</span>
-            Guardar Atajo
+            {{ i18n.t.customShortcuts.save }}
           </button>
           <button @click="resetForm" class="cancel-btn">
-            Cancelar
+            {{ i18n.t.customShortcuts.cancel }}
           </button>
         </div>
 
         <!-- Preview -->
         <div v-if="newCommand.name && newCommand.url" class="preview">
-          <p class="preview-label">Vista Previa:</p>
+          <p class="preview-label">{{ i18n.t.customShortcuts.preview }}</p>
           <div class="preview-item">
             <span class="preview-icon">{{ newCommand.icon || '🔗' }}</span>
             <div class="preview-content">
@@ -161,7 +161,7 @@
 
     <!-- Lista de atajos personalizados -->
     <div v-if="customCommands.length > 0" class="shortcuts-list">
-      <h4 class="list-title">Tus Atajos ({{ customCommands.length }})</h4>
+      <h4 class="list-title">{{ i18n.t.customShortcuts.yourShortcuts }} ({{ customCommands.length }})</h4>
       
       <div class="shortcuts-grid">
         <div
@@ -206,14 +206,14 @@
     <!-- Estado vacío -->
     <div v-else class="empty-state">
       <span class="empty-icon">📦</span>
-      <p class="empty-text">No tienes atajos personalizados aún</p>
-      <small class="empty-hint">Haz clic en "Añadir Atajo Personalizado" para crear uno</small>
+      <p class="empty-text">{{ i18n.t.customShortcuts.emptyTitle }}</p>
+      <small class="empty-hint">{{ i18n.t.customShortcuts.emptyHint }}</small>
     </div>
 
     <!-- Información adicional -->
     <div class="info-box">
       <p class="info-text">
-        💡 <strong>Consejo:</strong> Los atajos personalizados aparecerán en la paleta de comandos (Ctrl+Alt+Space) y podrás buscarlos por nombre o palabras clave.
+        💡 <strong>Tip:</strong> {{ i18n.t.customShortcuts.tip }}
       </p>
     </div>
   </div>
@@ -222,11 +222,13 @@
 <script>
 import { ref, computed } from 'vue';
 import useCommandsStore from '../stores/useCommandsStore.js';
+import useI18nStore from '../stores/useI18nStore.js';
 
 export default {
   name: 'CustomShortcutsManager',
   setup() {
     const commandsStore = useCommandsStore();
+    const i18n = useI18nStore();
     const showAddForm = ref(false);
     const keywordsInput = ref('');
     const editingId = ref(null);
@@ -270,16 +272,8 @@ export default {
     };
 
     const getCategoryLabel = (category) => {
-      const labels = {
-        custom: 'Personalizado',
-        productivity: 'Productividad',
-        communication: 'Comunicación',
-        development: 'Desarrollo',
-        design: 'Diseño',
-        social: 'Social',
-        utilities: 'Utilidades',
-      };
-      return labels[category] || category;
+      const key = 'cat' + category.charAt(0).toUpperCase() + category.slice(1);
+      return i18n.t.customShortcuts[key] || category;
     };
 
     const addCustomCommand = () => {
@@ -323,7 +317,7 @@ export default {
     };
 
     const deleteCommand = (commandId) => {
-      if (confirm('¿Estás seguro de que quieres eliminar este atajo?')) {
+      if (confirm(i18n.t.spaces.deleteConfirm)) {
         commandsStore.removeCustomCommand(commandId);
       }
     };
@@ -357,6 +351,7 @@ export default {
       deleteCommand,
       resetForm,
       getCategoryLabel,
+      i18n,
     };
   },
 };

@@ -6,11 +6,13 @@
       <a :href="imageAuthorLink" target="_blank" rel="noopener noreferrer">{{ imageAuthor }}</a> 
       on <a :href="imageLink" target="_blank" rel="noopener noreferrer">Unsplash</a>
     </div>
+    <SpaceSwitcher />
     <Minimalist v-if="tabStore.mode == 'Minimalist'" />
     <Informative v-if="tabStore.mode == 'Informative'" />
     <Production v-if="tabStore.mode == 'Productivity'"/>
     <SettingsModal />
     <CommandPalette />
+    <SmartSuggestions />
   </div>
 </template>
 
@@ -21,8 +23,12 @@
   import useWidgets from './stores/useWidgets.js';
   import useCommandsStore from './stores/useCommandsStore.js';
   import CommandPalette from './components/CommandPalette.vue';
+  import SpaceSwitcher from './components/SpaceSwitcher.vue';
+  import SmartSuggestions from './components/SmartSuggestions.vue';
   import { useCommands } from './composables/useCommands.js';
   import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts.js';
+  import { useAutoTheme } from './composables/useAutoTheme.js';
+  import useThemeStore from './stores/useThemeStore.js';
 
   export default {
     data() {
@@ -37,6 +43,7 @@
         imageAuthor: "",
         imageAuthorLink: "",
         imageLink: "",
+        autoTheme: null,
       }
     },
 
@@ -54,6 +61,8 @@
       Production: defineAsyncComponent(() => import('./pages/Prod.vue')),
       SettingsModal: defineAsyncComponent(() => import('./components/SettingsModal.vue')),
       CommandPalette,
+      SpaceSwitcher,
+      SmartSuggestions,
     },
 
     mounted() {
@@ -70,12 +79,26 @@
       }
       
       this.setupKeyboardShortcuts();
+
+      // Apply active theme colors
+      const themeStore = useThemeStore();
+      themeStore.applyTheme(this.tabStore.theme);
+
+      // Auto Theme
+      if (this.tabStore.autoTheme) {
+        this.autoTheme = useAutoTheme();
+        this.autoTheme.start();
+      }
     },
 
     beforeUnmount() {
       // Limpiar event listeners
       if (this.keyboardShortcutsCleanup) {
         this.keyboardShortcutsCleanup();
+      }
+      // Detener auto theme
+      if (this.autoTheme) {
+        this.autoTheme.stop();
       }
     },
 

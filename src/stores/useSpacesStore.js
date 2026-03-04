@@ -1,0 +1,121 @@
+import { defineStore } from 'pinia';
+import useTabStore from './useTabStore.js';
+import useWidgets from './useWidgets.js';
+
+const DEFAULT_SPACES = [
+  {
+    id: 'personal',
+    name: 'Personal',
+    icon: '🏠',
+    color: '#00b894',
+    background: { type: 'Unsplash', default: true, class: 'bg-orange' },
+    widgets: null,
+  },
+  {
+    id: 'work',
+    name: 'Trabajo',
+    icon: '💼',
+    color: '#0984e3',
+    background: { type: 'Gradient', default: true, class: 'bg-deal' },
+    widgets: null,
+  },
+  {
+    id: 'study',
+    name: 'Estudio',
+    icon: '📚',
+    color: '#6c5ce7',
+    background: { type: 'Gradient', default: true, class: 'bg-purple' },
+    widgets: null,
+  },
+];
+
+const useSpacesStore = defineStore('spacesStore', {
+  state: () => ({
+    spaces: DEFAULT_SPACES.map(s => ({ ...s })),
+    activeSpaceId: 'personal',
+    enabled: false,
+  }),
+
+  getters: {
+    activeSpace(state) {
+      return state.spaces.find(s => s.id === state.activeSpaceId) || state.spaces[0];
+    },
+  },
+
+  actions: {
+    switchSpace(spaceId) {
+      const space = this.spaces.find(s => s.id === spaceId);
+      if (!space) return;
+
+      this.saveCurrentToSpace(this.activeSpaceId);
+      this.activeSpaceId = spaceId;
+      this.applySpace(space);
+    },
+
+    saveCurrentToSpace(spaceId) {
+      const space = this.spaces.find(s => s.id === spaceId);
+      if (!space) return;
+
+      const tabStore = useTabStore();
+      const widgetsStore = useWidgets();
+
+      space.background = { ...tabStore.background };
+      space.widgets = JSON.parse(JSON.stringify(widgetsStore.widgets));
+    },
+
+    applySpace(space) {
+      const tabStore = useTabStore();
+      const widgetsStore = useWidgets();
+
+      if (space.background) {
+        tabStore.changeBackground({ ...space.background });
+      }
+      if (space.widgets) {
+        widgetsStore.widgets = JSON.parse(JSON.stringify(space.widgets));
+      }
+    },
+
+    addSpace(name, icon, color) {
+      const id = `space-${Date.now()}`;
+      this.spaces.push({
+        id,
+        name,
+        icon: icon || '🌐',
+        color: color || '#00b894',
+        background: { type: 'Unsplash', default: true, class: 'bg-orange' },
+        widgets: null,
+      });
+      return id;
+    },
+
+    removeSpace(spaceId) {
+      if (this.spaces.length <= 1) return;
+      if (spaceId === this.activeSpaceId) {
+        const remaining = this.spaces.filter(s => s.id !== spaceId);
+        this.activeSpaceId = remaining[0].id;
+        this.applySpace(this.spaces.find(s => s.id === this.activeSpaceId));
+      }
+      this.spaces = this.spaces.filter(s => s.id !== spaceId);
+    },
+
+    updateSpace(spaceId, updates) {
+      const space = this.spaces.find(s => s.id === spaceId);
+      if (space) {
+        Object.assign(space, updates);
+      }
+    },
+
+    resetSpaces() {
+      this.spaces = DEFAULT_SPACES.map(s => ({ ...s }));
+      this.activeSpaceId = 'personal';
+      this.enabled = false;
+    },
+  },
+
+  persist: {
+    enable: true,
+    storage: localStorage,
+  },
+});
+
+export default useSpacesStore;

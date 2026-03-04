@@ -2,7 +2,7 @@
   <div class="shortcut-editor">
     <div class="shortcut-header">
       <h4>{{ title }}</h4>
-      <button @click="resetShortcut" class="reset-btn" title="Resetear a valor por defecto">
+      <button @click="resetShortcut" class="reset-btn" :title="i18n.t.shortcutsTab.resetAll">
         ↺
       </button>
     </div>
@@ -15,14 +15,14 @@
         <kbd>{{ getKeyDisplay(localShortcut.key) }}</kbd>
       </div>
       <div v-else class="recording-text">
-        Presiona la combinación de teclas...
+        {{ i18n.t.shortcutsTab.pressCombo }}
       </div>
     </div>
 
     <div class="shortcut-controls">
       <label class="checkbox-label">
         <input type="checkbox" v-model="localShortcut.enabled" @change="updateShortcut" />
-        <span>Habilitado</span>
+        <span>{{ i18n.t.shortcutsTab.enabled }}</span>
       </label>
     </div>
 
@@ -34,6 +34,7 @@
 
 <script>
 import { ref, watch } from 'vue';
+import useI18nStore from '../stores/useI18nStore.js';
 
 export default {
   name: 'ShortcutEditor',
@@ -53,6 +54,7 @@ export default {
   },
   emits: ['update', 'reset'],
   setup(props, { emit }) {
+    const i18n = useI18nStore();
     const isRecording = ref(false);
     const error = ref('');
     const localShortcut = ref({ ...props.shortcut });
@@ -96,7 +98,7 @@ export default {
 
       // Validar que tenga al menos un modificador
       if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
-        error.value = 'Debes usar al menos una tecla modificadora (Ctrl, Alt, Shift)';
+        error.value = i18n.t.shortcutsTab.needModifier;
         isRecording.value = false;
         return;
       }
@@ -123,6 +125,7 @@ export default {
     };
 
     return {
+      i18n,
       isRecording,
       error,
       localShortcut,

@@ -8,7 +8,7 @@
           <div class="settings-header">
             <div class="header-content">
               <span class="settings-icon">⚙️</span>
-              <h2 class="settings-title">Configuración</h2>
+              <h2 class="settings-title">{{ i18n.t.settings.title }}</h2>
             </div>
             <button @click="closeSettings" class="close-btn">
               <span>✕</span>
@@ -40,29 +40,29 @@
             <!-- General Tab -->
             <div v-if="tab === 0" class="settings-section">
               <div class="section-header">
-                <h3 class="section-title-main">General</h3>
-                <p class="section-subtitle">Customize your dashboard</p>
+                <h3 class="section-title-main">{{ i18n.t.general.title }}</h3>
+                <p class="section-subtitle">{{ i18n.t.general.subtitle }}</p>
               </div>
               <div class="setting-item">
                 <div class="setting-info">
-                  <span class="setting-label">Shortcuts</span>
-                  <span class="setting-description">Mostrar accesos rápidos en la página</span>
+                  <span class="setting-label">{{ i18n.t.general.shortcuts }}</span>
+                  <span class="setting-description">{{ i18n.t.general.shortcutsDesc }}</span>
                 </div>
                 <Switch @click="settings.changeShortcuts()" :state="settings.shortcuts" />
               </div>
 
               <div class="setting-item">
                 <div class="setting-info">
-                  <span class="setting-label">Abrir búsqueda en</span>
-                  <span class="setting-description">Dónde abrir los resultados de búsqueda</span>
+                  <span class="setting-label">{{ i18n.t.general.openSearchIn }}</span>
+                  <span class="setting-description">{{ i18n.t.general.openSearchInDesc }}</span>
                 </div>
                 <Dropdown v-model="settings.openLink" :options="openLinks"/>
               </div>
 
               <div class="setting-item">
                 <div class="setting-info">
-                  <span class="setting-label">Nombre de la pestaña</span>
-                  <span class="setting-description">Personaliza el título de la pestaña</span>
+                  <span class="setting-label">{{ i18n.t.general.tabName }}</span>
+                  <span class="setting-description">{{ i18n.t.general.tabNameDesc }}</span>
                 </div>
                 <Input placeholder="New Tab" :value="settings.tabName" v-model="title" round full/>
               </div>
@@ -71,45 +71,53 @@
             <!-- Visual Tab -->
             <div v-if="tab === 1" class="settings-section">
               <div class="section-header">
-                <h3 class="section-title-main">Visual</h3>
-                <p class="section-subtitle">Themes and appearance</p>
+                <h3 class="section-title-main">{{ i18n.t.visual.title }}</h3>
+                <p class="section-subtitle">{{ i18n.t.visual.subtitle }}</p>
               </div>
               <div class="setting-item">
                 <div class="setting-info">
-                  <span class="setting-label">Fondo</span>
-                  <span class="setting-description">Tipo de fondo para la página</span>
+                  <span class="setting-label">{{ i18n.t.visual.background }}</span>
+                  <span class="setting-description">{{ i18n.t.visual.backgroundDesc }}</span>
                 </div>
                 <Dropdown v-model="background.type" :options="backgrounds" @change="changeBackground()" />
               </div>
 
               <div class="setting-item">
                 <div class="setting-info">
-                  <span class="setting-label">Modo oscuro</span>
-                  <span class="setting-description">Activar tema oscuro</span>
+                  <span class="setting-label">{{ i18n.t.visual.darkMode }}</span>
+                  <span class="setting-description">{{ i18n.t.visual.darkModeDesc }}</span>
                 </div>
                 <Switch @click="settings.setTheme()" :state="settings.theme == 'dark'" />
+              </div>
+
+              <div class="setting-item">
+                <div class="setting-info">
+                  <span class="setting-label">{{ i18n.t.visual.autoTheme }}</span>
+                  <span class="setting-description">{{ i18n.t.visual.autoThemeDesc }}</span>
+                </div>
+                <Switch @click="toggleAutoTheme()" :state="settings.autoTheme" />
               </div>
 
               <div class="separator"></div>
 
               <div class="setting-item">
                 <div class="setting-info">
-                  <span class="setting-label">Modo de visualización</span>
-                  <span class="setting-description">Selecciona cómo quieres ver tu página</span>
+                  <span class="setting-label">{{ i18n.t.visual.displayMode }}</span>
+                  <span class="setting-description">{{ i18n.t.visual.displayModeDesc }}</span>
                 </div>
                 <Dropdown v-model="settings.mode" :options="modes" @change="changeBackground()" />
               </div>
 
               <div class="setting-item" v-if="settings.mode == 'Productivity'">
                 <div class="setting-info">
-                  <span class="setting-label">Personalizar widgets</span>
-                  <span class="setting-description">Activar personalización de widgets</span>
+                  <span class="setting-label">{{ i18n.t.visual.customizeWidgets }}</span>
+                  <span class="setting-description">{{ i18n.t.visual.customizeWidgetsDesc }}</span>
                 </div>
                 <Switch @click="widgets.changeState" :state="widgets.state == true" />
               </div>
 
               <div v-if="background.type == 'Gradient'" class="gradients-section">
-                <span class="section-label">Gradientes disponibles</span>
+                <span class="section-label">{{ i18n.t.visual.availableGradients }}</span>
                 <div class="gradients-grid">
                   <div
                     v-for="(item, index) in gradients"
@@ -127,14 +135,14 @@
             <!-- Shortcuts Tab -->
             <div v-if="tab === 2" class="settings-section">
               <div class="shortcuts-header">
-                <h3 class="section-title">⌨️ Atajos de Teclado</h3>
+                <h3 class="section-title">⌨️ {{ i18n.t.shortcutsTab.title }}</h3>
                 <p class="section-description">
-                  Personaliza los atajos de teclado para acceder rápidamente a las funciones.
+                  {{ i18n.t.shortcutsTab.description }}
                 </p>
               </div>
 
               <ShortcutEditor
-                title="Abrir Paleta de Comandos"
+                :title="i18n.t.shortcutsTab.openCommandPalette"
                 :shortcut="commandsStore.shortcuts.openCommandPalette"
                 shortcutName="openCommandPalette"
                 @update="updateShortcut"
@@ -142,7 +150,7 @@
               />
 
               <ShortcutEditor
-                title="Abrir Configuración"
+                :title="i18n.t.shortcutsTab.openSettings"
                 :shortcut="commandsStore.shortcuts.openSettings"
                 shortcutName="openSettings"
                 @update="updateShortcut"
@@ -151,15 +159,15 @@
 
               <div class="shortcuts-info">
                 <p class="info-text">
-                  💡 <strong>Consejo:</strong> Haz clic en el cuadro del atajo y presiona la combinación de teclas que deseas usar.
+                  💡 <strong>Tip:</strong> {{ i18n.t.shortcutsTab.tip }}
                 </p>
                 <p class="info-text">
-                  ⚠️ <strong>Nota:</strong> Debes usar al menos una tecla modificadora (Ctrl, Alt, Shift).
+                  ⚠️ <strong>Note:</strong> {{ i18n.t.shortcutsTab.note }}
                 </p>
               </div>
 
               <button @click="resetAllShortcuts" class="reset-all-btn">
-                Resetear Todos los Atajos
+                {{ i18n.t.shortcutsTab.resetAll }}
               </button>
             </div>
 
@@ -167,13 +175,28 @@
             <div v-if="tab === 3" class="settings-section">
               <CustomShortcutsManager />
             </div>
+
+            <!-- Temas Tab -->
+            <div v-if="tab === 4" class="settings-section">
+              <ThemePicker />
+            </div>
+
+            <!-- Spaces Tab -->
+            <div v-if="tab === 5" class="settings-section">
+              <SpacesManager />
+            </div>
+
+            <!-- Language Tab -->
+            <div v-if="tab === 6" class="settings-section">
+              <LanguageSelector />
+            </div>
           </div>
           </div>
 
           <!-- Footer -->
           <div class="settings-footer">
             <div class="footer-hint">
-              <kbd>ESC</kbd> Cerrar
+              <kbd>ESC</kbd> {{ i18n.t.settings.close }}
             </div>
           </div>
           </div>
@@ -190,9 +213,13 @@ import Dropdown from './UI/Dropdown.vue';
 import Input from './UI/Input.vue';
 import ShortcutEditor from './ShortcutEditor.vue';
 import CustomShortcutsManager from './CustomShortcutsManager.vue';
+import SpacesManager from './SpacesManager.vue';
+import ThemePicker from './ThemePicker.vue';
+import LanguageSelector from './LanguageSelector.vue';
 import useTabStore from '../stores/useTabStore.js';
 import useWidgets from '../stores/useWidgets.js';
 import useCommandsStore from '../stores/useCommandsStore.js';
+import useI18nStore from '../stores/useI18nStore.js';
 
 export default {
   name: 'SettingsModal',
@@ -203,6 +230,9 @@ export default {
     Dropdown,
     ShortcutEditor,
     CustomShortcutsManager,
+    SpacesManager,
+    ThemePicker,
+    LanguageSelector,
   },
 
   data() {
@@ -211,6 +241,7 @@ export default {
       settings: useTabStore(),
       widgets: useWidgets(),
       commandsStore: useCommandsStore(),
+      i18n: useI18nStore(),
       background: {
         type: null,
         default: true,
@@ -218,27 +249,14 @@ export default {
         color: null,
       },
       title: '',
-      navs: [
-        {
-          title: 'General',
-          emoji: '⚙️',
-          description: 'Customize your dashboard',
-        },
-        {
-          title: 'Visual',
-          emoji: '🎨',
-          description: 'Themes and appearance',
-        },
-        {
-          title: 'Atajos',
-          emoji: '⌨️',
-          description: 'Keyboard shortcuts',
-        },
-        {
-          title: 'Personalizados',
-          emoji: '🔗',
-          description: 'Custom shortcuts',
-        },
+      navKeys: [
+        { emoji: '⚙️', titleKey: 'navGeneral', descKey: 'navGeneralDesc' },
+        { emoji: '🎨', titleKey: 'navVisual', descKey: 'navVisualDesc' },
+        { emoji: '⌨️', titleKey: 'navShortcuts', descKey: 'navShortcutsDesc' },
+        { emoji: '🔗', titleKey: 'navCustom', descKey: 'navCustomDesc' },
+        { emoji: '🎨', titleKey: 'navThemes', descKey: 'navThemesDesc' },
+        { emoji: '🪐', titleKey: 'navSpaces', descKey: 'navSpacesDesc' },
+        { emoji: '🌐', titleKey: 'navLanguage', descKey: 'navLanguageDesc' },
       ],
       openLinks: ['Self Tab', 'New Tab'],
       gradients: ['bg-orange', 'bg-green', 'bg-deal', 'bg-purple'],
@@ -255,6 +273,17 @@ export default {
 
   beforeUnmount() {
     document.removeEventListener('keydown', this.handleEscape);
+  },
+
+  computed: {
+    navs() {
+      const t = this.i18n.t.settings;
+      return this.navKeys.map(n => ({
+        emoji: n.emoji,
+        title: t[n.titleKey] || n.titleKey,
+        description: t[n.descKey] || n.descKey,
+      }));
+    },
   },
 
   watch: {
@@ -305,12 +334,20 @@ export default {
     },
 
     resetAllShortcuts() {
-      if (confirm('¿Estás seguro de que quieres resetear todos los atajos a sus valores por defecto?')) {
+      if (confirm(this.i18n.t.shortcutsTab.resetConfirm)) {
         this.commandsStore.resetAllShortcuts();
         setTimeout(() => {
           window.location.reload();
         }, 500);
       }
+    },
+
+    toggleAutoTheme() {
+      this.settings.autoTheme = !this.settings.autoTheme;
+      // Reload to apply/stop auto theme timer
+      setTimeout(() => {
+        window.location.reload();
+      }, 300);
     },
   },
 };

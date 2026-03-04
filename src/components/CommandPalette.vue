@@ -15,7 +15,7 @@
               @keydown.enter.prevent="executeSelected"
               @keydown.esc="closeCommandPalette"
               type="text"
-              placeholder="Buscar comandos, apps, historial..."
+              :placeholder="i18n.t.commandPalette.searchPlaceholder"
               class="search-input"
               autofocus
             />
@@ -47,8 +47,8 @@
           <!-- Empty State -->
           <div v-else-if="searchQuery && !isSearching" class="empty-state">
             <SearchX class="empty-icon-svg" :size="48" :stroke-width="1" />
-            <p>No se encontraron resultados</p>
-            <small>Intenta buscar por nombre, URL o categoría</small>
+            <p>{{ i18n.t.commandPalette.noResults }}</p>
+            <small>{{ i18n.t.commandPalette.trySearch }}</small>
           </div>
 
           <!-- Default State -->
@@ -57,7 +57,7 @@
             <div v-if="customCommands.length > 0" class="custom-commands-section">
               <div class="section-header">
                 <Star class="section-icon-svg" :size="16" :stroke-width="2" />
-                <h3 class="section-title">Tus Atajos</h3>
+                <h3 class="section-title">{{ i18n.t.commandPalette.yourShortcuts }}</h3>
               </div>
               <div class="custom-commands-list">
                 <div
@@ -101,15 +101,15 @@
           <!-- Loading State -->
           <div v-if="isSearching" class="loading-state">
             <div class="spinner"></div>
-            <p>Buscando...</p>
+            <p>{{ i18n.t.commandPalette.searching }}</p>
           </div>
 
           <!-- Footer -->
           <div class="command-footer">
             <div class="shortcuts-hint">
-              <kbd>↑↓</kbd> Navegar
-              <kbd>↵</kbd> Seleccionar
-              <kbd>ESC</kbd> Cerrar
+              <kbd>↑↓</kbd> {{ i18n.t.commandPalette.navigate }}
+              <kbd>↵</kbd> {{ i18n.t.commandPalette.select }}
+              <kbd>ESC</kbd> {{ i18n.t.commandPalette.close }}
             </div>
           </div>
         </div>
@@ -123,6 +123,7 @@ import { ref, watch, nextTick, computed } from 'vue';
 import { Search, SearchX, Star } from 'lucide-vue-next';
 import { useCommands } from '../composables/useCommands.js';
 import useCommandsStore from '../stores/useCommandsStore.js';
+import useI18nStore from '../stores/useI18nStore.js';
 
 export default {
   name: 'CommandPalette',
@@ -144,32 +145,21 @@ export default {
     } = useCommands();
 
     const commandsStore = useCommandsStore();
+    const i18n = useI18nStore();
     const searchInput = ref(null);
     
     // Obtener comandos personalizados del store
     const customCommands = computed(() => commandsStore.customCommands);
 
     // Categorías con sus labels e iconos
-    const categoryGroups = [
-      { name: 'productivity', label: 'Productividad', icon: '⚡' },
-      { name: 'communication', label: 'Comunicación', icon: '💬' },
-      { name: 'development', label: 'Desarrollo', icon: '💻' },
-      { name: 'design', label: 'Diseño', icon: '🎨' },
-      { name: 'social', label: 'Social', icon: '🌐' },
-      { name: 'utilities', label: 'Utilidades', icon: '🛠️' },
-    ];
-
-    const categoryLabels = {
-      productivity: 'Productividad',
-      communication: 'Comunicación',
-      development: 'Desarrollo',
-      design: 'Diseño',
-      social: 'Social',
-      utilities: 'Utilidades',
-      history: 'Historial',
-      bookmarks: 'Marcadores',
-      tabs: 'Pestañas',
-    };
+    const categoryGroups = computed(() => [
+      { name: 'productivity', label: i18n.t.customShortcuts.catProductivity, icon: '⚡' },
+      { name: 'communication', label: i18n.t.customShortcuts.catCommunication, icon: '💬' },
+      { name: 'development', label: i18n.t.customShortcuts.catDevelopment, icon: '💻' },
+      { name: 'design', label: i18n.t.customShortcuts.catDesign, icon: '🎨' },
+      { name: 'social', label: i18n.t.customShortcuts.catSocial, icon: '🌐' },
+      { name: 'utilities', label: i18n.t.customShortcuts.catUtilities, icon: '🛠️' },
+    ]);
 
     // Debounce para la búsqueda
     let searchTimeout = null;
@@ -181,7 +171,8 @@ export default {
     };
 
     const getCategoryLabel = (category) => {
-      return categoryLabels[category] || category;
+      const key = 'cat' + category.charAt(0).toUpperCase() + category.slice(1);
+      return i18n.t.customShortcuts[key] || category;
     };
 
     const getCommandsByCategory = (category) => {
@@ -206,6 +197,7 @@ export default {
       searchInput,
       categoryGroups,
       customCommands,
+      i18n,
       handleSearch,
       executeCommand,
       closeCommandPalette,

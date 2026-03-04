@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import useThemeStore from './useThemeStore.js';
 
 const useTabStore = defineStore('tabStore', {
   state: () => ({
@@ -13,6 +14,7 @@ const useTabStore = defineStore('tabStore', {
     state: false,
     openLink: 'Self Tab',
     mode: 'Minimalist',
+    autoTheme: true,
   }),
 
   actions: {
@@ -28,7 +30,9 @@ const useTabStore = defineStore('tabStore', {
 
     setTheme() {
       this.theme = this.theme === 'light' ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', this.theme)
+      document.documentElement.setAttribute('data-theme', this.theme);
+      const themeStore = useThemeStore();
+      themeStore.applyTheme(this.theme);
     },
 
     setTitle(title) {
@@ -76,7 +80,7 @@ const useTabStore = defineStore('tabStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['tabName', 'theme', 'background', 'shortcuts', 'openLink', 'mode'],
+    paths: ['tabName', 'theme', 'background', 'shortcuts', 'openLink', 'mode', 'autoTheme'],
   }
 })
 
