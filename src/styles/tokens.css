@@ -1,9 +1,18 @@
 /* ============================================
-   MIDORI TAB — Design Tokens
+   MIDORI TAB — Design Tokens (Flat / Midnight Sage)
    Sistema de diseño centralizado
    ============================================ */
 
 :root {
+  /* ── Midnight Sage Palette ── */
+  --ms-base: #080D14;
+  --ms-chrome: #0F1520;
+  --ms-panel: #1E2D3D;
+  --ms-active: #1D3530;
+  --ms-sage: #7EC4A8;
+  --ms-primary: #04A469;
+  --ms-text: #C4F0E0;
+
   /* ── Midori Brand Colors ── */
   --midori-50: #e6fbf4;
   --midori-100: #b3f2de;
@@ -21,7 +30,7 @@
   --accent-blue: #0984e3;
   --accent-warning: #fdcb6e;
   --accent-danger: #e17055;
-  --accent-success: #00b894;
+  --accent-success: #04A469;
 
   /* ── Neutral Colors ── */
   --neutral-50: #fafafa;
@@ -71,23 +80,17 @@
   --radius-xl: 24px;
   --radius-full: 9999px;
 
-  /* ── Shadows ── */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
-  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.24);
-  --shadow-glow: 0 0 20px rgba(0, 184, 148, 0.15);
-  --shadow-glow-strong: 0 0 30px rgba(0, 184, 148, 0.25);
+  /* ── Shadows (flat — minimal, no glow) ── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.14);
+  --shadow-xl: 0 8px 32px rgba(0, 0, 0, 0.2);
 
-  /* ── Glass Effect (Midori signature) ── */
-  --glass-blur: 20px;
-  --glass-saturate: 180%;
-
-  /* ── Transitions ── */
-  --transition-fast: 0.15s ease;
-  --transition-normal: 0.2s ease;
-  --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-spring: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* ── Transitions (fast — 150ms max for flat UI) ── */
+  --transition-fast: 0.1s ease;
+  --transition-normal: 0.15s ease;
+  --transition-smooth: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* ── Light Theme Tokens ── */
@@ -96,27 +99,26 @@
   --color-primary-hover: var(--midori-700);
   --color-primary-subtle: var(--midori-50);
 
-  --color-bg: #ffffff;
-  --color-bg-secondary: #f5f5f5;
-  --color-bg-elevated: #ffffff;
-  --color-surface: rgba(255, 255, 255, 0.85);
+  --color-bg: #E8EDEB;
+  --color-bg-secondary: #DDE4E0;
+  --color-bg-elevated: #F4F7F6;
 
-  --color-text: var(--neutral-800);
-  --color-text-secondary: var(--neutral-500);
-  --color-text-muted: var(--neutral-400);
+  --surface-base: #E8EDEB;
+  --surface-raised: #F4F7F6;
+  --surface-overlay: #FFFFFF;
+  --surface-sunken: #DDE4E0;
 
-  --color-border: rgba(0, 0, 0, 0.1);
-  --color-border-hover: rgba(0, 0, 0, 0.2);
+  --color-text: #1A2B26;
+  --color-text-secondary: #3A5B4D;
+  --color-text-muted: #5A7B6D;
 
-  --glass-bg: rgba(255, 255, 255, 0.6);
-  --glass-bg-hover: rgba(255, 255, 255, 0.75);
-  --glass-border: rgba(0, 184, 148, 0.12);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  --color-border: #C0CFC8;
+  --color-border-hover: #99B3A8;
 
-  --bg-blur: rgba(245, 245, 245, 0.7);
+  --color-accent-bg: rgba(4, 164, 105, 0.08);
+  --color-accent-border: rgba(4, 164, 105, 0.2);
 
-  --color-accent-bg: rgba(0, 184, 148, 0.08);
-  --color-accent-border: rgba(0, 184, 148, 0.2);
+  --theme-accent: var(--midori-600);
 
   --gradient-orange: linear-gradient(135deg, #ff7b7f, #ff595e, #e0484c);
   --gradient-green: linear-gradient(135deg, #8dc63f, #d4ff88);
@@ -125,57 +127,56 @@
   --gradient-midori: linear-gradient(135deg, var(--midori-400), var(--accent-teal));
 }
 
-/* ── Dark Theme Tokens ── */
+/* ── Dark Theme Tokens (Midnight Sage) ── */
 :root[data-theme='dark'] {
-  --color-primary: var(--midori-400);
+  --color-primary: var(--ms-primary);
   --color-primary-hover: var(--midori-300);
-  --color-primary-subtle: rgba(0, 184, 148, 0.1);
+  --color-primary-subtle: rgba(4, 164, 105, 0.1);
 
-  --color-bg: #1a1a1a;
-  --color-bg-secondary: #262626;
-  --color-bg-elevated: #2a2a2a;
-  --color-surface: rgba(26, 26, 26, 0.85);
+  --color-bg: var(--ms-base);
+  --color-bg-secondary: var(--ms-chrome);
+  --color-bg-elevated: var(--ms-panel);
 
-  --color-text: var(--neutral-100);
-  --color-text-secondary: var(--neutral-400);
-  --color-text-muted: var(--neutral-500);
+  --surface-base: var(--ms-base);
+  --surface-raised: var(--ms-chrome);
+  --surface-overlay: var(--ms-panel);
+  --surface-sunken: #060A10;
 
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-hover: rgba(255, 255, 255, 0.15);
+  --color-text: var(--ms-text);
+  --color-text-secondary: var(--ms-sage);
+  --color-text-muted: #5A9A82;
 
-  --glass-bg: rgba(0, 184, 148, 0.03);
-  --glass-bg-hover: rgba(0, 184, 148, 0.06);
-  --glass-border: rgba(0, 184, 148, 0.12);
-  --glass-shadow: 0 8px 32px rgba(0, 184, 148, 0.08);
+  --color-border: rgba(126, 196, 168, 0.1);
+  --color-border-hover: rgba(126, 196, 168, 0.2);
 
-  --bg-blur: rgba(10, 10, 10, 0.5);
+  --color-accent-bg: rgba(4, 164, 105, 0.1);
+  --color-accent-border: rgba(4, 164, 105, 0.25);
 
-  --color-accent-bg: rgba(0, 184, 148, 0.08);
-  --color-accent-border: rgba(0, 184, 148, 0.2);
+  --theme-accent: var(--ms-primary);
 
   --gradient-orange: linear-gradient(135deg, #e0484c, #ff595e, #8b2c2f);
   --gradient-green: linear-gradient(135deg, #8dc63f, #3a5311);
   --gradient-teal: linear-gradient(135deg, #00b9b5, #004f4d);
   --gradient-purple: linear-gradient(135deg, #be1c7d, #4b1037);
-  --gradient-midori: linear-gradient(135deg, var(--midori-600), var(--accent-teal));
+  --gradient-midori: linear-gradient(135deg, var(--ms-primary), var(--accent-teal));
 }
 
 /* ── Category Colors (consistentes en ambos temas) ── */
 :root {
-  --cat-productivity-bg: rgba(59, 130, 246, 0.15);
+  --cat-productivity-bg: rgba(59, 130, 246, 0.12);
   --cat-productivity-text: #60a5fa;
-  --cat-communication-bg: rgba(0, 184, 148, 0.15);
+  --cat-communication-bg: rgba(4, 164, 105, 0.12);
   --cat-communication-text: #34d399;
-  --cat-development-bg: rgba(139, 92, 246, 0.15);
+  --cat-development-bg: rgba(139, 92, 246, 0.12);
   --cat-development-text: #a78bfa;
-  --cat-design-bg: rgba(236, 72, 153, 0.15);
+  --cat-design-bg: rgba(236, 72, 153, 0.12);
   --cat-design-text: #f472b6;
-  --cat-social-bg: rgba(251, 146, 60, 0.15);
+  --cat-social-bg: rgba(251, 146, 60, 0.12);
   --cat-social-text: #fb923c;
-  --cat-utilities-bg: rgba(156, 163, 175, 0.15);
+  --cat-utilities-bg: rgba(156, 163, 175, 0.12);
   --cat-utilities-text: #9ca3af;
-  --cat-history-bg: rgba(234, 179, 8, 0.15);
+  --cat-history-bg: rgba(234, 179, 8, 0.12);
   --cat-history-text: #facc15;
-  --cat-bookmarks-bg: rgba(245, 158, 11, 0.15);
+  --cat-bookmarks-bg: rgba(245, 158, 11, 0.12);
   --cat-bookmarks-text: #fbbf24;
 }
