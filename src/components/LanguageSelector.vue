@@ -56,13 +56,13 @@ export default {
 .section-title-main {
   font-size: 1.3rem;
   font-weight: 600;
-  color: var(--text-color, white);
+  color: var(--color-text, #C4F0E0);
   margin: 0 0 0.3rem 0;
 }
 
 .section-subtitle {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-muted, #5A9A82);
   margin: 0;
 }
 
@@ -71,16 +71,16 @@ export default {
   align-items: center;
   gap: 0.6rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
 }
 
 .current-flag { font-size: 1.5rem; }
 .current-name {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-color, white);
+  color: var(--color-text, #C4F0E0);
 }
 
 .languages-grid {
@@ -95,24 +95,22 @@ export default {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 0.85rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 2px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  background: var(--surface-raised, #0F1520);
+  border: 2px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
   cursor: pointer;
-  transition: all 0.2s ease;
-  color: var(--text-color, white);
+  transition: all var(--transition-fast, 0.1s ease);
+  color: var(--color-text, #C4F0E0);
   text-align: left;
 }
 
 .lang-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
+  background: var(--surface-overlay, #1E2D3D);
+  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .lang-card.active {
-  border-color: var(--theme-accent, #00b894);
-  box-shadow: 0 0 12px rgba(0, 184, 148, 0.15);
+  border-color: var(--color-primary, #04A469);
 }
 
 .lang-flag { font-size: 1.25rem; }
@@ -128,7 +126,7 @@ export default {
   right: 0.4rem;
   width: 18px;
   height: 18px;
-  background: var(--theme-accent, #00b894);
+  background: var(--color-primary, #04A469);
   border-radius: 50%;
   display: flex;
   align-items: center;

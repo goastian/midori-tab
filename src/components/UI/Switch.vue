@@ -29,14 +29,17 @@
   width: 50px;
   height: 26px;
   padding: .2rem;
-  background: var(--bg-secondary);
+  background: var(--surface-overlay, #1E2D3D);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
   border-radius: 1rem;
   position: relative;
   cursor: pointer;
+  transition: background var(--transition-fast, 0.1s ease);
 }
 
 .container.active {
-  background: var(--blue);
+  background: var(--color-primary, #04A469);
+  border-color: var(--color-primary, #04A469);
 }
 
 .switch {
@@ -49,10 +52,10 @@
   align-items: center;
   top: 0;
   bottom: 0;
-  background: var(--bg-color);
+  background: white;
   margin: auto;
   left: 3px;
-  transition: .5s ease-in-out left, .5s ease-in-out background;
+  transition: left var(--transition-fast, 0.1s ease);
 }
 
 .switch.right {

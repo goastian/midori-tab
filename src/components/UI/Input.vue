@@ -49,10 +49,16 @@ export default {
 <style scoped>
 input {
   padding: .5rem 1rem;
-  background-color: var(--bg-glass);
-  color: var(--text-color);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: var(--surface-raised, #0F1520);
+  color: var(--color-text, #C4F0E0);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
   height: 35px;
+  font-size: 0.85rem;
+  transition: border-color var(--transition-fast, 0.1s ease);
+}
+
+input::placeholder {
+  color: var(--color-text-muted, #5A9A82);
 }
 
 .full-width {
@@ -61,10 +67,11 @@ input {
 
 input:focus {
   outline: none;
+  border-color: var(--color-primary, #04A469);
 }
 
 .round {
-  border-radius: .5rem;
+  border-radius: var(--radius-sm, 6px);
 }
 
 .rounded {

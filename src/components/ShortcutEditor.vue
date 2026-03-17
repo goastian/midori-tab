@@ -140,9 +140,9 @@ export default {
 
 <style scoped>
 .shortcut-editor {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
   padding: 1rem;
   margin-bottom: 1rem;
 }
@@ -158,36 +158,37 @@ export default {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-color, white);
+  color: var(--color-text, #C4F0E0);
 }
 
 .reset-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--text-color, white);
+  background: var(--surface-overlay, #1E2D3D);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  color: var(--color-text, #C4F0E0);
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm, 6px);
   cursor: pointer;
   font-size: 1.1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast, 0.1s ease);
 }
 
 .reset-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-accent-bg, rgba(4,164,105,0.08));
+  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
   transform: rotate(180deg);
 }
 
 .shortcut-display {
-  background: rgba(255, 255, 255, 0.08);
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
+  background: var(--surface-sunken, #060A10);
+  border: 2px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-sm, 6px);
   padding: 1rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast, 0.1s ease);
   min-height: 60px;
   display: flex;
   align-items: center;
@@ -195,13 +196,13 @@ export default {
 }
 
 .shortcut-display:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: var(--surface-overlay, #1E2D3D);
+  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .shortcut-display.recording {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: #3b82f6;
+  background: rgba(9, 132, 227, 0.1);
+  border-color: var(--accent-blue, #0984e3);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -215,18 +216,18 @@ export default {
 
 kbd {
   padding: 0.4rem 0.8rem;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 6px;
+  background: var(--surface-overlay, #1E2D3D);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-sm, 6px);
   font-size: 0.9rem;
-  color: var(--text-color, white);
-  font-family: monospace;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  color: var(--color-text, #C4F0E0);
+  font-family: var(--font-mono, monospace);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
   font-weight: 600;
 }
 
 .recording-text {
-  color: #60a5fa;
+  color: var(--accent-blue, #0984e3);
   font-weight: 500;
   font-size: 0.9rem;
   animation: blink 1s ease-in-out infinite;
@@ -244,7 +245,7 @@ kbd {
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  color: var(--text-color, white);
+  color: var(--color-text, #C4F0E0);
   font-size: 0.85rem;
 }
 
@@ -252,24 +253,25 @@ kbd {
   width: 18px;
   height: 18px;
   cursor: pointer;
+  accent-color: var(--color-primary, #04A469);
 }
 
 .error-message {
   margin-top: 0.8rem;
   padding: 0.6rem;
-  background: rgba(239, 68, 68, 0.2);
-  border-left: 3px solid #ef4444;
-  border-radius: 4px;
-  color: #fca5a5;
+  background: rgba(225, 112, 85, 0.1);
+  border-left: 3px solid var(--accent-danger, #e17055);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--accent-danger, #e17055);
   font-size: 0.85rem;
 }
 
 @keyframes pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+    box-shadow: 0 0 0 0 rgba(9, 132, 227, 0.3);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 8px rgba(9, 132, 227, 0);
   }
 }
 

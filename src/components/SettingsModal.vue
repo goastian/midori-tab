@@ -66,6 +66,14 @@
                 </div>
                 <Input placeholder="New Tab" :value="settings.tabName" v-model="title" round full/>
               </div>
+
+              <div class="setting-item">
+                <div class="setting-info">
+                  <span class="setting-label">{{ i18n.t.spaces?.enable || 'Activar Spaces' }}</span>
+                  <span class="setting-description">{{ i18n.t.spaces?.enableDesc || 'Cambia entre espacios de trabajo personalizados' }}</span>
+                </div>
+                <Switch @click="toggleSpaces()" :state="spacesStore.enabled" />
+              </div>
             </div>
 
             <!-- Visual Tab -->
@@ -189,6 +197,7 @@ import useTabStore from '../stores/useTabStore.js';
 import useCommandsStore from '../stores/useCommandsStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import useThemeStore from '../stores/useThemeStore.js';
+import useSpacesStore from '../stores/useSpacesStore.js';
 import { useAutoTheme } from '../composables/useAutoTheme.js';
 import { useKeyboardShortcuts } from '../composables/useKeyboardShortcuts.js';
 
@@ -209,6 +218,7 @@ export default {
       tab: 0,
       settings: useTabStore(),
       commandsStore: useCommandsStore(),
+      spacesStore: useSpacesStore(),
       i18n: useI18nStore(),
       background: {
         type: null,
@@ -221,7 +231,7 @@ export default {
         { emoji: '⚙️', titleKey: 'navGeneral', descKey: 'navGeneralDesc' },
         { emoji: '🎨', titleKey: 'navVisual', descKey: 'navVisualDesc' },
         { emoji: '⌨️', titleKey: 'navShortcuts', descKey: 'navShortcutsDesc' },
-        { emoji: '', titleKey: 'navLanguage', descKey: 'navLanguageDesc' },
+        { emoji: '🌐', titleKey: 'navLanguage', descKey: 'navLanguageDesc' },
       ],
       openLinks: ['Self Tab', 'New Tab'],
       gradients: ['bg-orange', 'bg-green', 'bg-deal', 'bg-purple'],
@@ -295,6 +305,10 @@ export default {
       if (confirm(this.i18n.t.shortcutsTab.resetConfirm)) {
         this.commandsStore.resetAllShortcuts();
       }
+    },
+
+    toggleSpaces() {
+      this.spacesStore.enabled = !this.spacesStore.enabled;
     },
 
     toggleAutoTheme() {

@@ -119,31 +119,30 @@ export default {
 
 .dialog {
     position: absolute;
-    width: 150px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    background-color: rgba(20, 20, 20, 0.95);
-    /* Eliminado backdrop-filter - dropdown pequeño */
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: #fff;
+    width: 180px;
+    background-color: var(--surface-overlay, #1E2D3D);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    color: var(--color-text, #C4F0E0);
     bottom: -130px;
     right: 0;
-    box-shadow: rgba(0, 0, 0, 0.1) 0px 0px 5px 0px, rgba(0, 0, 0, 0.1) 0px 0px 1px 0px;
+    box-shadow: var(--shadow-lg, 0 4px 16px rgba(0,0,0,0.14));
     z-index: 20;
-    border-radius: .4rem;
+    border-radius: var(--radius-sm, 6px);
 }
 
 h2 {
     font-size: .9rem;
+    color: var(--color-text, #C4F0E0);
 }
 
 .divider {
     width: 100%;
-    height: .05rem;
-    background-color: #D3D3D3;
+    height: 1px;
+    background-color: var(--color-border, rgba(126,196,168,0.1));
 }
 
 .dialog-top {
-    padding: .4rem;
+    padding: .5rem;
 }
 
 .dialog-top>span {
@@ -151,14 +150,14 @@ h2 {
 }
 
 .text-secondary {
-    color: #6E6E6E;
+    color: var(--color-text-muted, #5A9A82);
 }
 
 .email {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 135px;
+    width: 155px;
 }
 
 .dialog-main {
@@ -168,11 +167,17 @@ h2 {
 .account {
     cursor: pointer;
     font-size: .8rem;
+    color: var(--color-text, #C4F0E0);
 }
 
 a {
     text-decoration: none;
     font-size: .9rem;
+    color: var(--color-text, #C4F0E0);
+}
+
+a:hover {
+    color: var(--color-primary, #04A469);
 }
 
 .dialog-footer {

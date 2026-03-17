@@ -124,6 +124,7 @@
   --gradient-green: linear-gradient(135deg, #8dc63f, #d4ff88);
   --gradient-teal: linear-gradient(135deg, #00b9b5, #a6f7f5);
   --gradient-purple: linear-gradient(135deg, #be1c7d, #f78fc3);
+  --gradient-deal: linear-gradient(135deg, #0984e3, #00cec9);
   --gradient-midori: linear-gradient(135deg, var(--midori-400), var(--accent-teal));
 }
 
@@ -158,6 +159,7 @@
   --gradient-green: linear-gradient(135deg, #8dc63f, #3a5311);
   --gradient-teal: linear-gradient(135deg, #00b9b5, #004f4d);
   --gradient-purple: linear-gradient(135deg, #be1c7d, #4b1037);
+  --gradient-deal: linear-gradient(135deg, #0984e3, #004a7c);
   --gradient-midori: linear-gradient(135deg, var(--ms-primary), var(--accent-teal));
 }
 

@@ -94,8 +94,8 @@ button {
   align-items: center;
   justify-content: center;
   gap: .5rem;
-  transition: .5s ease-in-out background;
-  color: var(--text-color);
+  transition: background var(--transition-fast, 0.1s ease);
+  color: var(--color-text, #C4F0E0);
 }
 
 .w-full {

@@ -79,20 +79,26 @@ export default {
   width: 100%;
   height: 35px;
   padding: 0.5rem 1rem;
-  background-color: var(--bg-glass);
-  color: var(--text-color);
-  border: none;
+  background-color: var(--surface-raised, #0F1520);
+  color: var(--color-text, #C4F0E0);
   cursor: pointer;
-  border-radius: .5rem;
+  border-radius: var(--radius-sm, 6px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  font-size: 0.85rem;
+  transition: all var(--transition-fast, 0.1s ease);
+}
+
+.dropdown-button:hover {
+  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .arrow {
   margin-left: 8px;
-  transition: transform 0.2s;
+  transition: transform 0.15s ease;
+  font-size: 0.7rem;
 }
 
 .arrow.open {
@@ -104,25 +110,26 @@ export default {
   top: 100%;
   left: 0;
   z-index: 20;
-  background: var(--bg-color);
-  color: var(--text-color);
-  box-shadow: 1px 1px 1px solid var(--bg-glass);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: .5rem;
+  background: var(--surface-overlay, #1E2D3D);
+  color: var(--color-text, #C4F0E0);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-sm, 6px);
   margin-top: 0.25rem;
   width: 100%;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg, 0 4px 16px rgba(0,0,0,0.14));
+  overflow: hidden;
 }
 
 .dropdown-menu li {
   list-style: none;
   padding: 0.5rem 1rem;
   cursor: pointer;
-  transition: .5s ease-in-out background;
+  transition: background var(--transition-fast, 0.1s ease);
+  font-size: 0.85rem;
 }
 
 .dropdown-menu li:hover {
-  background-color: var(--bg-secondary);
+  background-color: var(--color-accent-bg, rgba(4,164,105,0.08));
 }
 </style>
 
