@@ -1,15 +1,17 @@
 {
   "name": "midori-newtab",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.8",
   "type": "module",
   "scripts": {
     "dev:chrome": "npm run build:manifest:chrome && vite build --watch",
     "dev:firefox": "npm run build:manifest:firefox && vite build --watch",
     "build:manifest:chrome": "node build-manifest.js manifest/chrome.json",
     "build:manifest:firefox": "node build-manifest.js manifest/firefox.json",
-    "build:chrome": "npm run build:manifest:chrome vite build",
+    "build:chrome": "npm run build:manifest:chrome && vite build",
     "build:firefox": "npm run build:manifest:firefox && vite build",
+    "package:chrome": "npm run build:chrome && node scripts/package.js chrome",
+    "package:firefox": "npm run build:firefox && node scripts/package.js firefox",
     "preview": "vite preview"
   },
   "dependencies": {

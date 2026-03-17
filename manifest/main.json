@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "midori-tab",
-  "description": "",
-  "version": "1.0.6",
+  "description": "A beautiful, customizable new tab with smart search, workspaces, bookmarks and command palette.",
+  "version": "1.0.7",
   "author": "Im-Jota",
   "chrome_url_overrides": {
     "newtab": "index.html"
@@ -10,8 +10,6 @@
   "permissions": [
     "storage",
     "identity",
-    "webRequest",
-    "webNavigation",
     "tabs",
     "history",
     "bookmarks",
