@@ -13,7 +13,7 @@ class UnsplashService {
   #author = '';
   #authorLink = '';
   #imageLink = '';
-  #total = 10;
+  #total = 5;
 
   getUrl() {
     return this.#url;

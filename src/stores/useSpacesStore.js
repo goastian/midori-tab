@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import useTabStore from './useTabStore.js';
-import useWidgets from './useWidgets.js';
 
 const DEFAULT_SPACES = [
   {
@@ -9,7 +8,6 @@ const DEFAULT_SPACES = [
     icon: '🏠',
     color: '#00b894',
     background: { type: 'Unsplash', default: true, class: 'bg-orange' },
-    widgets: null,
   },
   {
     id: 'work',
@@ -17,7 +15,6 @@ const DEFAULT_SPACES = [
     icon: '💼',
     color: '#0984e3',
     background: { type: 'Gradient', default: true, class: 'bg-deal' },
-    widgets: null,
   },
   {
     id: 'study',
@@ -25,7 +22,6 @@ const DEFAULT_SPACES = [
     icon: '📚',
     color: '#6c5ce7',
     background: { type: 'Gradient', default: true, class: 'bg-purple' },
-    widgets: null,
   },
 ];
 
@@ -57,21 +53,15 @@ const useSpacesStore = defineStore('spacesStore', {
       if (!space) return;
 
       const tabStore = useTabStore();
-      const widgetsStore = useWidgets();
 
       space.background = { ...tabStore.background };
-      space.widgets = JSON.parse(JSON.stringify(widgetsStore.widgets));
     },
 
     applySpace(space) {
       const tabStore = useTabStore();
-      const widgetsStore = useWidgets();
 
       if (space.background) {
         tabStore.changeBackground({ ...space.background });
-      }
-      if (space.widgets) {
-        widgetsStore.widgets = JSON.parse(JSON.stringify(space.widgets));
       }
     },
 
@@ -83,7 +73,6 @@ const useSpacesStore = defineStore('spacesStore', {
         icon: icon || '🌐',
         color: color || '#00b894',
         background: { type: 'Unsplash', default: true, class: 'bg-orange' },
-        widgets: null,
       });
       return id;
     },

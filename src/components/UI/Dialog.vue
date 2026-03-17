@@ -155,8 +155,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: var(--bg-blur);
-  backdrop-filter: blur(.2rem);
+  background-color: var(--surface-overlay, #1E2D3D);
   border-radius: .4rem;
 }
 

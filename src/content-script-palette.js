@@ -23,7 +23,6 @@ function createCommandPalette() {
     width: 100vw;
     height: 100vh;
     background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
     z-index: 999999999;
     display: none;
     align-items: flex-start;
@@ -36,13 +35,12 @@ function createCommandPalette() {
   const palette = document.createElement('div');
   palette.id = 'midori-command-palette';
   palette.style.cssText = `
-    background: rgba(20, 20, 20, 0.95);
-    backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(0, 184, 148, 0.12);
+    background: #0F1520;
+    border: 1px solid rgba(126, 196, 168, 0.1);
     border-radius: 16px;
     width: 90%;
     max-width: 600px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 184, 148, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
     overflow: hidden;
     animation: midoriSlideDown 0.2s ease-out;
   `;

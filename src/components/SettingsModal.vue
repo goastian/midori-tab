@@ -98,24 +98,6 @@
                 <Switch @click="toggleAutoTheme()" :state="settings.autoTheme" />
               </div>
 
-              <div class="separator"></div>
-
-              <div class="setting-item">
-                <div class="setting-info">
-                  <span class="setting-label">{{ i18n.t.visual.displayMode }}</span>
-                  <span class="setting-description">{{ i18n.t.visual.displayModeDesc }}</span>
-                </div>
-                <Dropdown v-model="settings.mode" :options="modes" @change="changeBackground()" />
-              </div>
-
-              <div class="setting-item" v-if="settings.mode == 'Productivity'">
-                <div class="setting-info">
-                  <span class="setting-label">{{ i18n.t.visual.customizeWidgets }}</span>
-                  <span class="setting-description">{{ i18n.t.visual.customizeWidgetsDesc }}</span>
-                </div>
-                <Switch @click="widgets.changeState" :state="widgets.state == true" />
-              </div>
-
               <div v-if="background.type == 'Gradient'" class="gradients-section">
                 <span class="section-label">{{ i18n.t.visual.availableGradients }}</span>
                 <div class="gradients-grid">
@@ -130,6 +112,10 @@
                   </div>
                 </div>
               </div>
+
+              <div class="separator"></div>
+
+              <ThemePicker />
             </div>
 
             <!-- Shortcuts Tab -->
@@ -171,23 +157,8 @@
               </button>
             </div>
 
-            <!-- Custom Shortcuts Tab -->
-            <div v-if="tab === 3" class="settings-section">
-              <CustomShortcutsManager />
-            </div>
-
-            <!-- Temas Tab -->
-            <div v-if="tab === 4" class="settings-section">
-              <ThemePicker />
-            </div>
-
-            <!-- Spaces Tab -->
-            <div v-if="tab === 5" class="settings-section">
-              <SpacesManager />
-            </div>
-
             <!-- Language Tab -->
-            <div v-if="tab === 6" class="settings-section">
+            <div v-if="tab === 3" class="settings-section">
               <LanguageSelector />
             </div>
           </div>
@@ -212,14 +183,14 @@ import Switch from './UI/Switch.vue';
 import Dropdown from './UI/Dropdown.vue';
 import Input from './UI/Input.vue';
 import ShortcutEditor from './ShortcutEditor.vue';
-import CustomShortcutsManager from './CustomShortcutsManager.vue';
-import SpacesManager from './SpacesManager.vue';
 import ThemePicker from './ThemePicker.vue';
 import LanguageSelector from './LanguageSelector.vue';
 import useTabStore from '../stores/useTabStore.js';
-import useWidgets from '../stores/useWidgets.js';
 import useCommandsStore from '../stores/useCommandsStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
+import useThemeStore from '../stores/useThemeStore.js';
+import { useAutoTheme } from '../composables/useAutoTheme.js';
+import { useKeyboardShortcuts } from '../composables/useKeyboardShortcuts.js';
 
 export default {
   name: 'SettingsModal',
@@ -229,8 +200,6 @@ export default {
     Input,
     Dropdown,
     ShortcutEditor,
-    CustomShortcutsManager,
-    SpacesManager,
     ThemePicker,
     LanguageSelector,
   },
@@ -239,7 +208,6 @@ export default {
     return {
       tab: 0,
       settings: useTabStore(),
-      widgets: useWidgets(),
       commandsStore: useCommandsStore(),
       i18n: useI18nStore(),
       background: {
@@ -253,15 +221,11 @@ export default {
         { emoji: '⚙️', titleKey: 'navGeneral', descKey: 'navGeneralDesc' },
         { emoji: '🎨', titleKey: 'navVisual', descKey: 'navVisualDesc' },
         { emoji: '⌨️', titleKey: 'navShortcuts', descKey: 'navShortcutsDesc' },
-        { emoji: '🔗', titleKey: 'navCustom', descKey: 'navCustomDesc' },
-        { emoji: '🎨', titleKey: 'navThemes', descKey: 'navThemesDesc' },
-        { emoji: '🪐', titleKey: 'navSpaces', descKey: 'navSpacesDesc' },
-        { emoji: '🌐', titleKey: 'navLanguage', descKey: 'navLanguageDesc' },
+        { emoji: '', titleKey: 'navLanguage', descKey: 'navLanguageDesc' },
       ],
       openLinks: ['Self Tab', 'New Tab'],
       gradients: ['bg-orange', 'bg-green', 'bg-deal', 'bg-purple'],
       backgrounds: ['Gradient', 'Unsplash'],
-      modes: ['Minimalist', 'Informative', 'Productivity'],
     };
   },
 
@@ -321,33 +285,30 @@ export default {
 
     updateShortcut(shortcutName, shortcutConfig) {
       this.commandsStore.updateShortcut(shortcutName, shortcutConfig);
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
     },
 
     resetShortcut(shortcutName) {
       this.commandsStore.resetShortcut(shortcutName);
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
     },
 
     resetAllShortcuts() {
       if (confirm(this.i18n.t.shortcutsTab.resetConfirm)) {
         this.commandsStore.resetAllShortcuts();
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
       }
     },
 
     toggleAutoTheme() {
       this.settings.autoTheme = !this.settings.autoTheme;
-      // Reload to apply/stop auto theme timer
-      setTimeout(() => {
-        window.location.reload();
-      }, 300);
+      if (this.settings.autoTheme) {
+        const autoTheme = useAutoTheme();
+        autoTheme.start();
+      } else {
+        const autoTheme = useAutoTheme();
+        autoTheme.stop();
+        // Re-apply current manual theme
+        const themeStore = useThemeStore();
+        themeStore.applyTheme(this.settings.theme);
+      }
     },
   },
 };
@@ -360,9 +321,7 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: flex-end;
   justify-content: flex-start;
@@ -374,12 +333,10 @@ export default {
   width: 900px;
   max-width: 90vw;
   height: 90vh;
-  background: var(--bg-glass, rgba(255, 255, 255, 0.1));
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px 16px 0 0;
-  box-shadow: 0 -10px 60px rgba(0, 0, 0, 0.3);
+  background: var(--surface-base, #080D14);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-lg, 16px) var(--radius-lg, 16px) 0 0;
+  box-shadow: var(--shadow-xl, 0 8px 32px rgba(0,0,0,0.2));
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -392,8 +349,8 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 1.2rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  background: var(--surface-raised, #0F1520);
 }
 
 .header-content {
@@ -409,28 +366,27 @@ export default {
 .settings-title {
   font-size: 1.2rem;
   font-weight: 600;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
   margin: 0;
 }
 
 .close-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  background: var(--surface-overlay, #1E2D3D);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-sm, 6px);
   width: 32px;
   height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
-  color: var(--text-color, white);
+  transition: all var(--transition-fast, 0.1s ease);
+  color: var(--color-text, white);
   font-size: 1.2rem;
 }
 
 .close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: scale(1.05);
+  background: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .settings-body {
@@ -441,8 +397,8 @@ export default {
 
 .settings-sidebar {
   width: 240px;
-  background: rgba(0, 0, 0, 0.2);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-sunken, #060A10);
+  border-right: 1px solid var(--color-border, rgba(126,196,168,0.1));
   overflow-y: auto;
   flex-shrink: 0;
 }
@@ -460,20 +416,20 @@ export default {
   padding: 0.75rem;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 6px);
   cursor: pointer;
-  transition: all 0.2s ease;
-  color: var(--text-color, white);
+  transition: all var(--transition-fast, 0.1s ease);
+  color: var(--color-text, white);
   text-align: left;
   margin-bottom: 0.25rem;
 }
 
 .sidebar-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-raised, #0F1520);
 }
 
 .sidebar-item.active {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--surface-overlay, #1E2D3D);
 }
 
 .sidebar-icon {
@@ -493,12 +449,12 @@ export default {
 .sidebar-title {
   font-weight: 500;
   font-size: 0.9rem;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
 }
 
 .sidebar-description {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--color-text-muted, #5A9A82);
   line-height: 1.3;
 }
 
@@ -521,13 +477,13 @@ export default {
 .section-title-main {
   font-size: 1.3rem;
   font-weight: 600;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
   margin: 0 0 0.3rem 0;
 }
 
 .section-subtitle {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-muted, #5A9A82);
   margin: 0;
 }
 
@@ -536,15 +492,15 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  transition: all 0.2s ease;
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
+  transition: all var(--transition-fast, 0.1s ease);
 }
 
 .setting-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--surface-overlay, #1E2D3D);
+  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .setting-info {
@@ -556,18 +512,18 @@ export default {
 
 .setting-label {
   font-weight: 500;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
   font-size: 0.95rem;
 }
 
 .setting-description {
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-muted, #5A9A82);
 }
 
 .separator {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-border, rgba(126,196,168,0.1));
   margin: 0.5rem 0;
 }
 
@@ -576,14 +532,14 @@ export default {
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
 }
 
 .section-label {
   font-weight: 500;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
   font-size: 0.9rem;
 }
 
@@ -595,9 +551,9 @@ export default {
 
 .gradient-card {
   height: 80px;
-  border-radius: 10px;
+  border-radius: var(--radius-md, 10px);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast, 0.1s ease);
   border: 2px solid transparent;
   display: flex;
   align-items: center;
@@ -606,19 +562,17 @@ export default {
 }
 
 .gradient-card:hover {
-  transform: scale(1.05);
-  border-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.03);
+  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .gradient-card.active {
-  border-color: rgba(59, 130, 246, 0.8);
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+  border-color: var(--color-primary, #04A469);
 }
 
 .check-icon {
   font-size: 1.5rem;
   color: white;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .shortcuts-header {
@@ -628,52 +582,51 @@ export default {
 .section-title {
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
   margin: 0 0 0.5rem 0;
 }
 
 .section-description {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-muted, #5A9A82);
   margin: 0;
 }
 
 .shortcuts-info {
   padding: 1rem;
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 10px;
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: var(--radius-md, 10px);
   margin-top: 1rem;
 }
 
 .info-text {
   font-size: 0.85rem;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
   margin: 0.5rem 0;
 }
 
 .reset-all-btn {
   width: 100%;
   padding: 0.8rem;
-  background: rgba(239, 68, 68, 0.2);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  border-radius: 8px;
-  color: var(--text-color, white);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--color-text, white);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast, 0.1s ease);
   margin-top: 1rem;
 }
 
 .reset-all-btn:hover {
-  background: rgba(239, 68, 68, 0.3);
-  transform: translateY(-2px);
+  background: rgba(239, 68, 68, 0.2);
 }
 
 .settings-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--color-border, rgba(126,196,168,0.1));
   padding: 0.8rem 1.5rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-sunken, #060A10);
 }
 
 .footer-hint {
@@ -681,20 +634,20 @@ export default {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-muted, #5A9A82);
 }
 
 .footer-hint kbd {
   padding: 0.2rem 0.5rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--surface-overlay, #1E2D3D);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
   border-radius: 4px;
   font-size: 0.75rem;
-  color: var(--text-color, white);
+  color: var(--color-text-secondary, #7EC4A8);
   font-family: monospace;
 }
 
-/* Scrollbar personalizado */
+/* Scrollbar */
 .settings-content::-webkit-scrollbar,
 .settings-sidebar::-webkit-scrollbar {
   width: 6px;
@@ -702,28 +655,28 @@ export default {
 
 .settings-content::-webkit-scrollbar-track,
 .settings-sidebar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
   border-radius: 3px;
 }
 
 .settings-content::-webkit-scrollbar-thumb,
 .settings-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-border, rgba(126,196,168,0.1));
   border-radius: 3px;
 }
 
 .settings-content::-webkit-scrollbar-thumb:hover,
 .settings-sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
-/* Animaciones */
+/* Animations */
 .slide-up-enter-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.15s ease;
 }
 
 .slide-up-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity 0.1s ease;
 }
 
 .slide-up-enter-from,
@@ -732,11 +685,11 @@ export default {
 }
 
 .modal-slide-enter-active {
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modal-slide-leave-active {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modal-slide-enter-from {
@@ -754,7 +707,7 @@ export default {
     max-width: 100vw;
     height: 95vh;
     margin-left: 0;
-    border-radius: 16px 16px 0 0;
+    border-radius: var(--radius-lg, 16px) var(--radius-lg, 16px) 0 0;
   }
 
   .settings-body {
@@ -764,7 +717,7 @@ export default {
   .settings-sidebar {
     width: 100%;
     border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
     max-height: 150px;
   }
 

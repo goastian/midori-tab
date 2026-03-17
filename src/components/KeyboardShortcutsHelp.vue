@@ -142,8 +142,6 @@ export default {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -152,11 +150,9 @@ export default {
 }
 
 .shortcuts-panel {
-  background: var(--bg-glass, rgba(255, 255, 255, 0.1));
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-lg, 16px);
   max-width: 800px;
   width: 100%;
   max-height: 80vh;

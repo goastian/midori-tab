@@ -90,12 +90,12 @@ export default {
 .suggestions-greeting {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
 }
 
 .suggestions-label {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--color-text-muted, #5A9A82);
   font-weight: 400;
 }
 
@@ -110,26 +110,26 @@ export default {
   align-items: center;
   gap: 0.65rem;
   padding: 0.6rem 0.75rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast, 0.1s ease);
   cursor: pointer;
 }
 
 .suggestion-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(0, 184, 148, 0.25);
+  background: var(--surface-overlay, #1E2D3D);
+  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
   transform: translateX(4px);
 }
 
 .suggestion-favicon {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm, 6px);
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-overlay, #1E2D3D);
 }
 
 .suggestion-info {
@@ -143,7 +143,7 @@ export default {
 .suggestion-title {
   font-size: 0.85rem;
   font-weight: 500;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -151,23 +151,23 @@ export default {
 
 .suggestion-hint {
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--color-text-muted, #5A9A82);
 }
 
 .dismiss-btn {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--color-text-muted, #5A9A82);
   cursor: pointer;
   font-size: 0.75rem;
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast, 0.1s ease);
   flex-shrink: 0;
 }
 
 .dismiss-btn:hover {
-  color: rgba(255, 107, 107, 0.8);
-  background: rgba(255, 107, 107, 0.1);
+  color: var(--accent-danger, #e17055);
+  background: rgba(225, 112, 85, 0.1);
 }
 </style>

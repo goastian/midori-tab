@@ -104,11 +104,9 @@ export default {
 
 <style scoped>
 .astian-rss-widget {
-  background: var(--bg-glass);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-color);
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  color: var(--color-text, white);
   border-radius: 12px;
   height: 100%;
   overflow: hidden;

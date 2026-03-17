@@ -168,8 +168,8 @@
 }
 
 .hover-glow:hover {
-  box-shadow: var(--shadow-glow);
-  border-color: var(--glass-border);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
 }
 
 .hover-scale {

@@ -47,12 +47,10 @@ export default {
   display: flex;
   gap: 0.35rem;
   padding: 0.3rem;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
   border-radius: 2rem;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md, 0 2px 8px rgba(0,0,0,0.1));
 }
 
 .switcher-pill {
@@ -63,24 +61,23 @@ export default {
   border-radius: 1.5rem;
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--color-text-muted, #5A9A82);
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 500;
-  transition: all 0.25s ease;
+  transition: all var(--transition-fast, 0.1s ease);
   white-space: nowrap;
 }
 
 .switcher-pill:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  background: var(--surface-overlay, #1E2D3D);
+  color: var(--color-text, white);
 }
 
 .switcher-pill.active {
-  background: color-mix(in srgb, var(--pill-color, #00b894) 30%, transparent);
-  border-color: color-mix(in srgb, var(--pill-color, #00b894) 50%, transparent);
-  color: white;
-  box-shadow: 0 0 10px color-mix(in srgb, var(--pill-color, #00b894) 20%, transparent);
+  background: color-mix(in srgb, var(--pill-color, var(--ms-primary, #04A469)) 25%, var(--surface-overlay, #1E2D3D));
+  border-color: color-mix(in srgb, var(--pill-color, var(--ms-primary, #04A469)) 40%, transparent);
+  color: var(--color-text, white);
 }
 
 .pill-icon {
@@ -94,10 +91,10 @@ export default {
 
 /* Transition */
 .slide-down-enter-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 .slide-down-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.1s ease, transform 0.1s ease;
 }
 .slide-down-enter-from, .slide-down-leave-to {
   opacity: 0;

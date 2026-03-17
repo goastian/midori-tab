@@ -19,6 +19,10 @@
         <div class="bottom">
             <v-options />
         </div>
+
+        <div class="cmd-hint">
+            <kbd>{{ cmdKey }}</kbd> {{ cmdLabel }}
+        </div>
     </div>
 </template>
 
@@ -26,12 +30,30 @@
 import { defineAsyncComponent } from 'vue';
 import img from '../assets/favicon.png';
 import useTabStore from '../stores/useTabStore';
+import useCommandsStore from '../stores/useCommandsStore';
 export default {
     data() {
         return {
             img,
             tab: useTabStore(),
+            commandsStore: useCommandsStore(),
         }
+    },
+
+    computed: {
+        cmdKey() {
+            const s = this.commandsStore.shortcuts?.openCommandPalette;
+            if (!s) return '⌘K';
+            const parts = [];
+            if (s.ctrl) parts.push(navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl');
+            if (s.alt) parts.push('Alt');
+            if (s.shift) parts.push('Shift');
+            parts.push(s.key?.toUpperCase() || 'K');
+            return parts.join('+');
+        },
+        cmdLabel() {
+            return 'Command Palette';
+        },
     },
     components: {
         VOptions: defineAsyncComponent(() => import('../components/VOptions.vue')),
@@ -102,5 +124,32 @@ export default {
     display: flex;
     justify-content: start;
     align-items: start;
+}
+
+.cmd-hint {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #5A9A82);
+    opacity: 0.5;
+    transition: opacity var(--transition-fast, 0.1s ease);
+}
+
+.cmd-hint:hover {
+    opacity: 0.8;
+}
+
+.cmd-hint kbd {
+    padding: 0.15rem 0.4rem;
+    background: var(--surface-raised, #0F1520);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-family: monospace;
+    color: var(--color-text-secondary, #7EC4A8);
 }
 </style>

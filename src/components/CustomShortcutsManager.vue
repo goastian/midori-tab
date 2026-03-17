@@ -503,14 +503,12 @@ label {
   top: calc(100% + 0.5rem);
   left: 0;
   right: 0;
-  background: rgba(20, 20, 20, 0.98);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 10px;
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
   padding: 1rem;
   z-index: 1000;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-xl, 0 8px 32px rgba(0,0,0,0.2));
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 0.6rem;

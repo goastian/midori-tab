@@ -13,8 +13,7 @@ const useTabStore = defineStore('tabStore', {
     shortcuts: true,
     state: false,
     openLink: 'Self Tab',
-    mode: 'Minimalist',
-    autoTheme: true,
+    autoTheme: false,
   }),
 
   actions: {
@@ -80,7 +79,7 @@ const useTabStore = defineStore('tabStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['tabName', 'theme', 'background', 'shortcuts', 'openLink', 'mode', 'autoTheme'],
+    paths: ['tabName', 'theme', 'background', 'shortcuts', 'openLink', 'autoTheme'],
   }
 })
 

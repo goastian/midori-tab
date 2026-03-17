@@ -95,6 +95,7 @@
 import useThemeStore from '../stores/useThemeStore.js';
 import useTabStore from '../stores/useTabStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
+import { useAutoTheme } from '../composables/useAutoTheme.js';
 
 export default {
   name: 'ThemePicker',
@@ -129,7 +130,15 @@ export default {
 
     toggleAutoAdapt() {
       this.tabStore.autoTheme = !this.tabStore.autoTheme;
-      setTimeout(() => window.location.reload(), 300);
+      if (this.tabStore.autoTheme) {
+        const autoTheme = useAutoTheme();
+        autoTheme.start();
+      } else {
+        const autoTheme = useAutoTheme();
+        autoTheme.stop();
+        // Re-apply current manual theme
+        this.themeStore.applyTheme(this.tabStore.theme);
+      }
     },
 
     swatchStyle(variant, key) {
@@ -165,13 +174,13 @@ export default {
 .section-title-main {
   font-size: 1.3rem;
   font-weight: 600;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
   margin: 0 0 0.3rem 0;
 }
 
 .section-subtitle {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-muted, #5A9A82);
   margin: 0;
 }
 
@@ -188,24 +197,22 @@ export default {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.6rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 2px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  background: var(--surface-raised, #0F1520);
+  border: 2px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast, 0.1s ease);
   text-align: left;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
 }
 
 .theme-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+  background: var(--surface-overlay, #1E2D3D);
+  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .theme-card.active {
-  border-color: var(--theme-accent, #00b894);
-  box-shadow: 0 0 16px rgba(0, 184, 148, 0.2);
+  border-color: var(--color-primary, #04A469);
 }
 
 .theme-preview {
@@ -241,7 +248,7 @@ export default {
   right: 0.4rem;
   width: 20px;
   height: 20px;
-  background: var(--theme-accent, #00b894);
+  background: var(--color-primary, #04A469);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -257,20 +264,20 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  transition: all 0.2s ease;
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
+  transition: all var(--transition-fast, 0.1s ease);
 }
 
 .setting-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--surface-overlay, #1E2D3D);
+  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .setting-info { display: flex; flex-direction: column; gap: 0.3rem; flex: 1; }
-.setting-label { font-weight: 500; color: var(--text-color, white); font-size: 0.95rem; }
-.setting-description { font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); }
+.setting-label { font-weight: 500; color: var(--color-text, white); font-size: 0.95rem; }
+.setting-description { font-size: 0.8rem; color: var(--color-text-muted, #5A9A82); }
 
 /* Toggle */
 .toggle-btn {
@@ -284,14 +291,14 @@ export default {
   display: block;
   width: 44px;
   height: 24px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--surface-overlay, #1E2D3D);
   border-radius: 12px;
   position: relative;
-  transition: background 0.2s;
+  transition: background var(--transition-fast, 0.1s ease);
 }
 
 .toggle-btn.active .toggle-track {
-  background: var(--theme-accent, #00b894);
+  background: var(--color-primary, #04A469);
 }
 
 .toggle-thumb {
@@ -302,7 +309,7 @@ export default {
   height: 20px;
   border-radius: 50%;
   background: white;
-  transition: transform 0.2s;
+  transition: transform var(--transition-fast, 0.1s ease);
 }
 
 .toggle-btn.active .toggle-thumb {
@@ -314,9 +321,9 @@ export default {
   display: flex;
   gap: 1rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  background: var(--surface-sunken, #060A10);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
 }
 
 .preview-section {
@@ -329,7 +336,7 @@ export default {
 .preview-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--color-text-muted, #5A9A82);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -343,8 +350,8 @@ export default {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  border: 2px solid rgba(255, 255, 255, 0.12);
-  transition: transform 0.15s ease;
+  border: 2px solid var(--color-border, rgba(126,196,168,0.1));
+  transition: transform var(--transition-fast, 0.1s ease);
 }
 
 .swatch:hover {
@@ -354,9 +361,9 @@ export default {
 /* Custom Editor */
 .custom-editor {
   padding: 1.25rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: var(--surface-raised, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-md, 10px);
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -366,14 +373,14 @@ export default {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-color, white);
+  color: var(--color-text, white);
 }
 
 .editor-variant-tabs {
   display: flex;
   gap: 0.35rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
+  background: var(--surface-sunken, #060A10);
+  border-radius: var(--radius-sm, 6px);
   padding: 0.2rem;
 }
 
@@ -382,17 +389,17 @@ export default {
   padding: 0.4rem;
   background: transparent;
   border: none;
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--color-text-muted, #5A9A82);
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast, 0.1s ease);
 }
 
 .variant-tab.active {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--text-color, white);
+  background: var(--surface-overlay, #1E2D3D);
+  color: var(--color-text, white);
 }
 
 .custom-fields {
@@ -407,14 +414,14 @@ export default {
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.5rem 0.6rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  background: var(--surface-sunken, #060A10);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-sm, 6px);
 }
 
 .color-field-label {
   font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--color-text-secondary, #7EC4A8);
   font-weight: 500;
 }
 
@@ -430,7 +437,7 @@ export default {
 
 .color-input::-webkit-color-swatch-wrapper { padding: 0; }
 .color-input::-webkit-color-swatch {
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  border: 2px solid var(--color-border, rgba(126,196,168,0.1));
   border-radius: 6px;
 }
 </style>

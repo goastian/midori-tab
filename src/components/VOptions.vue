@@ -21,24 +21,20 @@ export default {
 .container-options {
     display: flex;
     gap: 1rem;
-    /* Eliminado backdrop-filter - componente pequeño */
-    background-color: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    color: white;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+    background-color: var(--surface-raised, #0F1520);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    color: var(--color-text, white);
     padding: .3rem;
-    border-radius: .6rem;
+    border-radius: var(--radius-md, 10px);
 }
 
 .options {
     width: 100%;
-    background-color: var(--bg-blur);
+    background-color: var(--surface-overlay, #1E2D3D);
     display: flex;
     gap: 1rem;
     align-items: center;
     padding: .3rem .8rem;
-    border-radius: .5rem;
-    box-shadow: 0 0 .4rem var(--border-color);
+    border-radius: var(--radius-sm, 6px);
 }
 </style>
