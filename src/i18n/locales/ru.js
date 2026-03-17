@@ -43,10 +43,7 @@ export default {
     darkModeDesc: 'Включить тёмную тему',
     autoTheme: 'Авто-тема',
     autoThemeDesc: 'Автоматически переключает светлую днём и тёмную ночью',
-    displayMode: 'Режим отображения',
-    displayModeDesc: 'Выберите, как вы хотите видеть страницу',
-    customizeWidgets: 'Настроить виджеты',
-    customizeWidgetsDesc: 'Включить настройку виджетов',
+
     availableGradients: 'Доступные градиенты',
   },
 

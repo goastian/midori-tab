@@ -43,10 +43,7 @@ export default {
     darkModeDesc: 'ダークテーマを有効にする',
     autoTheme: '自動テーマ',
     autoThemeDesc: '昼は自動でライト、夜はダークに切り替え',
-    displayMode: '表示モード',
-    displayModeDesc: 'ページの表示方法を選択',
-    customizeWidgets: 'ウィジェットをカスタマイズ',
-    customizeWidgetsDesc: 'ウィジェットのカスタマイズを有効にする',
+
     availableGradients: '利用可能なグラデーション',
   },
 

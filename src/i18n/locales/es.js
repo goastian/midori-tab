@@ -47,10 +47,7 @@ export default {
     darkModeDesc: 'Activar tema oscuro',
     autoTheme: 'Auto Theme',
     autoThemeDesc: 'Cambia automáticamente claro de día, oscuro de noche',
-    displayMode: 'Modo de visualización',
-    displayModeDesc: 'Selecciona cómo quieres ver tu página',
-    customizeWidgets: 'Personalizar widgets',
-    customizeWidgetsDesc: 'Activar personalización de widgets',
+
     availableGradients: 'Gradientes disponibles',
   },
 

@@ -43,10 +43,7 @@ export default {
     darkModeDesc: 'Enable dark theme',
     autoTheme: 'Auto Theme',
     autoThemeDesc: 'Automatically switches light during day, dark at night',
-    displayMode: 'Display mode',
-    displayModeDesc: 'Select how you want to view your page',
-    customizeWidgets: 'Customize widgets',
-    customizeWidgetsDesc: 'Enable widget customization',
+
     availableGradients: 'Available gradients',
   },
 

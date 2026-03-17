@@ -43,10 +43,7 @@ export default {
     darkModeDesc: '启用深色主题',
     autoTheme: '自动主题',
     autoThemeDesc: '白天自动切换浅色，夜晚切换深色',
-    displayMode: '显示模式',
-    displayModeDesc: '选择页面显示方式',
-    customizeWidgets: '自定义小组件',
-    customizeWidgetsDesc: '启用小组件自定义',
+
     availableGradients: '可用渐变',
   },
 

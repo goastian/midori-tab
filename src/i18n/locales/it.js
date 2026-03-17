@@ -43,10 +43,7 @@ export default {
     darkModeDesc: 'Attiva il tema scuro',
     autoTheme: 'Tema Automatico',
     autoThemeDesc: 'Cambia automaticamente chiaro di giorno, scuro di notte',
-    displayMode: 'Modalità di visualizzazione',
-    displayModeDesc: 'Seleziona come vuoi vedere la tua pagina',
-    customizeWidgets: 'Personalizza widget',
-    customizeWidgetsDesc: 'Attiva la personalizzazione dei widget',
+
     availableGradients: 'Gradienti disponibili',
   },
 
