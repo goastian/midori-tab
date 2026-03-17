@@ -1,7 +1,7 @@
 {
   "name": "midori-newtab",
   "private": true,
-  "version": "1.0.6",
+  "version": "1.0.7",
   "type": "module",
   "scripts": {
     "dev:chrome": "npm run build:manifest:chrome && vite build --watch",
@@ -16,7 +16,6 @@
     "@fontsource/inter": "^5.2.8",
     "@iconify/vue": "^5.0.0",
     "axios": "^1.11.0",
-    "gridstack": "^12.2.2",
     "lucide-vue-next": "^0.575.0",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.4.1",
