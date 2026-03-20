@@ -63,22 +63,24 @@ import useI18nStore from '../stores/useI18nStore.js';
 const STORAGE_KEY = 'midori_bookmarks';
 const CATS_KEY = 'midori_bookmark_categories';
 
-const DEFAULT_CATEGORIES = ['Personal', 'Work', 'Study'];
+const DEFAULT_CATEGORIES = ['Personal', 'Work', 'Travel'];
 
 const DEFAULT_BOOKMARKS = {
   Personal: [
     { title: 'Astian', url: 'https://astian.org/', domain: 'astian.org' },
     { title: 'MiWallet', url: 'https://wallet.astian.org', domain: 'wallet.astian.org' },
-    { title: 'Instagram', url: 'https://instagram.com', domain: 'instagram.com' },
-    { title: 'Amazon', url: 'https://amazon.com', domain: 'amazon.com' },
+    { title: 'Amazon', url: 'https://amzn.to/47IiNIO', domain: 'amazon.com' },
+    { title: 'Aliexpress', url: 'https://s.click.aliexpress.com/e/_c2xYL4uP', domain: 'aliexpress.us' },
   ],
   Work: [
     { title: 'GitHub', url: 'https://github.com', domain: 'github.com' },
     { title: 'Notion', url: 'https://notion.so', domain: 'notion.so' },
   ],
-  Study: [
-    { title: 'MDN Web Docs', url: 'https://developer.mozilla.org', domain: 'mozilla.org' },
-    { title: 'FreeCodeCamp', url: 'https://freecodecamp.org', domain: 'freecodecamp.org' },
+  Travel: [
+    { title: 'Trip.com', url: 'https://www.trip.com/?Allianceid=4479273&SID=57814702&trip_sub1=&trip_sub3=D14220523', domain: 'trip.com' },
+    { title: 'Expedia', url: 'https://expedia.com/affiliate/tot01yr', domain: 'expedia.com' },
+    { title: 'Skyscanner', url: 'https://skyscanner.pxf.io/dyOg6M', domain: 'skyscanner.com' },
+    { title: 'GetYourGuide', url: 'getyourguide.com?partner_id=MK2RLVJ&utm_medium=online_publisher', domain: 'getyourguide.com' },
   ],
 };
 
