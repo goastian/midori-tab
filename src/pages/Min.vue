@@ -48,11 +48,6 @@
             </div>
         </section>
 
-        <!-- ═══ Fixed UI ═══ -->
-        <div class="bottom-bar">
-            <b-login />
-        </div>
-
         <div class="cmd-hint">
             <kbd>{{ cmdKey }}</kbd> {{ cmdLabel }}
         </div>
@@ -228,7 +223,6 @@ export default {
 
     components: {
         Settings,
-        BLogin: defineAsyncComponent(() => import('../components/BLogin.vue')),
         Logo: defineAsyncComponent(() => import('../components/Logo.vue')),
         SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
         BookmarkGrid: defineAsyncComponent(() => import('../components/BookmarkGrid.vue')),

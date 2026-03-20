@@ -2,7 +2,6 @@
     <div class="container-options">
         <div class="options">
             <b-setting />
-            <b-login />
         </div>
     </div>
 </template>
@@ -12,7 +11,6 @@ import { defineAsyncComponent } from 'vue';
 export default {
     components: {
         BSetting: defineAsyncComponent(() => import('../components/BSetting.vue')),
-        BLogin: defineAsyncComponent(() => import('../components/BLogin.vue')),
     }
 }
 </script>
