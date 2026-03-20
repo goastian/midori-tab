@@ -126,10 +126,11 @@ import useCommandsStore from '../stores/useCommandsStore';
 import useWidgetsStore from '../stores/useWidgetsStore';
 
 /** Widget keys for the bottom sheet (everything except search & bookmarks). */
-const GRID_KEYS = ['rss', 'calendar', 'notes', 'todo'];
+const GRID_KEYS = ['privacy', 'rss', 'calendar', 'notes', 'todo'];
 
 /** Widget metadata for the bottom sheet picker. */
 const WIDGET_META = [
+    { key: 'privacy', icon: '🛡️', label: 'Privacy' },
     { key: 'calendar', icon: '📅', label: 'Calendar' },
     { key: 'notes', icon: '📝', label: 'Sticky Note' },
     { key: 'todo', icon: '✅', label: 'Tasks' },
@@ -173,6 +174,7 @@ export default {
         },
         widgetComponentMap() {
             return {
+                privacy: 'PrivacyWidget',
                 rss: 'RssWidget',
                 calendar: 'CalendarWidget',
                 notes: 'NotesWidget',
@@ -227,6 +229,7 @@ export default {
         Logo: defineAsyncComponent(() => import('../components/Logo.vue')),
         SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
         BookmarkGrid: defineAsyncComponent(() => import('../components/BookmarkGrid.vue')),
+        PrivacyWidget: defineAsyncComponent(() => import('../components/PrivacyWidget.vue')),
         RssWidget: defineAsyncComponent(() => import('../components/RssWidget.vue')),
         CalendarWidget: defineAsyncComponent(() => import('../components/CalendarWidget.vue')),
         NotesWidget: defineAsyncComponent(() => import('../components/NotesWidget.vue')),

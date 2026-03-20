@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 
 /** Default widget order */
-const DEFAULT_ORDER = ['search', 'bookmarks', 'rss', 'calendar', 'notes', 'todo'];
+const DEFAULT_ORDER = ['search', 'bookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
 
 /**
  * Store that manages which widgets are enabled and their display order.
@@ -12,6 +12,7 @@ const useWidgetsStore = defineStore('widgetsStore', {
     enabled: {
       search: true,
       bookmarks: true,
+      privacy: true,
       rss: false,
       calendar: false,
       notes: false,
@@ -60,6 +61,7 @@ const useWidgetsStore = defineStore('widgetsStore', {
         store.enabled = {
           search: !!raw.search,
           bookmarks: !!raw.bookmarks,
+          privacy: raw.privacy !== false,
           rss: !!raw.rss,
           calendar: !!raw.calendar,
           notes: !!raw.notes,

@@ -59,15 +59,7 @@
     }
   ],
   "background": {
-    "scripts": [
-      "background.js"
-    ],
+    "service_worker": "background.js",
     "type": "module"
-  },
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "midoritabs@astian.org",
-      "strict_min_version": "109.0"
-    }
   }
 }
