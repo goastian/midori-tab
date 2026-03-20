@@ -41,7 +41,7 @@
                 <Switch @click="settings.changeShortcuts()" :state="settings.shortcuts" />
               </div>
 
-              <div class="setting-item">
+              <div class="setting-item setting-item--stacked">
                 <div class="setting-info">
                   <span class="setting-label">{{ i18n.t.general.openSearchIn }}</span>
                   <span class="setting-description">{{ i18n.t.general.openSearchInDesc }}</span>
@@ -49,7 +49,7 @@
                 <Dropdown v-model="settings.openLink" :options="openLinks"/>
               </div>
 
-              <div class="setting-item">
+              <div class="setting-item setting-item--stacked">
                 <div class="setting-info">
                   <span class="setting-label">{{ i18n.t.general.tabName }}</span>
                   <span class="setting-description">{{ i18n.t.general.tabNameDesc }}</span>
@@ -65,60 +65,6 @@
                 <Switch @click="toggleSpaces()" :state="spacesStore.enabled" />
               </div>
 
-              <div class="separator"></div>
-
-              <div class="section-header">
-                <h3 class="section-title-main">{{ i18n.t.widgets?.title || 'Widgets' }}</h3>
-                <p class="section-subtitle">{{ i18n.t.widgets?.subtitle || 'Activa o desactiva los componentes del New Tab' }}</p>
-              </div>
-
-              <div class="setting-item">
-                <div class="setting-info">
-                  <span class="setting-label">🔍 {{ i18n.t.widgets?.search || 'Buscador' }}</span>
-                  <span class="setting-description">{{ i18n.t.widgets?.searchDesc || 'Caja de búsqueda con AstianGO y Qwant' }}</span>
-                </div>
-                <Switch @click="widgetsStore.toggle('search')" :state="widgetsStore.enabled.search" />
-              </div>
-
-              <div class="setting-item">
-                <div class="setting-info">
-                  <span class="setting-label">🔖 {{ i18n.t.widgets?.bookmarks || 'Marcadores' }}</span>
-                  <span class="setting-description">{{ i18n.t.widgets?.bookmarksDesc || 'Accesos directos a tus sitios favoritos' }}</span>
-                </div>
-                <Switch @click="widgetsStore.toggle('bookmarks')" :state="widgetsStore.enabled.bookmarks" />
-              </div>
-
-              <div class="setting-item">
-                <div class="setting-info">
-                  <span class="setting-label">📰 {{ i18n.t.widgets?.rss || 'Noticias RSS' }}</span>
-                  <span class="setting-description">{{ i18n.t.widgets?.rssDesc || 'Feed de noticias personalizado' }}</span>
-                </div>
-                <Switch @click="widgetsStore.toggle('rss')" :state="widgetsStore.enabled.rss" />
-              </div>
-
-              <div class="setting-item">
-                <div class="setting-info">
-                  <span class="setting-label">📅 {{ i18n.t.widgets?.calendar || 'Calendario' }}</span>
-                  <span class="setting-description">{{ i18n.t.widgets?.calendarDesc || 'Fecha actual y próximos eventos' }}</span>
-                </div>
-                <Switch @click="widgetsStore.toggle('calendar')" :state="widgetsStore.enabled.calendar" />
-              </div>
-
-              <div class="setting-item">
-                <div class="setting-info">
-                  <span class="setting-label">📝 {{ i18n.t.widgets?.notes || 'Notas rápidas' }}</span>
-                  <span class="setting-description">{{ i18n.t.widgets?.notesDesc || 'Bloc de notas persistente' }}</span>
-                </div>
-                <Switch @click="widgetsStore.toggle('notes')" :state="widgetsStore.enabled.notes" />
-              </div>
-
-              <div class="setting-item">
-                <div class="setting-info">
-                  <span class="setting-label">✅ {{ i18n.t.widgets?.todo || 'Lista de tareas' }}</span>
-                  <span class="setting-description">{{ i18n.t.widgets?.todoDesc || 'Gestiona tus pendientes' }}</span>
-                </div>
-                <Switch @click="widgetsStore.toggle('todo')" :state="widgetsStore.enabled.todo" />
-              </div>
             </div>
 
             <!-- Visual Tab -->
@@ -127,7 +73,7 @@
                 <h3 class="section-title-main">{{ i18n.t.visual.title }}</h3>
                 <p class="section-subtitle">{{ i18n.t.visual.subtitle }}</p>
               </div>
-              <div class="setting-item">
+              <div class="setting-item setting-item--stacked">
                 <div class="setting-info">
                   <span class="setting-label">{{ i18n.t.visual.background }}</span>
                   <span class="setting-description">{{ i18n.t.visual.backgroundDesc }}</span>
@@ -530,6 +476,12 @@ export default {
 .setting-item:hover {
   background: var(--surface-overlay, #1E2D3D);
   border-color: var(--color-border-hover, rgba(126,196,168,0.2));
+}
+
+/* Stacked variant: label on top, control below (for dropdowns/inputs in narrow panel) */
+.setting-item--stacked {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .setting-info {
