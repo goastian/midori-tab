@@ -1,42 +1,32 @@
 <template>
   <Teleport to="body">
-    <Transition name="slide-up">
-      <div v-if="settings.state" class="settings-overlay" @click="closeSettings">
-        <Transition name="modal-slide">
-          <div v-if="settings.state" class="settings-modal" @click.stop>
+    <Transition name="panel-fade">
+      <div v-if="settings.state" class="panel-overlay" @click="closeSettings">
+        <Transition name="panel-slide">
+          <div v-if="settings.state" class="panel" @click.stop>
           <!-- Header -->
-          <div class="settings-header">
-            <div class="header-content">
-              <span class="settings-icon">⚙️</span>
-              <h2 class="settings-title">{{ i18n.t.settings.title }}</h2>
-            </div>
-            <button @click="closeSettings" class="close-btn">
+          <div class="panel-header">
+            <h2 class="panel-title">{{ i18n.t.settings.title }}</h2>
+            <button @click="closeSettings" class="panel-close">
               <span>✕</span>
             </button>
           </div>
 
-          <!-- Main Content Area -->
-          <div class="settings-body">
-            <!-- Sidebar Navigation -->
-            <aside class="settings-sidebar">
-              <nav class="sidebar-nav">
-                <button
-                  v-for="(item, index) in navs"
-                  :key="index"
-                  @click="changeTab(index)"
-                  :class="['sidebar-item', { active: index === tab }]"
-                >
-                  <span class="sidebar-icon">{{ item.emoji }}</span>
-                  <div class="sidebar-content">
-                    <span class="sidebar-title">{{ item.title }}</span>
-                    <span class="sidebar-description">{{ item.description }}</span>
-                  </div>
-                </button>
-              </nav>
-            </aside>
+          <!-- Tab navigation (horizontal) -->
+          <nav class="panel-tabs">
+            <button
+              v-for="(item, index) in navs"
+              :key="index"
+              @click="changeTab(index)"
+              :class="['panel-tab', { active: index === tab }]"
+            >
+              <span class="tab-icon">{{ item.emoji }}</span>
+              <span class="tab-label">{{ item.title }}</span>
+            </button>
+          </nav>
 
-            <!-- Content Panel -->
-            <div class="settings-content">
+          <!-- Scrollable content -->
+          <div class="panel-content">
             <!-- General Tab -->
             <div v-if="tab === 0" class="settings-section">
               <div class="section-header">
@@ -225,13 +215,10 @@
               <LanguageSelector />
             </div>
           </div>
-          </div>
 
           <!-- Footer -->
-          <div class="settings-footer">
-            <div class="footer-hint">
-              <kbd>ESC</kbd> {{ i18n.t.settings.close }}
-            </div>
+          <div class="panel-footer">
+            <kbd>ESC</kbd> <span>{{ i18n.t.settings.close }}</span>
           </div>
           </div>
         </Transition>
@@ -386,187 +373,158 @@ export default {
 </script>
 
 <style scoped>
-.settings-overlay {
+/* ═══════════════════════════════════════
+   Settings Panel — Right-side slide-in
+   ═══════════════════════════════════════ */
+
+/* ── Overlay ── */
+.panel-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
   z-index: 9999;
-  padding: 0;
+  display: flex;
+  justify-content: flex-end;
 }
 
-.settings-modal {
-  width: 900px;
-  max-width: 90vw;
-  height: 90vh;
+/* ── Panel container ── */
+.panel {
+  width: 380px;
+  max-width: 92vw;
+  height: 100vh;
   background: var(--surface-base, #080D14);
-  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-lg, 16px) var(--radius-lg, 16px) 0 0;
-  box-shadow: var(--shadow-xl, 0 8px 32px rgba(0,0,0,0.2));
-  overflow: hidden;
+  border-left: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  box-shadow: -4px 0 24px rgba(0,0,0,0.25);
   display: flex;
   flex-direction: column;
-  margin-left: 1rem;
-  margin-bottom: 0;
+  overflow: hidden;
 }
 
-.settings-header {
+/* ── Header ── */
+.panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.2rem 1.5rem;
+  padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
   background: var(--surface-raised, #0F1520);
+  flex-shrink: 0;
 }
 
-.header-content {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-}
-
-.settings-icon {
-  font-size: 1.5rem;
-}
-
-.settings-title {
-  font-size: 1.2rem;
+.panel-title {
+  font-size: 1rem;
   font-weight: 600;
   color: var(--color-text, white);
   margin: 0;
 }
 
-.close-btn {
-  background: var(--surface-overlay, #1E2D3D);
-  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-sm, 6px);
-  width: 32px;
-  height: 32px;
+.panel-close {
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--surface-overlay, #1E2D3D);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  border-radius: var(--radius-sm, 6px);
+  color: var(--color-text-muted, #5A9A82);
+  font-size: 1rem;
   cursor: pointer;
-  transition: all var(--transition-fast, 0.1s ease);
-  color: var(--color-text, white);
-  font-size: 1.2rem;
+  transition: all 0.12s ease;
 }
 
-.close-btn:hover {
+.panel-close:hover {
   background: var(--color-border-hover, rgba(126,196,168,0.2));
+  color: var(--color-text, white);
 }
 
-.settings-body {
+/* ── Horizontal tab bar ── */
+.panel-tabs {
   display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-.settings-sidebar {
-  width: 240px;
+  gap: 2px;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
   background: var(--surface-sunken, #060A10);
-  border-right: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  overflow-y: auto;
   flex-shrink: 0;
+  overflow-x: auto;
 }
 
-.sidebar-nav {
+.panel-tab {
   display: flex;
-  flex-direction: column;
-  padding: 0.5rem;
-}
-
-.sidebar-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  background: transparent;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.7rem;
   border: none;
+  background: transparent;
   border-radius: var(--radius-sm, 6px);
   cursor: pointer;
-  transition: all var(--transition-fast, 0.1s ease);
-  color: var(--color-text, white);
-  text-align: left;
-  margin-bottom: 0.25rem;
-}
-
-.sidebar-item:hover {
-  background: var(--surface-raised, #0F1520);
-}
-
-.sidebar-item.active {
-  background: var(--surface-overlay, #1E2D3D);
-}
-
-.sidebar-icon {
-  font-size: 1.2rem;
-  flex-shrink: 0;
-  margin-top: 0.1rem;
-}
-
-.sidebar-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.sidebar-title {
-  font-weight: 500;
-  font-size: 0.9rem;
-  color: var(--color-text, white);
-}
-
-.sidebar-description {
-  font-size: 0.75rem;
   color: var(--color-text-muted, #5A9A82);
-  line-height: 1.3;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.12s ease;
 }
 
-.settings-content {
+.panel-tab:hover {
+  background: var(--surface-raised, #0F1520);
+  color: var(--color-text, #C4F0E0);
+}
+
+.panel-tab.active {
+  background: var(--surface-overlay, #1E2D3D);
+  color: var(--color-text, white);
+}
+
+.tab-icon {
+  font-size: 0.9rem;
+}
+
+.tab-label {
+  font-size: 0.8rem;
+}
+
+/* ── Scrollable content area ── */
+.panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 1rem 1.25rem;
 }
 
+/* ── Sections ── */
 .settings-section {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .section-header {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .section-title-main {
-  font-size: 1.3rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--color-text, white);
-  margin: 0 0 0.3rem 0;
+  margin: 0 0 0.2rem 0;
 }
 
 .section-subtitle {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--color-text-muted, #5A9A82);
   margin: 0;
 }
 
+/* ── Setting item rows ── */
 .setting-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem;
+  padding: 0.75rem 0.85rem;
   background: var(--surface-raised, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
-  transition: all var(--transition-fast, 0.1s ease);
+  border-radius: var(--radius-sm, 6px);
+  gap: 0.75rem;
+  transition: all 0.1s ease;
 }
 
 .setting-item:hover {
@@ -577,59 +535,61 @@ export default {
 .setting-info {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.15rem;
   flex: 1;
+  min-width: 0;
 }
 
 .setting-label {
   font-weight: 500;
   color: var(--color-text, white);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
 }
 
 .setting-description {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: var(--color-text-muted, #5A9A82);
+  line-height: 1.3;
 }
 
 .separator {
   height: 1px;
   background: var(--color-border, rgba(126,196,168,0.1));
-  margin: 0.5rem 0;
+  margin: 0.35rem 0;
 }
 
+/* ── Gradients ── */
 .gradients-section {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 0.75rem;
+  padding: 0.85rem;
   background: var(--surface-raised, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-sm, 6px);
 }
 
 .section-label {
   font-weight: 500;
   color: var(--color-text, white);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .gradients-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 0.8rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
 }
 
 .gradient-card {
-  height: 80px;
-  border-radius: var(--radius-md, 10px);
+  height: 56px;
+  border-radius: var(--radius-sm, 6px);
   cursor: pointer;
-  transition: all var(--transition-fast, 0.1s ease);
+  transition: all 0.12s ease;
   border: 2px solid transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
 }
 
 .gradient-card:hover {
@@ -642,168 +602,145 @@ export default {
 }
 
 .check-icon {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   color: white;
 }
 
+/* ── Shortcuts ── */
 .shortcuts-header {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .section-title {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--color-text, white);
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.3rem 0;
 }
 
 .section-description {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--color-text-muted, #5A9A82);
   margin: 0;
 }
 
 .shortcuts-info {
-  padding: 1rem;
+  padding: 0.75rem;
   background: var(--surface-raised, #0F1520);
   border: 1px solid rgba(59, 130, 246, 0.15);
-  border-radius: var(--radius-md, 10px);
-  margin-top: 1rem;
+  border-radius: var(--radius-sm, 6px);
+  margin-top: 0.5rem;
 }
 
 .info-text {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--color-text, white);
-  margin: 0.5rem 0;
+  margin: 0.3rem 0;
 }
 
 .reset-all-btn {
   width: 100%;
-  padding: 0.8rem;
+  padding: 0.65rem;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.25);
   border-radius: var(--radius-sm, 6px);
   color: var(--color-text, white);
   font-weight: 500;
+  font-size: 0.82rem;
   cursor: pointer;
-  transition: all var(--transition-fast, 0.1s ease);
-  margin-top: 1rem;
+  transition: all 0.1s ease;
+  margin-top: 0.5rem;
 }
 
 .reset-all-btn:hover {
   background: rgba(239, 68, 68, 0.2);
 }
 
-.settings-footer {
+/* ── Footer ── */
+.panel-footer {
   border-top: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  padding: 0.8rem 1.5rem;
+  padding: 0.6rem 1.25rem;
   background: var(--surface-sunken, #060A10);
-}
-
-.footer-hint {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
+  gap: 0.4rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted, #5A9A82);
+  flex-shrink: 0;
 }
 
-.footer-hint kbd {
-  padding: 0.2rem 0.5rem;
+.panel-footer kbd {
+  padding: 0.15rem 0.4rem;
   background: var(--surface-overlay, #1E2D3D);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--color-text-secondary, #7EC4A8);
   font-family: monospace;
 }
 
-/* Scrollbar */
-.settings-content::-webkit-scrollbar,
-.settings-sidebar::-webkit-scrollbar {
-  width: 6px;
+/* ── Scrollbar ── */
+.panel-content::-webkit-scrollbar {
+  width: 5px;
 }
 
-.settings-content::-webkit-scrollbar-track,
-.settings-sidebar::-webkit-scrollbar-track {
+.panel-content::-webkit-scrollbar-track {
   background: transparent;
-  border-radius: 3px;
 }
 
-.settings-content::-webkit-scrollbar-thumb,
-.settings-sidebar::-webkit-scrollbar-thumb {
+.panel-content::-webkit-scrollbar-thumb {
   background: var(--color-border, rgba(126,196,168,0.1));
   border-radius: 3px;
 }
 
-.settings-content::-webkit-scrollbar-thumb:hover,
-.settings-sidebar::-webkit-scrollbar-thumb:hover {
+.panel-content::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
-/* Animations */
-.slide-up-enter-active {
+/* ── Animations: slide from right ── */
+.panel-fade-enter-active {
   transition: opacity 0.15s ease;
 }
 
-.slide-up-leave-active {
-  transition: opacity 0.1s ease;
+.panel-fade-leave-active {
+  transition: opacity 0.12s ease;
 }
 
-.slide-up-enter-from,
-.slide-up-leave-to {
+.panel-fade-enter-from,
+.panel-fade-leave-to {
   opacity: 0;
 }
 
-.modal-slide-enter-active {
+.panel-slide-enter-active {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.panel-slide-leave-active {
   transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.modal-slide-leave-active {
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+.panel-slide-enter-from {
+  transform: translateX(100%);
 }
 
-.modal-slide-enter-from {
-  transform: translateY(100%);
+.panel-slide-leave-to {
+  transform: translateX(100%);
 }
 
-.modal-slide-leave-to {
-  transform: translateY(100%);
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .settings-modal {
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .panel {
     width: 100vw;
     max-width: 100vw;
-    height: 95vh;
-    margin-left: 0;
-    border-radius: var(--radius-lg, 16px) var(--radius-lg, 16px) 0 0;
+    border-left: none;
   }
 
-  .settings-body {
-    flex-direction: column;
-  }
-
-  .settings-sidebar {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
-    max-height: 150px;
-  }
-
-  .sidebar-nav {
-    flex-direction: row;
-    overflow-x: auto;
-    padding: 0.5rem;
-  }
-
-  .sidebar-item {
-    min-width: 140px;
+  .panel-tabs {
+    padding: 0.4rem 0.5rem;
   }
 
   .gradients-grid {
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

@@ -1,52 +1,92 @@
 <template>
-    <div class="containerMin">
-        <div class="content">
-            <div class="contentTop">
-                <Logo />
+    <div class="dashboard">
+        <!-- ═══ Top bar: settings icon top-right ═══ -->
+        <header class="dash-topbar">
+            <div class="topbar-left"></div>
+            <Logo />
+            <div class="topbar-right">
+                <button class="settings-btn" @click="openSettings" title="Settings">
+                    <Settings :size="20" :stroke-width="1.5" />
+                </button>
             </div>
+        </header>
 
-            <!-- Dynamic widget area with drag & drop -->
-            <div class="widgets-area">
+        <!-- ═══ Search (always first, not draggable) ═══ -->
+        <section v-if="widgetsStore.enabled.search" class="dash-search">
+            <SearchBox :searchTarget="tab.openLink" />
+        </section>
+
+        <!-- ═══ Bookmarks row (always second, not draggable) ═══ -->
+        <section v-if="widgetsStore.enabled.bookmarks" class="dash-bookmarks">
+            <BookmarkGrid :openTarget="tab.openLink" />
+        </section>
+
+        <!-- ═══ Optional widgets grid — draggable ═══ -->
+        <section v-if="gridWidgets.length" class="dash-grid">
+            <div
+                v-for="(key, index) in gridWidgets"
+                :key="key"
+                :ref="el => setSlotRef(el, index)"
+                class="grid-slot"
+                :class="{
+                    dragging: drag.active && drag.fromIndex === index,
+                    'drop-before': drag.active && drag.overIndex === index && drag.fromIndex > index,
+                    'drop-after': drag.active && drag.overIndex === index && drag.fromIndex < index,
+                    'span-full': key === 'rss',
+                }"
+            >
                 <div
-                    v-for="(key, index) in widgetsStore.activeWidgets"
-                    :key="key"
-                    class="widget-slot"
-                    :class="{
-                        dragging: dragIndex === index,
-                        'drag-over': dragOverIndex === index && dragIndex !== index,
-                        'full-width': key === 'search' || key === 'bookmarks' || key === 'rss',
-                    }"
-                    draggable="true"
-                    @dragstart="onDragStart(index, $event)"
-                    @dragover.prevent="onDragOver(index)"
-                    @dragleave="onDragLeave"
-                    @drop="onDrop(index)"
-                    @dragend="onDragEnd"
+                    class="drag-handle"
+                    @pointerdown.prevent="onPointerDown(index, $event)"
                 >
-                    <div class="widget-drag-handle" :title="'Arrastra para mover'">⋮⋮</div>
-                    <component
-                        :is="widgetComponentMap[key]"
-                        v-bind="widgetProps[key] || {}"
-                    />
+                    <span class="handle-dots">⋮⋮</span>
                 </div>
+                <component
+                    :is="widgetComponentMap[key]"
+                    v-bind="widgetProps[key] || {}"
+                />
             </div>
-        </div>
+        </section>
 
-        <div class="bottom">
-            <v-options />
+        <!-- ═══ Fixed UI ═══ -->
+        <div class="bottom-bar">
+            <b-login />
         </div>
 
         <div class="cmd-hint">
             <kbd>{{ cmdKey }}</kbd> {{ cmdLabel }}
         </div>
+
+        <!-- Drag ghost overlay -->
+        <Teleport to="body">
+            <div
+                v-if="drag.active"
+                class="drag-ghost"
+                :style="ghostStyle"
+            >
+                <div class="ghost-label">{{ dragLabel }}</div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
 <script>
 import { defineAsyncComponent } from 'vue';
+import { Settings } from 'lucide-vue-next';
 import useTabStore from '../stores/useTabStore';
 import useCommandsStore from '../stores/useCommandsStore';
 import useWidgetsStore from '../stores/useWidgetsStore';
+
+/** Widget keys that live in the grid (everything except search & bookmarks). */
+const GRID_KEYS = ['rss', 'calendar', 'notes', 'todo'];
+
+/** Human-readable labels for drag ghost. */
+const LABELS = {
+    rss: 'RSS',
+    calendar: 'Calendario',
+    notes: 'Notas',
+    todo: 'Tareas',
+};
 
 export default {
     data() {
@@ -54,8 +94,16 @@ export default {
             tab: useTabStore(),
             commandsStore: useCommandsStore(),
             widgetsStore: useWidgetsStore(),
-            dragIndex: null,
-            dragOverIndex: null,
+            slotRefs: [],
+            drag: {
+                active: false,
+                fromIndex: -1,
+                overIndex: -1,
+                x: 0,
+                y: 0,
+                startX: 0,
+                startY: 0,
+            },
         };
     },
 
@@ -73,60 +121,114 @@ export default {
         cmdLabel() {
             return 'Command Palette';
         },
-        /** Map of widget key → component name for dynamic rendering. */
+        /** Returns the grid widgets that are enabled, in configured order. */
+        gridWidgets() {
+            return this.widgetsStore.order.filter(
+                k => GRID_KEYS.includes(k) && this.widgetsStore.enabled[k]
+            );
+        },
         widgetComponentMap() {
             return {
-                search: 'SearchBox',
-                bookmarks: 'BookmarkGrid',
                 rss: 'RssWidget',
                 calendar: 'CalendarWidget',
                 notes: 'NotesWidget',
                 todo: 'TodoWidget',
             };
         },
-        /** Props passed to each widget component. */
         widgetProps() {
+            return {};
+        },
+        ghostStyle() {
             return {
-                search: { searchTarget: this.tab.openLink },
-                bookmarks: { openTarget: this.tab.openLink },
+                left: `${this.drag.x - 60}px`,
+                top: `${this.drag.y - 20}px`,
             };
+        },
+        dragLabel() {
+            const key = this.gridWidgets[this.drag.fromIndex];
+            return LABELS[key] || key;
         },
     },
 
     methods: {
-        /** Drag & drop handlers for reordering widgets. */
-        onDragStart(index, event) {
-            this.dragIndex = index;
-            event.dataTransfer.effectAllowed = 'move';
+        setSlotRef(el, index) {
+            if (el) this.slotRefs[index] = el;
         },
-        onDragOver(index) {
-            this.dragOverIndex = index;
+
+        /** Pointer-based drag: start tracking on the handle only. */
+        onPointerDown(index, event) {
+            this.drag.active = true;
+            this.drag.fromIndex = index;
+            this.drag.overIndex = index;
+            this.drag.startX = event.clientX;
+            this.drag.startY = event.clientY;
+            this.drag.x = event.clientX;
+            this.drag.y = event.clientY;
+
+            document.addEventListener('pointermove', this.onPointerMove);
+            document.addEventListener('pointerup', this.onPointerUp);
+            document.body.style.userSelect = 'none';
         },
-        onDragLeave() {
-            this.dragOverIndex = null;
+
+        onPointerMove(event) {
+            if (!this.drag.active) return;
+            this.drag.x = event.clientX;
+            this.drag.y = event.clientY;
+
+            // Detect which slot the pointer is over
+            for (let i = 0; i < this.slotRefs.length; i++) {
+                const el = this.slotRefs[i];
+                if (!el) continue;
+                const rect = el.getBoundingClientRect();
+                if (
+                    event.clientX >= rect.left &&
+                    event.clientX <= rect.right &&
+                    event.clientY >= rect.top &&
+                    event.clientY <= rect.bottom
+                ) {
+                    this.drag.overIndex = i;
+                    break;
+                }
+            }
         },
-        onDrop(toIndex) {
-            if (this.dragIndex !== null && this.dragIndex !== toIndex) {
-                // Convert visible indices to order-array indices
-                const activeKeys = this.widgetsStore.activeWidgets;
-                const fromKey = activeKeys[this.dragIndex];
-                const toKey = activeKeys[toIndex];
+
+        onPointerUp() {
+            document.removeEventListener('pointermove', this.onPointerMove);
+            document.removeEventListener('pointerup', this.onPointerUp);
+            document.body.style.userSelect = '';
+
+            const { fromIndex, overIndex } = this.drag;
+            if (fromIndex !== overIndex && fromIndex >= 0 && overIndex >= 0) {
+                const fromKey = this.gridWidgets[fromIndex];
+                const toKey = this.gridWidgets[overIndex];
                 const fullOrder = this.widgetsStore.order;
                 const fromFull = fullOrder.indexOf(fromKey);
                 const toFull = fullOrder.indexOf(toKey);
-                this.widgetsStore.reorder(fromFull, toFull);
+                if (fromFull >= 0 && toFull >= 0) {
+                    this.widgetsStore.reorder(fromFull, toFull);
+                }
             }
-            this.dragIndex = null;
-            this.dragOverIndex = null;
+
+            this.drag.active = false;
+            this.drag.fromIndex = -1;
+            this.drag.overIndex = -1;
+            this.slotRefs = [];
         },
-        onDragEnd() {
-            this.dragIndex = null;
-            this.dragOverIndex = null;
+
+        /** Opens the settings panel. */
+        openSettings() {
+            this.tab.updateState();
         },
     },
 
+    beforeUnmount() {
+        document.removeEventListener('pointermove', this.onPointerMove);
+        document.removeEventListener('pointerup', this.onPointerUp);
+    },
+
     components: {
-        VOptions: defineAsyncComponent(() => import('../components/VOptions.vue')),
+        Settings,
+        BLogin: defineAsyncComponent(() => import('../components/BLogin.vue')),
         Logo: defineAsyncComponent(() => import('../components/Logo.vue')),
         SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
         BookmarkGrid: defineAsyncComponent(() => import('../components/BookmarkGrid.vue')),
@@ -139,99 +241,173 @@ export default {
 </script>
 
 <style scoped>
-.containerMin {
+/* ═══════════════════════════════════════
+   Dashboard layout — Flat Design
+   ═══════════════════════════════════════ */
+.dashboard {
     width: 100%;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 1rem 2rem;
+    padding: 2rem 2rem 4rem;
+    gap: 1.25rem;
     font-size: 13px;
+    box-sizing: border-box;
 }
 
-.bottom {
+/* ── Top bar: 3-column layout (spacer / logo / settings) ── */
+.dash-topbar {
+    width: 100%;
+    max-width: 720px;
+    display: grid;
+    grid-template-columns: 48px 1fr 48px;
+    align-items: center;
+}
+
+.dash-topbar > :nth-child(2) {
+    justify-self: center;
+}
+
+.topbar-left {
+    /* empty spacer to balance the grid */
+}
+
+.topbar-right {
+    justify-self: end;
+}
+
+.settings-btn {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-raised, #0F1520);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-muted, #5A9A82);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.settings-btn:hover {
+    background: var(--surface-overlay, #1E2D3D);
+    color: var(--color-text, #C4F0E0);
+    border-color: var(--color-border-hover, rgba(126,196,168,0.2));
+}
+
+/* ── Search bar ── */
+.dash-search {
+    width: 100%;
+    max-width: 640px;
+}
+
+/* ── Bookmarks row ── */
+.dash-bookmarks {
+    width: 100%;
+    max-width: 720px;
+}
+
+/* ── Widget grid: 2 columnas para widgets opcionales ── */
+.dash-grid {
+    width: 100%;
+    max-width: 720px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+}
+
+@media (max-width: 600px) {
+    .dash-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Grid slot: contenedor individual de widget ── */
+.grid-slot {
+    position: relative;
+    border-radius: var(--radius-md, 10px);
+    transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.grid-slot.span-full {
+    grid-column: 1 / -1;
+}
+
+.grid-slot.dragging {
+    opacity: 0.35;
+    transform: scale(0.96);
+}
+
+.grid-slot.drop-before,
+.grid-slot.drop-after {
+    box-shadow: 0 0 0 2px var(--color-primary, #04A469);
+    border-radius: var(--radius-md, 10px);
+}
+
+/* ── Drag handle: visible on hover ── */
+.drag-handle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--surface-overlay, rgba(30,45,61,0.85));
+    cursor: grab;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    touch-action: none;
+}
+
+.grid-slot:hover .drag-handle {
+    opacity: 1;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+    background: var(--color-primary, #04A469);
+}
+
+.handle-dots {
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    color: var(--color-text-muted, #5A9A82);
+    user-select: none;
+    pointer-events: none;
+}
+
+.drag-handle:active .handle-dots {
+    color: white;
+}
+
+/* ── Drag ghost (follows pointer) ── */
+.drag-ghost {
+    position: fixed;
+    z-index: 99999;
+    pointer-events: none;
+    padding: 0.4rem 1rem;
+    background: var(--color-primary, #04A469);
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm, 6px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    white-space: nowrap;
+}
+
+/* ── Fixed bottom bar ── */
+.bottom-bar {
     position: fixed;
     bottom: 1rem;
     left: 1rem;
     z-index: 100;
-}
-
-.content {
-    width: 100%;
-    min-width: 400px;
-    max-width: 800px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding-top: 3rem;
-    gap: 1.5rem;
-}
-
-.contentTop {
-    width: 100%;
-    display: flex;
-    justify-content: end;
-    align-items: center;
-}
-
-/* ── Widgets area with flex-wrap for side-by-side small widgets ── */
-.widgets-area {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    width: 100%;
-    min-width: 200px;
-    max-width: 800px;
-    align-items: flex-start;
-}
-
-/* ── Individual widget slot (draggable container) ── */
-.widget-slot {
-    position: relative;
-    flex: 1 1 280px;
-    min-width: 280px;
-    transition: transform 0.15s ease, opacity 0.15s ease;
-}
-
-.widget-slot.full-width {
-    flex-basis: 100%;
-    min-width: 100%;
-}
-
-.widget-slot.dragging {
-    opacity: 0.4;
-    transform: scale(0.97);
-}
-
-.widget-slot.drag-over {
-    border-radius: var(--radius-md, 10px);
-    box-shadow: 0 0 0 2px var(--color-primary, #04A469);
-}
-
-/* ── Drag handle ── */
-.widget-drag-handle {
-    position: absolute;
-    top: 6px;
-    left: 6px;
-    z-index: 5;
-    font-size: 0.65rem;
-    letter-spacing: 1px;
-    color: var(--color-text-dim, #3A5B4D);
-    cursor: grab;
-    opacity: 0;
-    transition: opacity var(--transition-fast, 0.1s ease);
-    user-select: none;
-    padding: 0.15rem 0.3rem;
-    border-radius: 3px;
-    background: var(--surface-overlay, #1E2D3D);
-}
-
-.widget-slot:hover .widget-drag-handle {
-    opacity: 1;
-}
-
-.widget-drag-handle:active {
-    cursor: grabbing;
 }
 
 /* ── Command palette hint ── */
