@@ -68,7 +68,7 @@ const DEFAULT_CATEGORIES = ['Personal', 'Work', 'Study'];
 const DEFAULT_BOOKMARKS = {
   Personal: [
     { title: 'Astian', url: 'https://astian.org/', domain: 'astian.org' },
-    { title: 'YouTube', url: 'https://youtube.com', domain: 'youtube.com' },
+    { title: 'MiWallet', url: 'https://wallet.astian.org', domain: 'wallet.astian.org' },
     { title: 'Instagram', url: 'https://instagram.com', domain: 'instagram.com' },
     { title: 'Amazon', url: 'https://amazon.com', domain: 'amazon.com' },
   ],
@@ -163,6 +163,22 @@ export default {
       if (!url) return;
       try {
         const domain = new URL(url).hostname;
+        this.bookmarks[this.activeTab].push({ title, url, domain });
+        this.save();
+      } catch { /* invalid url */ }
+    },
+
+    /**
+     * Adds a bookmark programmatically from an external caller (e.g. parent via ref).
+     * @param {string} title - Bookmark display name.
+     * @param {string} url - Bookmark URL.
+     */
+    addBookmarkExternal(title, url) {
+      try {
+        const domain = new URL(url).hostname;
+        if (!this.bookmarks[this.activeTab]) {
+          this.bookmarks[this.activeTab] = [];
+        }
         this.bookmarks[this.activeTab].push({ title, url, domain });
         this.save();
       } catch { /* invalid url */ }

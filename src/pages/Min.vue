@@ -1,87 +1,140 @@
 <template>
     <div class="dashboard">
-        <!-- ═══ Top bar: settings icon top-right ═══ -->
-        <header class="dash-topbar">
-            <div class="topbar-left"></div>
+        <!-- ═══ Settings button: fixed top-right ═══ -->
+        <button class="settings-btn" @click="openSettings" title="Settings">
+            <Settings :size="20" :stroke-width="1.5" />
+        </button>
+
+        <!-- ═══ Logo centered ═══ -->
+        <header class="dash-header">
             <Logo />
-            <div class="topbar-right">
-                <button class="settings-btn" @click="openSettings" title="Settings">
-                    <Settings :size="20" :stroke-width="1.5" />
-                </button>
-            </div>
         </header>
 
-        <!-- ═══ Search (always first, not draggable) ═══ -->
+        <!-- ═══ Search ═══ -->
         <section v-if="widgetsStore.enabled.search" class="dash-search">
             <SearchBox :searchTarget="tab.openLink" />
         </section>
 
-        <!-- ═══ Bookmarks row (always second, not draggable) ═══ -->
+        <!-- ═══ Bookmarks row ═══ -->
         <section v-if="widgetsStore.enabled.bookmarks" class="dash-bookmarks">
-            <BookmarkGrid :openTarget="tab.openLink" />
+            <BookmarkGrid ref="bookmarkGrid" :openTarget="tab.openLink" />
         </section>
 
-        <!-- ═══ Optional widgets grid — draggable ═══ -->
-        <section v-if="gridWidgets.length" class="dash-grid">
-            <div
-                v-for="(key, index) in gridWidgets"
-                :key="key"
-                :ref="el => setSlotRef(el, index)"
-                class="grid-slot"
-                :class="{
-                    dragging: drag.active && drag.fromIndex === index,
-                    'drop-before': drag.active && drag.overIndex === index && drag.fromIndex > index,
-                    'drop-after': drag.active && drag.overIndex === index && drag.fromIndex < index,
-                    'span-full': key === 'rss',
-                }"
-            >
-                <div
-                    class="drag-handle"
-                    @pointerdown.prevent="onPointerDown(index, $event)"
-                >
-                    <span class="handle-dots">⋮⋮</span>
-                </div>
-                <component
-                    :is="widgetComponentMap[key]"
-                    v-bind="widgetProps[key] || {}"
-                />
+        <!-- ═══ Active widgets area (rendered when toggled from bottom sheet) ═══ -->
+        <section v-if="activeGridWidgets.length" class="dash-widgets">
+            <div v-for="key in activeGridWidgets" :key="key" class="widget-card">
+                <button class="widget-close" @click="widgetsStore.toggle(key)" title="Close widget">✕</button>
+                <component :is="widgetComponentMap[key]" />
             </div>
         </section>
 
+        <!-- ═══ Bottom action bar ═══ -->
+        <div class="bottom-actions">
+            <button class="action-btn" @click="showShortcutDialog = true">
+                <Plus :size="14" :stroke-width="2" />
+                <span>Shortcut</span>
+            </button>
+            <button class="action-btn" @click="showWidgetSheet = !showWidgetSheet">
+                <Minus v-if="showWidgetSheet" :size="14" :stroke-width="2" />
+                <Plus v-else :size="14" :stroke-width="2" />
+                <span>Widget</span>
+            </button>
+        </div>
+
+        <!-- ═══ Command palette hint ═══ -->
         <div class="cmd-hint">
             <kbd>{{ cmdKey }}</kbd> {{ cmdLabel }}
         </div>
 
-        <!-- Drag ghost overlay -->
+        <!-- ═══ Widget bottom sheet ═══ -->
         <Teleport to="body">
-            <div
-                v-if="drag.active"
-                class="drag-ghost"
-                :style="ghostStyle"
-            >
-                <div class="ghost-label">{{ dragLabel }}</div>
-            </div>
+            <Transition name="sheet-fade">
+                <div v-if="showWidgetSheet" class="sheet-overlay" @click="showWidgetSheet = false"></div>
+            </Transition>
+            <Transition name="sheet-slide">
+                <div v-if="showWidgetSheet" class="widget-sheet">
+                    <div class="sheet-header">
+                        <span class="sheet-title">Add a New Widget</span>
+                        <button class="sheet-close" @click="showWidgetSheet = false">✕</button>
+                    </div>
+                    <div class="sheet-grid">
+                        <button
+                            v-for="w in availableWidgets"
+                            :key="w.key"
+                            class="sheet-item"
+                            :class="{ active: widgetsStore.enabled[w.key] }"
+                            @click="toggleWidget(w.key)"
+                        >
+                            <span class="sheet-item-icon">{{ w.icon }}</span>
+                            <span class="sheet-item-label">{{ w.label }}</span>
+                        </button>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <!-- ═══ Shortcut add dialog ═══ -->
+        <Teleport to="body">
+            <Transition name="dialog-fade">
+                <div v-if="showShortcutDialog" class="dialog-overlay" @click="showShortcutDialog = false">
+                    <Transition name="dialog-zoom">
+                        <div v-if="showShortcutDialog" class="shortcut-dialog" @click.stop>
+                            <div class="dialog-header">
+                                <span class="dialog-title">Add Bookmark to Speed Dial</span>
+                                <button class="dialog-close" @click="showShortcutDialog = false">✕</button>
+                            </div>
+                            <div class="dialog-body">
+                                <label class="dialog-label">
+                                    <span>Address</span>
+                                    <input
+                                        v-model="shortcutForm.url"
+                                        class="dialog-input"
+                                        type="url"
+                                        placeholder="https://example.com"
+                                        @keydown.enter="submitShortcut"
+                                        ref="shortcutUrlInput"
+                                    />
+                                </label>
+                                <label class="dialog-label">
+                                    <span>Title</span>
+                                    <input
+                                        v-model="shortcutForm.title"
+                                        class="dialog-input"
+                                        type="text"
+                                        placeholder="My Website"
+                                        @keydown.enter="submitShortcut"
+                                    />
+                                </label>
+                            </div>
+                            <div class="dialog-footer">
+                                <button class="dialog-btn-primary" @click="submitShortcut">Add</button>
+                                <button class="dialog-btn-secondary" @click="showShortcutDialog = false">Cancel</button>
+                            </div>
+                        </div>
+                    </Transition>
+                </div>
+            </Transition>
         </Teleport>
     </div>
 </template>
 
 <script>
-import { defineAsyncComponent } from 'vue';
-import { Settings } from 'lucide-vue-next';
+import { defineAsyncComponent, nextTick } from 'vue';
+import { Settings, Plus, Minus } from 'lucide-vue-next';
 import useTabStore from '../stores/useTabStore';
 import useCommandsStore from '../stores/useCommandsStore';
 import useWidgetsStore from '../stores/useWidgetsStore';
 
-/** Widget keys that live in the grid (everything except search & bookmarks). */
+/** Widget keys for the bottom sheet (everything except search & bookmarks). */
 const GRID_KEYS = ['rss', 'calendar', 'notes', 'todo'];
 
-/** Human-readable labels for drag ghost. */
-const LABELS = {
-    rss: 'RSS',
-    calendar: 'Calendario',
-    notes: 'Notas',
-    todo: 'Tareas',
-};
+/** Widget metadata for the bottom sheet picker. */
+const WIDGET_META = [
+    { key: 'calendar', icon: '📅', label: 'Calendar' },
+    { key: 'notes', icon: '📝', label: 'Sticky Note' },
+    { key: 'todo', icon: '✅', label: 'Tasks' },
+    { key: 'rss', icon: '📰', label: 'Feeds' },
+];
 
 export default {
     data() {
@@ -89,16 +142,9 @@ export default {
             tab: useTabStore(),
             commandsStore: useCommandsStore(),
             widgetsStore: useWidgetsStore(),
-            slotRefs: [],
-            drag: {
-                active: false,
-                fromIndex: -1,
-                overIndex: -1,
-                x: 0,
-                y: 0,
-                startX: 0,
-                startY: 0,
-            },
+            showWidgetSheet: false,
+            showShortcutDialog: false,
+            shortcutForm: { url: '', title: '' },
         };
     },
 
@@ -117,10 +163,13 @@ export default {
             return 'Command Palette';
         },
         /** Returns the grid widgets that are enabled, in configured order. */
-        gridWidgets() {
+        activeGridWidgets() {
             return this.widgetsStore.order.filter(
                 k => GRID_KEYS.includes(k) && this.widgetsStore.enabled[k]
             );
+        },
+        availableWidgets() {
+            return WIDGET_META;
         },
         widgetComponentMap() {
             return {
@@ -130,99 +179,51 @@ export default {
                 todo: 'TodoWidget',
             };
         },
-        widgetProps() {
-            return {};
-        },
-        ghostStyle() {
-            return {
-                left: `${this.drag.x - 60}px`,
-                top: `${this.drag.y - 20}px`,
-            };
-        },
-        dragLabel() {
-            const key = this.gridWidgets[this.drag.fromIndex];
-            return LABELS[key] || key;
+    },
+
+    watch: {
+        showShortcutDialog(val) {
+            if (val) {
+                this.shortcutForm = { url: '', title: '' };
+                nextTick(() => {
+                    this.$refs.shortcutUrlInput?.focus();
+                });
+            }
         },
     },
 
     methods: {
-        setSlotRef(el, index) {
-            if (el) this.slotRefs[index] = el;
-        },
-
-        /** Pointer-based drag: start tracking on the handle only. */
-        onPointerDown(index, event) {
-            this.drag.active = true;
-            this.drag.fromIndex = index;
-            this.drag.overIndex = index;
-            this.drag.startX = event.clientX;
-            this.drag.startY = event.clientY;
-            this.drag.x = event.clientX;
-            this.drag.y = event.clientY;
-
-            document.addEventListener('pointermove', this.onPointerMove);
-            document.addEventListener('pointerup', this.onPointerUp);
-            document.body.style.userSelect = 'none';
-        },
-
-        onPointerMove(event) {
-            if (!this.drag.active) return;
-            this.drag.x = event.clientX;
-            this.drag.y = event.clientY;
-
-            // Detect which slot the pointer is over
-            for (let i = 0; i < this.slotRefs.length; i++) {
-                const el = this.slotRefs[i];
-                if (!el) continue;
-                const rect = el.getBoundingClientRect();
-                if (
-                    event.clientX >= rect.left &&
-                    event.clientX <= rect.right &&
-                    event.clientY >= rect.top &&
-                    event.clientY <= rect.bottom
-                ) {
-                    this.drag.overIndex = i;
-                    break;
-                }
-            }
-        },
-
-        onPointerUp() {
-            document.removeEventListener('pointermove', this.onPointerMove);
-            document.removeEventListener('pointerup', this.onPointerUp);
-            document.body.style.userSelect = '';
-
-            const { fromIndex, overIndex } = this.drag;
-            if (fromIndex !== overIndex && fromIndex >= 0 && overIndex >= 0) {
-                const fromKey = this.gridWidgets[fromIndex];
-                const toKey = this.gridWidgets[overIndex];
-                const fullOrder = this.widgetsStore.order;
-                const fromFull = fullOrder.indexOf(fromKey);
-                const toFull = fullOrder.indexOf(toKey);
-                if (fromFull >= 0 && toFull >= 0) {
-                    this.widgetsStore.reorder(fromFull, toFull);
-                }
-            }
-
-            this.drag.active = false;
-            this.drag.fromIndex = -1;
-            this.drag.overIndex = -1;
-            this.slotRefs = [];
-        },
-
         /** Opens the settings panel. */
         openSettings() {
             this.tab.updateState();
         },
-    },
 
-    beforeUnmount() {
-        document.removeEventListener('pointermove', this.onPointerMove);
-        document.removeEventListener('pointerup', this.onPointerUp);
+        /** Toggles a widget on/off from the bottom sheet. */
+        toggleWidget(key) {
+            this.widgetsStore.toggle(key);
+        },
+
+        /** Submits the shortcut form and adds a bookmark to BookmarkGrid. */
+        submitShortcut() {
+            const { url, title } = this.shortcutForm;
+            if (!url || !url.trim()) return;
+            const finalTitle = (title && title.trim()) ? title.trim() : url;
+            let finalUrl = url.trim();
+            if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+                finalUrl = 'https://' + finalUrl;
+            }
+            const grid = this.$refs.bookmarkGrid;
+            if (grid && grid.addBookmarkExternal) {
+                grid.addBookmarkExternal(finalTitle, finalUrl);
+            }
+            this.showShortcutDialog = false;
+        },
     },
 
     components: {
         Settings,
+        Plus,
+        Minus,
         Logo: defineAsyncComponent(() => import('../components/Logo.vue')),
         SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
         BookmarkGrid: defineAsyncComponent(() => import('../components/BookmarkGrid.vue')),
@@ -244,51 +245,43 @@ export default {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 2rem 2rem 4rem;
+    padding: 1.5rem 2rem 5rem;
     gap: 1.25rem;
     font-size: 13px;
     box-sizing: border-box;
 }
 
-/* ── Top bar: 3-column layout (spacer / logo / settings) ── */
-.dash-topbar {
-    width: 100%;
-    max-width: 720px;
-    display: grid;
-    grid-template-columns: 48px 1fr 48px;
-    align-items: center;
-}
-
-.dash-topbar > :nth-child(2) {
-    justify-self: center;
-}
-
-.topbar-left {
-    /* empty spacer to balance the grid */
-}
-
-.topbar-right {
-    justify-self: end;
-}
-
+/* ── Settings button: fixed top-right of viewport ── */
 .settings-btn {
-    width: 38px;
-    height: 38px;
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 50;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--surface-raised, #0F1520);
+    background: var(--surface-raised, rgba(15,21,32,0.75));
     border: 1px solid var(--color-border, rgba(126,196,168,0.1));
     border-radius: var(--radius-sm, 6px);
     color: var(--color-text-muted, #5A9A82);
     cursor: pointer;
     transition: all 0.15s ease;
+    backdrop-filter: blur(8px);
 }
 
 .settings-btn:hover {
     background: var(--surface-overlay, #1E2D3D);
     color: var(--color-text, #C4F0E0);
     border-color: var(--color-border-hover, rgba(126,196,168,0.2));
+}
+
+/* ── Header: logo centered ── */
+.dash-header {
+    padding-top: 0.5rem;
+    display: flex;
+    justify-content: center;
 }
 
 /* ── Search bar ── */
@@ -303,8 +296,8 @@ export default {
     max-width: 720px;
 }
 
-/* ── Widget grid: 2 columnas para widgets opcionales ── */
-.dash-grid {
+/* ── Active widgets area (2-col grid) ── */
+.dash-widgets {
     width: 100%;
     max-width: 720px;
     display: grid;
@@ -314,94 +307,310 @@ export default {
 }
 
 @media (max-width: 600px) {
-    .dash-grid {
+    .dash-widgets {
         grid-template-columns: 1fr;
     }
 }
 
-/* ── Grid slot: contenedor individual de widget ── */
-.grid-slot {
+.widget-card {
     position: relative;
     border-radius: var(--radius-md, 10px);
-    transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
 }
 
-.grid-slot.span-full {
-    grid-column: 1 / -1;
-}
-
-.grid-slot.dragging {
-    opacity: 0.35;
-    transform: scale(0.96);
-}
-
-.grid-slot.drop-before,
-.grid-slot.drop-after {
-    box-shadow: 0 0 0 2px var(--color-primary, #04A469);
-    border-radius: var(--radius-md, 10px);
-}
-
-/* ── Drag handle: visible on hover ── */
-.drag-handle {
+.widget-close {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 6px;
+    right: 6px;
     z-index: 10;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-overlay, rgba(30,45,61,0.85));
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-muted, #5A9A82);
+    font-size: 0.7rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.widget-card:hover .widget-close {
+    opacity: 1;
+}
+
+.widget-close:hover {
+    background: var(--accent-danger, #e17055);
+    color: white;
+}
+
+/* ═══ Bottom action bar ═══ */
+.bottom-actions {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 80;
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.35rem;
+    background: var(--surface-raised, rgba(15,21,32,0.8));
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-md, 10px);
+    backdrop-filter: blur(12px);
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-muted, #5A9A82);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    white-space: nowrap;
+}
+
+.action-btn:hover {
+    background: var(--surface-overlay, #1E2D3D);
+    color: var(--color-text, #C4F0E0);
+}
+
+/* ═══ Widget bottom sheet ═══ */
+.sheet-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 8000;
+}
+
+.widget-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 8001;
+    background: var(--surface-base, #080D14);
+    border-top: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-lg, 16px) var(--radius-lg, 16px) 0 0;
+    padding: 1.25rem 2rem 2rem;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.2);
+}
+
+.sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.sheet-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text, white);
+}
+
+.sheet-close {
     width: 28px;
     height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: var(--surface-overlay, #1E2D3D);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
     border-radius: var(--radius-sm, 6px);
-    background: var(--surface-overlay, rgba(30,45,61,0.85));
-    cursor: grab;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-    touch-action: none;
-}
-
-.grid-slot:hover .drag-handle {
-    opacity: 1;
-}
-
-.drag-handle:active {
-    cursor: grabbing;
-    background: var(--color-primary, #04A469);
-}
-
-.handle-dots {
-    font-size: 0.8rem;
-    letter-spacing: 2px;
     color: var(--color-text-muted, #5A9A82);
-    user-select: none;
-    pointer-events: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.12s ease;
 }
 
-.drag-handle:active .handle-dots {
-    color: white;
+.sheet-close:hover {
+    color: var(--color-text, white);
+    background: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
-/* ── Drag ghost (follows pointer) ── */
-.drag-ghost {
-    position: fixed;
-    z-index: 99999;
-    pointer-events: none;
-    padding: 0.4rem 1rem;
-    background: var(--color-primary, #04A469);
-    color: white;
-    font-size: 0.8rem;
-    font-weight: 600;
-    border-radius: var(--radius-sm, 6px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+.sheet-grid {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.sheet-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.25rem;
+    min-width: 80px;
+    background: var(--surface-raised, #0F1520);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-md, 10px);
+    color: var(--color-text-muted, #5A9A82);
+    cursor: pointer;
+    transition: all 0.12s ease;
+    flex-shrink: 0;
+}
+
+.sheet-item:hover {
+    background: var(--surface-overlay, #1E2D3D);
+    border-color: var(--color-border-hover, rgba(126,196,168,0.2));
+    color: var(--color-text, #C4F0E0);
+}
+
+.sheet-item.active {
+    border-color: var(--color-primary, #04A469);
+    background: rgba(4, 164, 105, 0.08);
+    color: var(--color-primary, #04A469);
+}
+
+.sheet-item-icon {
+    font-size: 1.8rem;
+}
+
+.sheet-item-label {
+    font-size: 0.72rem;
+    font-weight: 500;
     white-space: nowrap;
 }
 
-/* ── Fixed bottom bar ── */
-.bottom-bar {
+/* ═══ Shortcut add dialog ═══ */
+.dialog-overlay {
     position: fixed;
-    bottom: 1rem;
-    left: 1rem;
-    z-index: 100;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.shortcut-dialog {
+    width: 380px;
+    max-width: 90vw;
+    background: var(--surface-base, #080D14);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-lg, 16px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    overflow: hidden;
+}
+
+.dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    background: var(--surface-raised, #0F1520);
+}
+
+.dialog-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text, white);
+}
+
+.dialog-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-overlay, #1E2D3D);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-muted, #5A9A82);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.dialog-close:hover {
+    color: var(--color-text, white);
+}
+
+.dialog-body {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.dialog-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--color-text-muted, #5A9A82);
+}
+
+.dialog-input {
+    padding: 0.6rem 0.75rem;
+    background: var(--surface-raised, #0F1520);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text, #C4F0E0);
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.12s ease;
+}
+
+.dialog-input:focus {
+    border-color: var(--color-primary, #04A469);
+}
+
+.dialog-input::placeholder {
+    color: var(--color-text-dim, #3A5B4D);
+}
+
+.dialog-footer {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    background: var(--surface-sunken, #060A10);
+}
+
+.dialog-btn-primary {
+    padding: 0.5rem 1.25rem;
+    background: var(--color-primary, #04A469);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.dialog-btn-primary:hover {
+    background: var(--color-primary-hover, #059b62);
+}
+
+.dialog-btn-secondary {
+    padding: 0.5rem 1.25rem;
+    background: var(--surface-overlay, #1E2D3D);
+    color: var(--color-text-muted, #5A9A82);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.dialog-btn-secondary:hover {
+    background: var(--surface-raised, #0F1520);
+    color: var(--color-text, white);
 }
 
 /* ── Command palette hint ── */
@@ -412,10 +621,11 @@ export default {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--color-text-muted, #5A9A82);
-    opacity: 0.5;
-    transition: opacity var(--transition-fast, 0.1s ease);
+    opacity: 0.4;
+    transition: opacity 0.12s ease;
+    z-index: 10;
 }
 
 .cmd-hint:hover {
@@ -423,12 +633,36 @@ export default {
 }
 
 .cmd-hint kbd {
-    padding: 0.15rem 0.4rem;
-    background: var(--surface-raised, #0F1520);
+    padding: 0.12rem 0.35rem;
+    background: var(--surface-raised, rgba(15,21,32,0.7));
     border: 1px solid var(--color-border, rgba(126,196,168,0.1));
     border-radius: 4px;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-family: monospace;
     color: var(--color-text-secondary, #7EC4A8);
 }
+
+/* ═══ Transitions ═══ */
+
+/* Bottom sheet */
+.sheet-fade-enter-active { transition: opacity 0.15s ease; }
+.sheet-fade-leave-active { transition: opacity 0.12s ease; }
+.sheet-fade-enter-from,
+.sheet-fade-leave-to { opacity: 0; }
+
+.sheet-slide-enter-active { transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.sheet-slide-leave-active { transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1); }
+.sheet-slide-enter-from { transform: translateY(100%); }
+.sheet-slide-leave-to { transform: translateY(100%); }
+
+/* Dialog */
+.dialog-fade-enter-active { transition: opacity 0.15s ease; }
+.dialog-fade-leave-active { transition: opacity 0.12s ease; }
+.dialog-fade-enter-from,
+.dialog-fade-leave-to { opacity: 0; }
+
+.dialog-zoom-enter-active { transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease; }
+.dialog-zoom-leave-active { transition: transform 0.15s ease, opacity 0.12s ease; }
+.dialog-zoom-enter-from { transform: scale(0.95); opacity: 0; }
+.dialog-zoom-leave-to { transform: scale(0.95); opacity: 0; }
 </style>
