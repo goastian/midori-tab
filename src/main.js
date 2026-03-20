@@ -9,7 +9,6 @@ import '@fontsource/inter/latin-600.css';
 import './styles/tokens.css'
 import './styles/animations.css'
 import './style.css'
-import 'zen-wdg/zen-wdg.css'
 
 const app = createApp(App)
 const pinia = createPinia();

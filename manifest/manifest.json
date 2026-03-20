@@ -3,7 +3,7 @@
   "name": "midori-tab",
   "description": "A beautiful, customizable new tab with smart search, workspaces, bookmarks and command palette.",
   "version": "1.0.7",
-  "author": "Astian",
+  "author": "Im-Jota",
   "chrome_url_overrides": {
     "newtab": "index.html"
   },
