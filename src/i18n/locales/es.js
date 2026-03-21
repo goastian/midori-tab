@@ -162,4 +162,78 @@ export default {
     subtitle: 'Selecciona el idioma de la interfaz',
     current: 'Idioma actual',
   },
+
+  common: {
+    on: 'On',
+    off: 'Off',
+  },
+
+  dashboard: {
+    actions: {
+      shortcut: 'Atajo',
+      widget: 'Widget',
+    },
+    cmdHint: 'Paleta de comandos',
+    widgetsSheet: {
+      title: 'Añadir un widget',
+      close: 'Cerrar',
+    },
+    shortcutsDialog: {
+      title: 'Añadir marcador al Speed Dial',
+      address: 'Dirección',
+      addressPlaceholder: 'https://ejemplo.com',
+      name: 'Título',
+      namePlaceholder: 'Mi sitio web',
+      add: 'Añadir',
+      cancel: 'Cancelar',
+      close: 'Cerrar',
+    },
+    quickSettings: {
+      title: 'Ajustes rápidos',
+      close: 'Cerrar',
+      theme: 'Tema',
+      themeLight: 'Claro',
+      themeDark: 'Oscuro',
+      density: 'Densidad',
+      densityCompact: 'Compacta',
+      densityComfortable: 'Cómoda',
+      search: 'Búsqueda',
+      bookmarks: 'Marcadores',
+      wallpaper: 'Fondo',
+      refresh: 'Refrescar',
+      settings: 'Configuración',
+      open: 'Abrir',
+    },
+  },
+
+  onboarding: {
+    title: 'Bienvenido a Midori Tab',
+    close: 'Cerrar',
+    back: 'Atrás',
+    next: 'Siguiente',
+    done: 'Listo',
+    steps: {
+      commandPalette: {
+        title: 'Paleta de comandos',
+        description: 'Usa {shortcut} para abrir la paleta en cualquier sitio.',
+      },
+      widgets: {
+        title: 'Widgets',
+        description: 'Activa widgets desde “Widget” y personaliza tu tablero.',
+      },
+      shortcuts: {
+        title: 'Atajos',
+        description: 'Agrega accesos rápidos a tus sitios favoritos desde “Atajo”.',
+      },
+      themeDensity: {
+        title: 'Tema y densidad',
+        description: 'Cambia tema y densidad desde “Ajustes rápidos”.',
+      },
+      shortcutConfig: {
+        title: 'Configurar atajos',
+        chromium: 'En Chrome/Edge/Opera/Vivaldi: abre chrome://extensions/shortcuts.',
+        firefox: 'En Firefox: abre about:addons → Extensiones → Midori Tab.',
+      },
+    },
+  },
 };

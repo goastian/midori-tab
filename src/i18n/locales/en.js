@@ -151,4 +151,78 @@ export default {
     subtitle: 'Select the interface language',
     current: 'Current language',
   },
+
+  common: {
+    on: 'On',
+    off: 'Off',
+  },
+
+  dashboard: {
+    actions: {
+      shortcut: 'Shortcut',
+      widget: 'Widget',
+    },
+    cmdHint: 'Command Palette',
+    widgetsSheet: {
+      title: 'Add a New Widget',
+      close: 'Close',
+    },
+    shortcutsDialog: {
+      title: 'Add Bookmark to Speed Dial',
+      address: 'Address',
+      addressPlaceholder: 'https://example.com',
+      name: 'Title',
+      namePlaceholder: 'My Website',
+      add: 'Add',
+      cancel: 'Cancel',
+      close: 'Close',
+    },
+    quickSettings: {
+      title: 'Quick settings',
+      close: 'Close',
+      theme: 'Theme',
+      themeLight: 'Light',
+      themeDark: 'Dark',
+      density: 'Density',
+      densityCompact: 'Compact',
+      densityComfortable: 'Comfortable',
+      search: 'Search',
+      bookmarks: 'Bookmarks',
+      wallpaper: 'Wallpaper',
+      refresh: 'Refresh',
+      settings: 'Settings',
+      open: 'Open',
+    },
+  },
+
+  onboarding: {
+    title: 'Welcome to Midori Tab',
+    close: 'Close',
+    back: 'Back',
+    next: 'Next',
+    done: 'Done',
+    steps: {
+      commandPalette: {
+        title: 'Command palette',
+        description: 'Use {shortcut} to open the palette on any website.',
+      },
+      widgets: {
+        title: 'Widgets',
+        description: 'Enable widgets from “Widget” and customize your dashboard.',
+      },
+      shortcuts: {
+        title: 'Shortcuts',
+        description: 'Add quick access to your favorite sites from “Shortcut”.',
+      },
+      themeDensity: {
+        title: 'Theme and density',
+        description: 'Change theme and density from “Quick settings”.',
+      },
+      shortcutConfig: {
+        title: 'Customize shortcuts',
+        chromium: 'On Chrome/Edge/Opera/Vivaldi: open chrome://extensions/shortcuts.',
+        firefox: 'On Firefox: open about:addons → Extensions → Midori Tab.',
+      },
+    },
+  },
 };

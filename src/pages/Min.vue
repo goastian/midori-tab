@@ -1,8 +1,11 @@
 <template>
     <div class="dashboard">
         <!-- ═══ Settings button: fixed top-right ═══ -->
-        <button class="settings-btn" @click="openSettings" title="Settings">
+        <button class="settings-btn" type="button" @click="openSettings" :title="i18n.t.settings.title" :aria-label="i18n.t.settings.title">
             <Settings :size="20" :stroke-width="1.5" />
+        </button>
+        <button class="quick-btn" type="button" @click="showQuickSettings = !showQuickSettings" :title="i18n.$t('dashboard.quickSettings.title')" :aria-label="i18n.$t('dashboard.quickSettings.title')">
+            <SlidersHorizontal :size="20" :stroke-width="1.5" />
         </button>
 
         <!-- ═══ Logo centered ═══ -->
@@ -24,20 +27,22 @@
         <section v-if="activeGridWidgets.length" class="dash-widgets">
             <div v-for="key in activeGridWidgets" :key="key" class="widget-card">
                 <button class="widget-close" @click="widgetsStore.toggle(key)" title="Close widget">✕</button>
-                <component :is="widgetComponentMap[key]" />
+                <LazyMount>
+                    <component :is="widgetComponentMap[key]" />
+                </LazyMount>
             </div>
         </section>
 
         <!-- ═══ Bottom action bar ═══ -->
         <div class="bottom-actions">
-            <button class="action-btn" @click="showShortcutDialog = true">
+            <button class="action-btn" type="button" @click="showShortcutDialog = true" :aria-label="i18n.$t('dashboard.actions.shortcut')">
                 <Plus :size="14" :stroke-width="2" />
-                <span>Shortcut</span>
+                <span>{{ i18n.$t('dashboard.actions.shortcut') }}</span>
             </button>
-            <button class="action-btn" @click="showWidgetSheet = !showWidgetSheet">
+            <button class="action-btn" type="button" @click="showWidgetSheet = !showWidgetSheet" :aria-label="i18n.$t('dashboard.actions.widget')">
                 <Minus v-if="showWidgetSheet" :size="14" :stroke-width="2" />
                 <Plus v-else :size="14" :stroke-width="2" />
-                <span>Widget</span>
+                <span>{{ i18n.$t('dashboard.actions.widget') }}</span>
             </button>
         </div>
 
@@ -54,8 +59,8 @@
             <Transition name="sheet-slide">
                 <div v-if="showWidgetSheet" class="widget-sheet">
                     <div class="sheet-header">
-                        <span class="sheet-title">Add a New Widget</span>
-                        <button class="sheet-close" @click="showWidgetSheet = false">✕</button>
+                        <span class="sheet-title">{{ i18n.$t('dashboard.widgetsSheet.title') }}</span>
+                        <button class="sheet-close" type="button" @click="showWidgetSheet = false" :aria-label="i18n.$t('dashboard.widgetsSheet.close')">✕</button>
                     </div>
                     <div class="sheet-grid">
                         <button
@@ -73,6 +78,45 @@
             </Transition>
         </Teleport>
 
+        <Teleport to="body">
+            <Transition name="dialog-fade">
+                <div v-if="showQuickSettings" class="quick-overlay" @click="showQuickSettings = false">
+                    <div class="quick-panel" @click.stop>
+                        <div class="quick-header">
+                            <span class="quick-title">{{ i18n.$t('dashboard.quickSettings.title') }}</span>
+                            <button class="quick-close" type="button" @click="showQuickSettings = false" :aria-label="i18n.$t('dashboard.quickSettings.close')">✕</button>
+                        </div>
+                        <div class="quick-grid">
+                            <button class="quick-item" type="button" @click="tab.setTheme()">
+                                <span class="quick-item-title">{{ i18n.$t('dashboard.quickSettings.theme') }}</span>
+                                <span class="quick-item-value">{{ tab.theme === 'light' ? i18n.$t('dashboard.quickSettings.themeLight') : i18n.$t('dashboard.quickSettings.themeDark') }}</span>
+                            </button>
+                            <button class="quick-item" type="button" @click="toggleDensity">
+                                <span class="quick-item-title">{{ i18n.$t('dashboard.quickSettings.density') }}</span>
+                                <span class="quick-item-value">{{ tab.density === 'compact' ? i18n.$t('dashboard.quickSettings.densityCompact') : i18n.$t('dashboard.quickSettings.densityComfortable') }}</span>
+                            </button>
+                            <button class="quick-item" type="button" @click="toggleSection('search')">
+                                <span class="quick-item-title">{{ i18n.$t('dashboard.quickSettings.search') }}</span>
+                                <span class="quick-item-value">{{ widgetsStore.enabled.search ? i18n.$t('common.on') : i18n.$t('common.off') }}</span>
+                            </button>
+                            <button class="quick-item" type="button" @click="toggleSection('bookmarks')">
+                                <span class="quick-item-title">{{ i18n.$t('dashboard.quickSettings.bookmarks') }}</span>
+                                <span class="quick-item-value">{{ widgetsStore.enabled.bookmarks ? i18n.$t('common.on') : i18n.$t('common.off') }}</span>
+                            </button>
+                            <button class="quick-item" type="button" @click="refreshWallpaper">
+                                <span class="quick-item-title">{{ i18n.$t('dashboard.quickSettings.wallpaper') }}</span>
+                                <span class="quick-item-value">{{ i18n.$t('dashboard.quickSettings.refresh') }}</span>
+                            </button>
+                            <button class="quick-item" type="button" @click="openSettingsAndCloseQuick">
+                                <span class="quick-item-title">{{ i18n.$t('dashboard.quickSettings.settings') }}</span>
+                                <span class="quick-item-value">{{ i18n.$t('dashboard.quickSettings.open') }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
         <!-- ═══ Shortcut add dialog ═══ -->
         <Teleport to="body">
             <Transition name="dialog-fade">
@@ -80,35 +124,35 @@
                     <Transition name="dialog-zoom">
                         <div v-if="showShortcutDialog" class="shortcut-dialog" @click.stop>
                             <div class="dialog-header">
-                                <span class="dialog-title">Add Bookmark to Speed Dial</span>
-                                <button class="dialog-close" @click="showShortcutDialog = false">✕</button>
+                                <span class="dialog-title">{{ i18n.$t('dashboard.shortcutsDialog.title') }}</span>
+                                <button class="dialog-close" type="button" @click="showShortcutDialog = false" :aria-label="i18n.$t('dashboard.shortcutsDialog.close')">✕</button>
                             </div>
                             <div class="dialog-body">
                                 <label class="dialog-label">
-                                    <span>Address</span>
+                                    <span>{{ i18n.$t('dashboard.shortcutsDialog.address') }}</span>
                                     <input
                                         v-model="shortcutForm.url"
                                         class="dialog-input"
                                         type="url"
-                                        placeholder="https://example.com"
+                                        :placeholder="i18n.$t('dashboard.shortcutsDialog.addressPlaceholder')"
                                         @keydown.enter="submitShortcut"
                                         ref="shortcutUrlInput"
                                     />
                                 </label>
                                 <label class="dialog-label">
-                                    <span>Title</span>
+                                    <span>{{ i18n.$t('dashboard.shortcutsDialog.name') }}</span>
                                     <input
                                         v-model="shortcutForm.title"
                                         class="dialog-input"
                                         type="text"
-                                        placeholder="My Website"
+                                        :placeholder="i18n.$t('dashboard.shortcutsDialog.namePlaceholder')"
                                         @keydown.enter="submitShortcut"
                                     />
                                 </label>
                             </div>
                             <div class="dialog-footer">
-                                <button class="dialog-btn-primary" @click="submitShortcut">Add</button>
-                                <button class="dialog-btn-secondary" @click="showShortcutDialog = false">Cancel</button>
+                                <button class="dialog-btn-primary" type="button" @click="submitShortcut">{{ i18n.$t('dashboard.shortcutsDialog.add') }}</button>
+                                <button class="dialog-btn-secondary" type="button" @click="showShortcutDialog = false">{{ i18n.$t('dashboard.shortcutsDialog.cancel') }}</button>
                             </div>
                         </div>
                     </Transition>
@@ -120,10 +164,11 @@
 
 <script>
 import { defineAsyncComponent, nextTick } from 'vue';
-import { Settings, Plus, Minus } from 'lucide-vue-next';
+import { Settings, SlidersHorizontal, Plus, Minus } from 'lucide-vue-next';
 import useTabStore from '../stores/useTabStore';
 import useCommandsStore from '../stores/useCommandsStore';
 import useWidgetsStore from '../stores/useWidgetsStore';
+import useI18nStore from '../stores/useI18nStore.js';
 
 /** Widget keys for the bottom sheet (everything except search & bookmarks). */
 const GRID_KEYS = ['privacy', 'rss', 'calendar', 'notes', 'todo'];
@@ -143,8 +188,10 @@ export default {
             tab: useTabStore(),
             commandsStore: useCommandsStore(),
             widgetsStore: useWidgetsStore(),
+            i18n: useI18nStore(),
             showWidgetSheet: false,
             showShortcutDialog: false,
+            showQuickSettings: false,
             shortcutForm: { url: '', title: '' },
         };
     },
@@ -161,7 +208,7 @@ export default {
             return parts.join('+');
         },
         cmdLabel() {
-            return 'Command Palette';
+            return this.i18n.$t('dashboard.cmdHint');
         },
         /** Returns the grid widgets that are enabled, in configured order. */
         activeGridWidgets() {
@@ -200,6 +247,23 @@ export default {
             this.tab.updateState();
         },
 
+        openSettingsAndCloseQuick() {
+            this.showQuickSettings = false;
+            this.openSettings();
+        },
+
+        toggleDensity() {
+            this.tab.setDensity(this.tab.density === 'compact' ? 'comfortable' : 'compact');
+        },
+
+        toggleSection(key) {
+            this.widgetsStore.toggle(key);
+        },
+
+        refreshWallpaper() {
+            window.dispatchEvent(new CustomEvent('midori:refresh-wallpaper'));
+        },
+
         /** Toggles a widget on/off from the bottom sheet. */
         toggleWidget(key) {
             this.widgetsStore.toggle(key);
@@ -224,6 +288,7 @@ export default {
 
     components: {
         Settings,
+        SlidersHorizontal,
         Plus,
         Minus,
         Logo: defineAsyncComponent(() => import('../components/Logo.vue')),
@@ -234,6 +299,7 @@ export default {
         CalendarWidget: defineAsyncComponent(() => import('../components/CalendarWidget.vue')),
         NotesWidget: defineAsyncComponent(() => import('../components/NotesWidget.vue')),
         TodoWidget: defineAsyncComponent(() => import('../components/TodoWidget.vue')),
+        LazyMount: defineAsyncComponent(() => import('../components/LazyMount.vue')),
     },
 };
 </script>
@@ -272,6 +338,31 @@ export default {
     cursor: pointer;
     transition: all 0.15s ease;
     backdrop-filter: blur(8px);
+}
+
+.quick-btn {
+    position: fixed;
+    top: 1rem;
+    right: 3.75rem;
+    z-index: 50;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-raised, rgba(15,21,32,0.75));
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-muted, #5A9A82);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    backdrop-filter: blur(8px);
+}
+
+.quick-btn:hover {
+    background: var(--surface-overlay, #1E2D3D);
+    color: var(--color-text, #C4F0E0);
+    border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .settings-btn:hover {
@@ -668,4 +759,100 @@ export default {
 .dialog-zoom-leave-active { transition: transform 0.15s ease, opacity 0.12s ease; }
 .dialog-zoom-enter-from { transform: scale(0.95); opacity: 0; }
 .dialog-zoom-leave-to { transform: scale(0.95); opacity: 0; }
+
+.quick-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.25);
+    z-index: 8500;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: 1rem;
+}
+
+.quick-panel {
+    width: 340px;
+    max-width: calc(100vw - 2rem);
+    background: var(--surface-base, #080D14);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-lg, 16px);
+    box-shadow: var(--shadow-xl, 0 8px 32px rgba(0,0,0,0.3));
+    overflow: hidden;
+}
+
+.quick-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    background: var(--surface-raised, #0F1520);
+}
+
+.quick-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text, white);
+}
+
+.quick-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-overlay, #1E2D3D);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-muted, #5A9A82);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.quick-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    padding: 1rem;
+}
+
+.quick-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 0.85rem;
+    background: var(--surface-raised, #0F1520);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: var(--radius-md, 10px);
+    color: var(--color-text, #C4F0E0);
+    cursor: pointer;
+    transition: all 0.12s ease;
+    text-align: left;
+}
+
+.quick-item:hover {
+    background: var(--surface-overlay, #1E2D3D);
+    border-color: var(--color-border-hover, rgba(126,196,168,0.2));
+}
+
+.quick-item-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.quick-item-value {
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #5A9A82);
+}
+
+:global([data-density='compact']) .dashboard {
+    padding: 1rem 1.25rem 4.25rem;
+    gap: 0.9rem;
+}
+
+:global([data-density='compact']) .dash-bookmarks {
+    max-width: 680px;
+}
 </style>

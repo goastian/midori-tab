@@ -3,11 +3,56 @@
 
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
+function normalizeLocale(code) {
+  if (!code) return '';
+  return String(code).trim().toLowerCase().split('-')[0];
+}
+
+function getUiLocale() {
+  try {
+    if (browserAPI?.i18n?.getUILanguage) return normalizeLocale(browserAPI.i18n.getUILanguage());
+    return normalizeLocale(navigator.language);
+  } catch (e) {
+    return 'en';
+  }
+}
+
+const UI_MESSAGES = {
+  en: {
+    searchPlaceholder: 'Search commands, apps, history...',
+    emptyTitle: 'Type to search commands, apps or history',
+    emptyHint: 'ESC to close',
+    error: 'Search error',
+    noResults: 'No results found',
+  },
+  es: {
+    searchPlaceholder: 'Buscar comandos, apps, historial...',
+    emptyTitle: 'Escribe para buscar comandos, apps o historial',
+    emptyHint: 'ESC para cerrar',
+    error: 'Error al buscar',
+    noResults: 'No se encontraron resultados',
+  },
+};
+
+const uiLocale = getUiLocale();
+const msg = UI_MESSAGES[uiLocale] || UI_MESSAGES.en;
+
 let paletteInjected = false;
 let paletteOpen = false;
 let selectedIndex = 0;
 let currentResults = [];
 let searchTimeout = null;
+let latestSearchId = 0;
+let remoteRefreshTimeout = null;
+
+const CACHE_TTL_MS = 30_000;
+const REMOTE_REFRESH_DELAY_MS = 350;
+const REMOTE_MIN_QUERY_LEN = 3;
+
+const historyCache = new Map();
+const bookmarksCache = new Map();
+const inFlightHistory = new Map();
+const inFlightBookmarks = new Map();
 
 // Crear y montar la paleta de comandos
 function createCommandPalette() {
@@ -49,7 +94,7 @@ function createCommandPalette() {
   const searchInput = document.createElement('input');
   searchInput.id = 'midori-search-input';
   searchInput.type = 'text';
-  searchInput.placeholder = 'Buscar comandos, apps, historial...';
+  searchInput.placeholder = msg.searchPlaceholder;
   searchInput.style.cssText = `
     width: 100%;
     padding: 20px 24px;
@@ -81,8 +126,8 @@ function createCommandPalette() {
   `;
   emptyState.innerHTML = `
     <div style="font-size: 48px; margin-bottom: 12px;">🔍</div>
-    <div style="font-size: 14px;">Escribe para buscar comandos, apps o historial</div>
-    <div style="font-size: 12px; margin-top: 8px; opacity: 0.7;">ESC para cerrar</div>
+    <div style="font-size: 14px;">${msg.emptyTitle}</div>
+    <div style="font-size: 12px; margin-top: 8px; opacity: 0.7;">${msg.emptyHint}</div>
   `;
   results.appendChild(emptyState);
   
@@ -199,6 +244,14 @@ function createCommandPalette() {
   
   searchInput.addEventListener('input', debouncedSearch);
   searchInput.addEventListener('keydown', handleKeyNavigation);
+  results.addEventListener('click', (e) => {
+    const item = e.target.closest('.midori-command-item');
+    if (!item) return;
+    const idx = Number(item.dataset.index);
+    if (!Number.isFinite(idx)) return;
+    const command = currentResults[idx];
+    if (command) executeCommand(command);
+  });
   
   document.body.appendChild(overlay);
   paletteInjected = true;
@@ -207,6 +260,7 @@ function createCommandPalette() {
 // Debounce de búsqueda (150ms)
 function debouncedSearch(e) {
   clearTimeout(searchTimeout);
+  clearTimeout(remoteRefreshTimeout);
   const query = e.target.value.trim();
   
   if (!query) {
@@ -217,12 +271,22 @@ function debouncedSearch(e) {
   searchTimeout = setTimeout(async () => {
     const resultsContainer = document.getElementById('midori-results');
     try {
-      const results = await searchAll(query);
+      const searchId = ++latestSearchId;
+      const results = await searchAll(query, { allowRemote: false });
+      if (searchId !== latestSearchId) return;
       currentResults = results;
       selectedIndex = 0;
       renderResults(results);
+      remoteRefreshTimeout = setTimeout(async () => {
+        if (searchId !== latestSearchId) return;
+        const refreshed = await searchAll(query, { allowRemote: true });
+        if (searchId !== latestSearchId) return;
+        currentResults = refreshed;
+        selectedIndex = 0;
+        renderResults(refreshed);
+      }, REMOTE_REFRESH_DELAY_MS);
     } catch (error) {
-      resultsContainer.innerHTML = '<div style="color: rgba(255,255,255,0.5); padding: 20px; text-align: center;">Error al buscar</div>';
+      resultsContainer.replaceChildren(createEmptyMessage(msg.error));
     }
   }, 150);
 }
@@ -248,6 +312,7 @@ function openCommandPalette() {
 // Cerrar paleta
 function closeCommandPalette() {
   clearTimeout(searchTimeout);
+  clearTimeout(remoteRefreshTimeout);
   const overlay = document.getElementById('midori-command-palette-overlay');
   if (overlay) {
     overlay.style.display = 'none';
@@ -265,45 +330,49 @@ export function toggleCommandPalette() {
 }
 
 // Buscar en todo
-async function searchAll(query) {
+async function searchAll(query, options = {}) {
+  const { allowRemote = true } = options;
   const results = [];
+  const normalizedQuery = String(query || '').trim().toLowerCase();
   
   // Comandos predefinidos
   const commands = getPredefinedCommands();
   commands.forEach(cmd => {
     const searchText = `${cmd.name} ${cmd.description} ${cmd.keywords?.join(' ')}`.toLowerCase();
-    if (searchText.includes(query.toLowerCase())) {
+    if (searchText.includes(normalizedQuery)) {
       results.push(cmd);
     }
   });
-  
-  // Historial (usando Browser API)
-  try {
-    const response = await browserAPI.runtime.sendMessage({
-      type: 'SEARCH_HISTORY',
-      query: query
-    });
-    if (response && response.success && response.data) {
-      results.push(...response.data);
-    }
-  } catch (e) {
-    // Silenciar errores de historial
+
+  const cachedHistory = getCachedOrPrefixFiltered(historyCache, normalizedQuery);
+  const cachedBookmarks = getCachedOrPrefixFiltered(bookmarksCache, normalizedQuery);
+  results.push(...cachedHistory);
+  results.push(...cachedBookmarks);
+
+  if (!allowRemote || normalizedQuery.length < REMOTE_MIN_QUERY_LEN) {
+    return results.slice(0, 10);
   }
-  
-  // Marcadores
-  try {
-    const response = await browserAPI.runtime.sendMessage({
-      type: 'SEARCH_BOOKMARKS',
-      query: query
-    });
-    if (response && response.success && response.data) {
-      results.push(...response.data);
-    }
-  } catch (e) {
-    // Silenciar errores de marcadores
-  }
-  
-  return results.slice(0, 10);
+
+  const [historyRemote, bookmarksRemote] = await Promise.all([
+    fetchWithCache({
+      messageType: 'SEARCH_HISTORY',
+      query: normalizedQuery,
+      cache: historyCache,
+      inFlight: inFlightHistory,
+    }),
+    fetchWithCache({
+      messageType: 'SEARCH_BOOKMARKS',
+      query: normalizedQuery,
+      cache: bookmarksCache,
+      inFlight: inFlightBookmarks,
+    }),
+  ]);
+
+  const merged = [];
+  merged.push(...results.filter(r => r.category !== 'history' && r.category !== 'bookmarks'));
+  merged.push(...historyRemote);
+  merged.push(...bookmarksRemote);
+  return merged.slice(0, 10);
 }
 
 // Renderizar resultados
@@ -311,25 +380,29 @@ function renderResults(results) {
   const resultsContainer = document.getElementById('midori-results');
   
   if (results.length === 0) {
-    resultsContainer.innerHTML = '<div style="color: rgba(255,255,255,0.5); padding: 20px; text-align: center;">No se encontraron resultados</div>';
+    resultsContainer.replaceChildren(createEmptyMessage(msg.noResults));
     return;
   }
-  
-  resultsContainer.innerHTML = results.map((item, index) => `
-    <div class="midori-command-item ${index === selectedIndex ? 'selected' : ''}" data-index="${index}">
-      <span class="midori-command-icon">${item.icon || '🔗'}</span>
-      <div class="midori-command-content">
-        <div class="midori-command-name">${item.name}</div>
-        <div class="midori-command-description">${item.description || item.url || ''}</div>
-      </div>
-      <span class="midori-category-label category-${item.category}">${item.category}</span>
-    </div>
-  `).join('');
-  
-  // Event listeners para clicks
-  resultsContainer.querySelectorAll('.midori-command-item').forEach((el, index) => {
-    el.addEventListener('click', () => executeCommand(results[index]));
+
+  const prevNodesById = new Map();
+  resultsContainer.querySelectorAll('.midori-command-item').forEach((node) => {
+    const id = node.dataset.id;
+    if (id) prevNodesById.set(id, node);
   });
+
+  const fragment = document.createDocumentFragment();
+  for (let i = 0; i < results.length; i++) {
+    const item = results[i];
+    const id = String(item.id || `${item.category || 'item'}-${i}`);
+    let node = prevNodesById.get(id);
+    if (!node) {
+      node = createResultNode();
+    }
+    updateResultNode(node, item, i, id);
+    fragment.appendChild(node);
+  }
+  resultsContainer.replaceChildren(fragment);
+  updateSelection(true);
 }
 
 // Navegación con teclado
@@ -343,13 +416,13 @@ function handleKeyNavigation(e) {
   if (e.key === 'ArrowDown') {
     e.preventDefault();
     selectedIndex = Math.min(selectedIndex + 1, currentResults.length - 1);
-    updateSelection();
+    updateSelection(true);
   }
   
   if (e.key === 'ArrowUp') {
     e.preventDefault();
     selectedIndex = Math.max(selectedIndex - 1, 0);
-    updateSelection();
+    updateSelection(true);
   }
   
   if (e.key === 'Enter') {
@@ -360,11 +433,14 @@ function handleKeyNavigation(e) {
   }
 }
 
-function updateSelection() {
-  document.querySelectorAll('.midori-command-item').forEach((el, index) => {
+function updateSelection(forceScroll = false) {
+  const resultsContainer = document.getElementById('midori-results');
+  if (!resultsContainer) return;
+  const nodes = resultsContainer.querySelectorAll('.midori-command-item');
+  nodes.forEach((el, index) => {
     if (index === selectedIndex) {
       el.classList.add('selected');
-      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      if (forceScroll) el.scrollIntoView({ block: 'nearest' });
     } else {
       el.classList.remove('selected');
     }
@@ -403,4 +479,109 @@ function getPredefinedCommands() {
 function loadPredefinedCommands() {
   currentResults = getPredefinedCommands();
   renderResults(currentResults);
+}
+
+function createEmptyMessage(text) {
+  const el = document.createElement('div');
+  el.style.cssText = 'color: rgba(255,255,255,0.5); padding: 20px; text-align: center;';
+  el.textContent = text;
+  return el;
+}
+
+function createResultNode() {
+  const root = document.createElement('div');
+  root.className = 'midori-command-item';
+
+  const icon = document.createElement('span');
+  icon.className = 'midori-command-icon';
+  root.appendChild(icon);
+
+  const content = document.createElement('div');
+  content.className = 'midori-command-content';
+
+  const name = document.createElement('div');
+  name.className = 'midori-command-name';
+  content.appendChild(name);
+
+  const desc = document.createElement('div');
+  desc.className = 'midori-command-description';
+  content.appendChild(desc);
+
+  root.appendChild(content);
+
+  const category = document.createElement('span');
+  category.className = 'midori-category-label';
+  root.appendChild(category);
+
+  return root;
+}
+
+function updateResultNode(node, item, index, id) {
+  node.dataset.index = String(index);
+  node.dataset.id = id;
+  if (index === selectedIndex) node.classList.add('selected');
+  else node.classList.remove('selected');
+
+  const iconEl = node.querySelector('.midori-command-icon');
+  const nameEl = node.querySelector('.midori-command-name');
+  const descEl = node.querySelector('.midori-command-description');
+  const catEl = node.querySelector('.midori-category-label');
+
+  if (iconEl) iconEl.textContent = item.icon || '🔗';
+  if (nameEl) nameEl.textContent = item.name || '';
+  if (descEl) descEl.textContent = item.description || item.url || '';
+
+  const category = item.category || '';
+  if (catEl) {
+    catEl.textContent = category;
+    catEl.className = `midori-category-label category-${category}`;
+  }
+}
+
+function getCachedOrPrefixFiltered(cache, normalizedQuery) {
+  if (!normalizedQuery) return [];
+  const exact = cache.get(normalizedQuery);
+  if (isFresh(exact)) return exact.data;
+  for (let i = normalizedQuery.length - 1; i >= 1; i--) {
+    const prefix = normalizedQuery.slice(0, i);
+    const entry = cache.get(prefix);
+    if (!isFresh(entry)) continue;
+    return filterByQuery(entry.data, normalizedQuery);
+  }
+  return [];
+}
+
+function isFresh(entry) {
+  return !!entry && (Date.now() - entry.ts) < CACHE_TTL_MS;
+}
+
+function filterByQuery(items, normalizedQuery) {
+  return (items || []).filter((it) => {
+    const name = String(it.name || '').toLowerCase();
+    const desc = String(it.description || it.url || '').toLowerCase();
+    return name.includes(normalizedQuery) || desc.includes(normalizedQuery);
+  });
+}
+
+async function fetchWithCache({ messageType, query, cache, inFlight }) {
+  const cached = cache.get(query);
+  if (isFresh(cached)) return cached.data;
+  const existing = inFlight.get(query);
+  if (existing) return existing;
+
+  const p = (async () => {
+    try {
+      const response = await browserAPI.runtime.sendMessage({ type: messageType, query });
+      const data = response && response.success && Array.isArray(response.data) ? response.data : [];
+      cache.set(query, { ts: Date.now(), data });
+      return data;
+    } catch (e) {
+      return [];
+    } finally {
+      inFlight.delete(query);
+    }
+  })();
+
+  inFlight.set(query, p);
+  return p;
 }
