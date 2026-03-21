@@ -5,6 +5,7 @@ const useTabStore = defineStore('tabStore', {
   state: () => ({
     tabName: 'New Tab',
     theme: 'dark',
+    density: 'comfortable',
     background: {
       type: 'Unsplash',
       default: true,
@@ -19,6 +20,7 @@ const useTabStore = defineStore('tabStore', {
   actions: {
     loadSettings () {
       document.documentElement.setAttribute('data-theme', this.theme);
+      document.documentElement.setAttribute('data-density', this.density);
       document.title = this.tabName;
       this.changeBackground();
     },
@@ -32,6 +34,11 @@ const useTabStore = defineStore('tabStore', {
       document.documentElement.setAttribute('data-theme', this.theme);
       const themeStore = useThemeStore();
       themeStore.applyTheme(this.theme);
+    },
+
+    setDensity(density) {
+      this.density = density;
+      document.documentElement.setAttribute('data-density', this.density);
     },
 
     setTitle(title) {
@@ -68,10 +75,11 @@ const useTabStore = defineStore('tabStore', {
     },
 
     openLinkTab(url) {
+      const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
       if(this.openLink == 'New Tab') {
-        chrome.tabs.create({ url: url});
+        browserAPI.tabs.create({ url: url});
       } else if(this.openLink == 'Self Tab') {
-        chrome.tabs.update({ url: url });
+        browserAPI.tabs.update({ url: url });
       }
     }
   },
@@ -79,7 +87,7 @@ const useTabStore = defineStore('tabStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['tabName', 'theme', 'background', 'shortcuts', 'openLink', 'autoTheme'],
+    paths: ['tabName', 'theme', 'density', 'background', 'shortcuts', 'openLink', 'autoTheme'],
   }
 })
 

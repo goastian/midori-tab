@@ -5,15 +5,19 @@
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 let paletteModule = null;
+let paletteLoadingPromise = null;
 
 // Cargar la paleta bajo demanda (lazy load)
 async function loadPalette() {
   if (!paletteModule) {
     try {
-      paletteModule = await import(
+      if (!paletteLoadingPromise) {
+        paletteLoadingPromise = import(
         /* webpackChunkName: "palette" */
         browserAPI.runtime.getURL('content-script-palette.js')
-      );
+        );
+      }
+      paletteModule = await paletteLoadingPromise;
     } catch (e) {
       // Fallback: inyectar el script directamente
       return new Promise((resolve) => {
@@ -38,6 +42,24 @@ async function togglePalette() {
     paletteModule.toggleCommandPalette();
   }
 }
+
+function isCommandPaletteShortcut(e) {
+  if (!e) return false;
+  if (!e.ctrlKey || !e.altKey) return false;
+  if (e.shiftKey || e.metaKey) return false;
+  if (e.code === 'Space') return true;
+  return e.key === ' ' || e.key === 'Spacebar';
+}
+
+function onKeydown(e) {
+  if (e.repeat) return;
+  if (!isCommandPaletteShortcut(e)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  togglePalette();
+}
+
+window.addEventListener('keydown', onKeydown, true);
 
 // Escuchar mensajes del background (desde comando del navegador)
 browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {

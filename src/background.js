@@ -49,6 +49,16 @@ browserAPI.commands.onCommand.addListener(async (command) => {
       if (!tab || !tab.id) {
         return;
       }
+
+      const tabUrl = tab.url || '';
+      const isWebPage = tabUrl.startsWith('http://') || tabUrl.startsWith('https://');
+      if (!isWebPage) {
+        try {
+          await browserAPI.runtime.sendMessage({ type: 'TOGGLE_COMMAND_PALETTE_NEW_TAB' });
+        } catch (e) {
+        }
+        return;
+      }
       
       // Intentar enviar mensaje al content script existente
       try {

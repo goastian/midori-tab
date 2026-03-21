@@ -1,5 +1,6 @@
 <template>
   <button
+    :type="type"
     :class="[
         { 'flat' : flat },
         { 'bound' : bound },
@@ -37,6 +38,10 @@
       title: {
         type: String,
         required: false,
+      },
+      type: {
+        type: String,
+        default: 'button',
       },
       bound: {
         type: Boolean,

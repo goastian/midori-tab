@@ -8,18 +8,27 @@ const selectedIndex = ref(0);
 const searchResults = ref([]);
 const isSearching = ref(false);
 
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
+const CACHE_TTL_MS = 30_000;
+const REMOTE_MIN_QUERY_LEN = 3;
+const historyCache = new Map();
+const bookmarksCache = new Map();
+const inFlightHistory = new Map();
+const inFlightBookmarks = new Map();
+
 // Helper para abrir URLs sin popups de permiso
 const openUrl = (url, options = {}) => {
   const { newTab = true, active = true } = options;
   
   // Usar API de extensiones (funciona en Chrome y Firefox sin popups)
-  if (typeof chrome !== 'undefined' && chrome.tabs) {
+  if (browserAPI?.tabs) {
     if (newTab) {
       // Abrir en nueva pestaña
-      chrome.tabs.create({ url, active });
+      browserAPI.tabs.create({ url, active });
     } else {
       // Actualizar pestaña actual
-      chrome.tabs.update({ url });
+      browserAPI.tabs.update({ url });
     }
   } else {
     // Fallback para contextos sin API de extensiones (dev, test)
@@ -272,17 +281,27 @@ export function useCommands() {
 
   // Buscar en historial del navegador
   const searchHistory = async (query) => {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return [];
+    const cached = getCachedOrPrefixFiltered(historyCache, q);
+    if (q.length < REMOTE_MIN_QUERY_LEN) return cached;
+    const exact = historyCache.get(q);
+    if (isFresh(exact)) return exact.data;
+
     try {
-      const results = await chrome.history.search({
-        text: query,
+      const existing = inFlightHistory.get(q);
+      const p = existing || browserAPI.history.search({
+        text: q,
         maxResults: 10,
         startTime: 0,
       });
+      if (!existing) inFlightHistory.set(q, p);
+      const results = await p;
       
       const commandsStore = useCommandsStore();
       const openInNewTab = commandsStore.settings.openInNewTab;
       
-      return results.map(item => ({
+      const mapped = results.map(item => ({
         id: `history-${item.id}`,
         name: item.title || item.url,
         description: item.url,
@@ -295,20 +314,34 @@ export function useCommands() {
         url: item.url,
         lastVisitTime: item.lastVisitTime,
       }));
+      historyCache.set(q, { ts: Date.now(), data: mapped });
+      return mapped;
     } catch (error) {
-      return [];
+      return cached;
+    } finally {
+      inFlightHistory.delete(q);
     }
   };
 
   // Buscar en marcadores
   const searchBookmarks = async (query) => {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return [];
+    const cached = getCachedOrPrefixFiltered(bookmarksCache, q);
+    if (q.length < REMOTE_MIN_QUERY_LEN) return cached;
+    const exact = bookmarksCache.get(q);
+    if (isFresh(exact)) return exact.data;
+
     try {
-      const bookmarks = await chrome.bookmarks.search(query);
+      const existing = inFlightBookmarks.get(q);
+      const p = existing || browserAPI.bookmarks.search(q);
+      if (!existing) inFlightBookmarks.set(q, p);
+      const bookmarks = await p;
       
       const commandsStore = useCommandsStore();
       const openInNewTab = commandsStore.settings.openInNewTab;
       
-      return bookmarks
+      const mapped = bookmarks
         .filter(bookmark => bookmark.url)
         .map(bookmark => ({
           id: `bookmark-${bookmark.id}`,
@@ -322,15 +355,19 @@ export function useCommands() {
           type: 'bookmark',
           url: bookmark.url,
         }));
+      bookmarksCache.set(q, { ts: Date.now(), data: mapped });
+      return mapped;
     } catch (error) {
-      return [];
+      return cached;
+    } finally {
+      inFlightBookmarks.delete(q);
     }
   };
 
   // Buscar en pestañas abiertas
   const searchTabs = async (query) => {
     try {
-      const tabs = await chrome.tabs.query({});
+      const tabs = await browserAPI.tabs.query({});
       const lowerQuery = query.toLowerCase();
       
       const filteredTabs = tabs.filter(tab => 
@@ -344,7 +381,7 @@ export function useCommands() {
         description: tab.url,
         icon: '🗂️',
         action: () => {
-          chrome.tabs.update(tab.id, { active: true });
+          browserAPI.tabs.update(tab.id, { active: true });
         },
         category: 'tabs',
         type: 'tab',
@@ -519,4 +556,24 @@ export function useCommands() {
     searchCommands,
     searchCustomCommands,
   };
+}
+
+function isFresh(entry) {
+  return !!entry && (Date.now() - entry.ts) < CACHE_TTL_MS;
+}
+
+function getCachedOrPrefixFiltered(cache, q) {
+  const exact = cache.get(q);
+  if (isFresh(exact)) return exact.data;
+  for (let i = q.length - 1; i >= 1; i--) {
+    const prefix = q.slice(0, i);
+    const entry = cache.get(prefix);
+    if (!isFresh(entry)) continue;
+    return entry.data.filter((it) => {
+      const name = String(it.name || '').toLowerCase();
+      const desc = String(it.description || it.url || '').toLowerCase();
+      return name.includes(q) || desc.includes(q);
+    });
+  }
+  return [];
 }

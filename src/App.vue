@@ -8,9 +8,10 @@
     </div>
     <SpaceSwitcher />
     <Minimalist />
-    <SettingsModal />
-    <CommandPalette />
-    <SmartSuggestions />
+    <SettingsModal v-if="tabStore.state" />
+    <CommandPalette v-if="renderCommandPalette" />
+    <SmartSuggestions v-if="renderSmartSuggestions" />
+    <OnboardingModal v-if="showOnboarding" @close="completeOnboarding" />
   </div>
 </template>
 
@@ -19,9 +20,7 @@
   import useTabStore from './stores/useTabStore.js';
   import UnsService from './services/UnsService.js';
   import useCommandsStore from './stores/useCommandsStore.js';
-  import CommandPalette from './components/CommandPalette.vue';
   import SpaceSwitcher from './components/SpaceSwitcher.vue';
-  import SmartSuggestions from './components/SmartSuggestions.vue';
   import { useCommands } from './composables/useCommands.js';
   import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts.js';
   import { useAutoTheme } from './composables/useAutoTheme.js';
@@ -34,6 +33,11 @@
         backgroundImage: "",
         tabStore: useTabStore(),
         keyboardShortcutsCleanup: null,
+        runtimeMessageListener: null,
+        refreshWallpaperListener: null,
+        showOnboarding: false,
+        renderCommandPalette: false,
+        renderSmartSuggestions: false,
         imageAuthor: "",
         imageAuthorLink: "",
         imageLink: "",
@@ -44,9 +48,10 @@
     components: {
       Minimalist: defineAsyncComponent(() => import('./pages/Min.vue')),
       SettingsModal: defineAsyncComponent(() => import('./components/SettingsModal.vue')),
-      CommandPalette,
+      CommandPalette: defineAsyncComponent(() => import('./components/CommandPalette.vue')),
       SpaceSwitcher,
-      SmartSuggestions,
+      SmartSuggestions: defineAsyncComponent(() => import('./components/SmartSuggestions.vue')),
+      OnboardingModal: defineAsyncComponent(() => import('./components/OnboardingModal.vue')),
     },
 
     mounted() {
@@ -59,6 +64,10 @@
       }
       
       this.setupKeyboardShortcuts();
+      this.setupRuntimeMessages();
+      this.setupWallpaperRefresh();
+      this.setupOnboarding();
+      this.setupDeferredMounts();
 
       // Apply active theme colors
       const themeStore = useThemeStore();
@@ -75,6 +84,15 @@
       // Limpiar event listeners
       if (this.keyboardShortcutsCleanup) {
         this.keyboardShortcutsCleanup();
+      }
+      if (this.runtimeMessageListener) {
+        const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+        if (browserAPI?.runtime?.onMessage?.removeListener) {
+          browserAPI.runtime.onMessage.removeListener(this.runtimeMessageListener);
+        }
+      }
+      if (this.refreshWallpaperListener) {
+        window.removeEventListener('midori:refresh-wallpaper', this.refreshWallpaperListener);
       }
       // Detener auto theme
       if (this.autoTheme) {
@@ -101,7 +119,6 @@
       },
 
       setupKeyboardShortcuts() {
-        const { toggleCommandPalette } = useCommands();
         const commandsStore = useCommandsStore();
         
         // Configurar atajos de teclado desde el store
@@ -116,7 +133,7 @@
             alt: paletteShortcut.alt,
             shift: paletteShortcut.shift,
             callback: (e) => {
-              toggleCommandPalette();
+              this.toggleCommandPalette();
             },
             allowInInput: false,
           });
@@ -138,6 +155,59 @@
         }
         const result = useKeyboardShortcuts(shortcuts);
         this.keyboardShortcutsCleanup = result.cleanup;
+      },
+
+      setupRuntimeMessages() {
+        const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+        const listener = (message) => {
+          if (message?.type === 'TOGGLE_COMMAND_PALETTE_NEW_TAB') {
+            this.toggleCommandPalette();
+          }
+        };
+        this.runtimeMessageListener = listener;
+        if (browserAPI?.runtime?.onMessage?.addListener) {
+          browserAPI.runtime.onMessage.addListener(listener);
+        }
+      },
+
+      toggleCommandPalette() {
+        this.renderCommandPalette = true;
+        const { toggleCommandPalette } = useCommands();
+        toggleCommandPalette();
+      },
+
+      setupDeferredMounts() {
+        const enable = () => {
+          this.renderSmartSuggestions = true;
+        };
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+          window.requestIdleCallback(enable, { timeout: 1000 });
+        } else {
+          setTimeout(enable, 400);
+        }
+      },
+
+      setupWallpaperRefresh() {
+        const listener = () => this.load();
+        this.refreshWallpaperListener = listener;
+        window.addEventListener('midori:refresh-wallpaper', listener);
+      },
+
+      setupOnboarding() {
+        try {
+          const done = localStorage.getItem('midori_onboarding_done') === '1';
+          this.showOnboarding = !done;
+        } catch (e) {
+          this.showOnboarding = false;
+        }
+      },
+
+      completeOnboarding() {
+        this.showOnboarding = false;
+        try {
+          localStorage.setItem('midori_onboarding_done', '1');
+        } catch (e) {
+        }
       },
 
     }

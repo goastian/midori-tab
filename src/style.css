@@ -43,6 +43,20 @@ body {
   color: var(--color-text);
 }
 
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-border, rgba(4, 164, 105, 0.25));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .bg-orange {
   background: var(--gradient-orange);
 }
