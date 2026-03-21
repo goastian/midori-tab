@@ -1,25 +1,86 @@
-// Compatibilidad Firefox/Chrome  
-var browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+// Compatibilidad Firefox/Chrome
+const isBrowser = typeof browser !== 'undefined';
+var browserAPI = isBrowser ? browser : chrome;
+
+function promisifyChrome(fn, ...args) {
+  return new Promise((resolve, reject) => {
+    fn(...args, (result) => {
+      const err = chrome.runtime?.lastError;
+      if (err) reject(new Error(err.message));
+      else resolve(result);
+    });
+  });
+}
+
+function tabsQuery(queryInfo) {
+  return isBrowser ? browserAPI.tabs.query(queryInfo) : promisifyChrome(browserAPI.tabs.query, queryInfo);
+}
+
+function tabsSendMessage(tabId, message) {
+  return isBrowser ? browserAPI.tabs.sendMessage(tabId, message) : promisifyChrome(browserAPI.tabs.sendMessage, tabId, message);
+}
+
+function runtimeSendMessage(message) {
+  return isBrowser ? browserAPI.runtime.sendMessage(message) : promisifyChrome(browserAPI.runtime.sendMessage, message);
+}
+
+function scriptingExecuteScript(details) {
+  if (!browserAPI.scripting?.executeScript) return Promise.reject(new Error('scripting.executeScript not available'));
+  return isBrowser ? browserAPI.scripting.executeScript(details) : promisifyChrome(browserAPI.scripting.executeScript, details);
+}
+
+function tabsExecuteScript(tabId, details) {
+  if (!browserAPI.tabs?.executeScript) return Promise.reject(new Error('tabs.executeScript not available'));
+  return isBrowser ? browserAPI.tabs.executeScript(tabId, details) : promisifyChrome(browserAPI.tabs.executeScript, tabId, details);
+}
+
+async function injectContentScript(tabId) {
+  try {
+    await scriptingExecuteScript({ target: { tabId }, files: ['content-script.js'] });
+  } catch (e) {
+    try {
+      await tabsExecuteScript(tabId, { file: 'content-script.js' });
+    } catch (e2) {
+      throw e2;
+    }
+  }
+}
+
+function historySearch(query) {
+  return isBrowser ? browserAPI.history.search(query) : promisifyChrome(browserAPI.history.search, query);
+}
+
+function bookmarksSearch(query) {
+  return isBrowser ? browserAPI.bookmarks.search(query) : promisifyChrome(browserAPI.bookmarks.search, query);
+}
+
+function tabsCreate(createProperties) {
+  return isBrowser ? browserAPI.tabs.create(createProperties) : promisifyChrome(browserAPI.tabs.create, createProperties);
+}
+
+function tabsUpdate(tabIdOrUpdateProperties, updateProperties) {
+  if (typeof tabIdOrUpdateProperties === 'number') {
+    return isBrowser ? browserAPI.tabs.update(tabIdOrUpdateProperties, updateProperties) : promisifyChrome(browserAPI.tabs.update, tabIdOrUpdateProperties, updateProperties);
+  }
+  return isBrowser ? browserAPI.tabs.update(tabIdOrUpdateProperties) : promisifyChrome(browserAPI.tabs.update, tabIdOrUpdateProperties);
+}
 
 // ⚡ INYECTAR CONTENT SCRIPT EN TODAS LAS PESTAÑAS AL INSTALAR/ACTUALIZAR
 async function injectContentScriptInAllTabs() {
   try {
     // Obtener todas las pestañas
-    const tabs = await browserAPI.tabs.query({});
+    const tabs = await tabsQuery({});
     
     for (const tab of tabs) {
       // Solo inyectar en páginas web normales (http/https)
       if (tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
         try {
           // Intentar enviar un mensaje de prueba para ver si ya está cargado
-          await browserAPI.tabs.sendMessage(tab.id, { type: 'PING' });
+          await tabsSendMessage(tab.id, { type: 'PING' });
         } catch (error) {
           // Si falla, el content script no está cargado - inyectarlo
           try {
-            await browserAPI.scripting.executeScript({
-              target: { tabId: tab.id },
-              files: ['content-script.js']
-            });
+            await injectContentScript(tab.id);
           } catch (injectError) {
           }
         }
@@ -44,7 +105,7 @@ browserAPI.commands.onCommand.addListener(async (command) => {
   if (command === 'toggle-command-palette') {
     try {
       // Obtener pestaña activa
-      const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await tabsQuery({ active: true, currentWindow: true });
       
       if (!tab || !tab.id) {
         return;
@@ -54,29 +115,35 @@ browserAPI.commands.onCommand.addListener(async (command) => {
       const isWebPage = tabUrl.startsWith('http://') || tabUrl.startsWith('https://');
       if (!isWebPage) {
         try {
-          await browserAPI.runtime.sendMessage({ type: 'TOGGLE_COMMAND_PALETTE_NEW_TAB' });
+          await runtimeSendMessage({ type: 'TOGGLE_COMMAND_PALETTE_NEW_TAB' });
         } catch (e) {
         }
         return;
       }
       
+      const sendToggle = async () => {
+        await tabsSendMessage(tab.id, { type: 'TOGGLE_COMMAND_PALETTE' });
+      };
+      
       // Intentar enviar mensaje al content script existente
       try {
-        await browserAPI.tabs.sendMessage(tab.id, { type: 'TOGGLE_COMMAND_PALETTE' });
+        await sendToggle();
       } catch (error) {
         
-        await browserAPI.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['content-script.js']
-        });
-        
-        // Esperar un poco y abrir la paleta
-        setTimeout(async () => {
+        try {
+          await injectContentScript(tab.id);
+        } catch (e) {
+        }
+
+        const delays = [50, 200, 600];
+        for (const delay of delays) {
+          await new Promise(r => setTimeout(r, delay));
           try {
-            await browserAPI.tabs.sendMessage(tab.id, { type: 'TOGGLE_COMMAND_PALETTE' });
+            await sendToggle();
+            break;
           } catch (e) {
           }
-        }, 100);
+        }
       }
     } catch (error) {
     }
@@ -95,7 +162,7 @@ const handlers = {
   
   SEARCH_HISTORY: async (msg) => {
     try {
-      const results = await browserAPI.history.search({
+      const results = await historySearch({
         text: msg.query,
         maxResults: 5,
         startTime: 0,
@@ -117,7 +184,7 @@ const handlers = {
   
   SEARCH_BOOKMARKS: async (msg) => {
     try {
-      const bookmarks = await browserAPI.bookmarks.search(msg.query);
+      const bookmarks = await bookmarksSearch(msg.query);
       
       return bookmarks
         .filter(bookmark => bookmark.url)
@@ -139,10 +206,10 @@ const handlers = {
   OPEN_URL: async (msg) => {
     try {
       if (msg.newTab) {
-        await browserAPI.tabs.create({ url: msg.url, active: true });
+        await tabsCreate({ url: msg.url, active: true });
       } else {
-        const [currentTab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
-        await browserAPI.tabs.update(currentTab.id, { url: msg.url });
+        const [currentTab] = await tabsQuery({ active: true, currentWindow: true });
+        await tabsUpdate(currentTab.id, { url: msg.url });
       }
       return { success: true };
     } catch (error) {

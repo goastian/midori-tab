@@ -59,7 +59,10 @@ function onKeydown(e) {
   togglePalette();
 }
 
-window.addEventListener('keydown', onKeydown, true);
+if (!window.__midoriPaletteKeyListenerInstalled) {
+  window.__midoriPaletteKeyListenerInstalled = true;
+  window.addEventListener('keydown', onKeydown, true);
+}
 
 // Escuchar mensajes del background (desde comando del navegador)
 browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {

@@ -23,8 +23,8 @@
   "commands": {
     "toggle-command-palette": {
       "suggested_key": {
-        "default": "Ctrl+Alt+Space",
-        "mac": "Command+Alt+Space"
+        "default": "Ctrl+Shift+Space",
+        "mac": "Command+Shift+Space"
       },
       "description": "Abrir paleta de comandos"
     }
@@ -33,7 +33,7 @@
     {
       "matches": ["http://*/*", "https://*/*"],
       "js": ["content-script.js"],
-      "run_at": "document_end",
+      "run_at": "document_start",
       "all_frames": false
     }
   ],
