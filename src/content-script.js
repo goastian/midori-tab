@@ -45,6 +45,9 @@ async function togglePalette() {
 
 function isCommandPaletteShortcut(e) {
   if (!e) return false;
+  if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+    return e.code === 'F2' || e.key === 'F2';
+  }
   if (!e.ctrlKey || !e.altKey) return false;
   if (e.shiftKey || e.metaKey) return false;
   if (e.code === 'Space') return true;

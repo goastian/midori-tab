@@ -65,6 +65,23 @@ function tabsUpdate(tabIdOrUpdateProperties, updateProperties) {
   return isBrowser ? browserAPI.tabs.update(tabIdOrUpdateProperties) : promisifyChrome(browserAPI.tabs.update, tabIdOrUpdateProperties);
 }
 
+function tabsRemove(tabIds) {
+  return isBrowser ? browserAPI.tabs.remove(tabIds) : promisifyChrome(browserAPI.tabs.remove, tabIds);
+}
+
+function tabsDuplicate(tabId) {
+  if (!browserAPI.tabs?.duplicate) return Promise.reject(new Error('tabs.duplicate not available'));
+  return isBrowser ? browserAPI.tabs.duplicate(tabId) : promisifyChrome(browserAPI.tabs.duplicate, tabId);
+}
+
+function tabsReload(tabId) {
+  return isBrowser ? browserAPI.tabs.reload(tabId) : promisifyChrome(browserAPI.tabs.reload, tabId);
+}
+
+function bookmarksRemove(id) {
+  return isBrowser ? browserAPI.bookmarks.remove(id) : promisifyChrome(browserAPI.bookmarks.remove, id);
+}
+
 // ⚡ INYECTAR CONTENT SCRIPT EN TODAS LAS PESTAÑAS AL INSTALAR/ACTUALIZAR
 async function injectContentScriptInAllTabs() {
   try {
@@ -191,6 +208,7 @@ const handlers = {
         .slice(0, 5)
         .map(bookmark => ({
           id: `bookmark-${bookmark.id}`,
+          bookmarkId: bookmark.id,
           name: bookmark.title,
           description: bookmark.url,
           icon: '⭐',
@@ -200,6 +218,102 @@ const handlers = {
     } catch (error) {
       console.error('Error searching bookmarks:', error);
       return [];
+    }
+  },
+
+  SEARCH_TABS: async (msg) => {
+    try {
+      const query = String(msg.query || '').trim().toLowerCase();
+      const tabs = await tabsQuery({ currentWindow: true });
+      return tabs
+        .filter((tab) => {
+          const title = String(tab.title || '').toLowerCase();
+          const url = String(tab.url || '').toLowerCase();
+          if (!query) return true;
+          return title.includes(query) || url.includes(query);
+        })
+        .slice(0, 8)
+        .map((tab) => ({
+          id: `tab-${tab.id}`,
+          tabId: tab.id,
+          windowId: tab.windowId,
+          name: tab.title || tab.url,
+          description: tab.url,
+          icon: '🗂️',
+          category: 'tabs',
+        }));
+    } catch (error) {
+      console.error('Error searching tabs:', error);
+      return [];
+    }
+  },
+
+  ACTIVATE_TAB: async (msg) => {
+    const tabId = Number(msg.tabId);
+    const windowId = Number(msg.windowId);
+    if (!Number.isFinite(tabId)) return { success: false };
+    try {
+      if (Number.isFinite(windowId) && browserAPI.windows?.update) {
+        await (isBrowser ? browserAPI.windows.update(windowId, { focused: true }) : promisifyChrome(browserAPI.windows.update, windowId, { focused: true }));
+      }
+      await tabsUpdate(tabId, { active: true });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  CLOSE_TAB: async (msg) => {
+    const tabId = Number(msg.tabId);
+    if (!Number.isFinite(tabId)) return { success: false };
+    try {
+      await tabsRemove(tabId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  REMOVE_BOOKMARK: async (msg) => {
+    const bookmarkId = String(msg.bookmarkId || '');
+    if (!bookmarkId) return { success: false };
+    try {
+      await bookmarksRemove(bookmarkId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  ACTION_CURRENT_TAB: async (msg) => {
+    const action = String(msg.action || '');
+    try {
+      const [tab] = await tabsQuery({ active: true, currentWindow: true });
+      if (!tab?.id) return { success: false };
+      if (action === 'reload') {
+        await tabsReload(tab.id);
+        return { success: true };
+      }
+      if (action === 'duplicate') {
+        await tabsDuplicate(tab.id);
+        return { success: true };
+      }
+      if (action === 'pin_toggle') {
+        await tabsUpdate(tab.id, { pinned: !tab.pinned });
+        return { success: true };
+      }
+      if (action === 'mute_toggle') {
+        const muted = !!tab.mutedInfo?.muted;
+        await tabsUpdate(tab.id, { muted: !muted });
+        return { success: true };
+      }
+      if (action === 'close') {
+        await tabsRemove(tab.id);
+        return { success: true };
+      }
+      return { success: false };
+    } catch (error) {
+      return { success: false, error: error.message };
     }
   },
   

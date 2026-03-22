@@ -51,8 +51,12 @@ const REMOTE_MIN_QUERY_LEN = 3;
 
 const historyCache = new Map();
 const bookmarksCache = new Map();
+const tabsCache = new Map();
 const inFlightHistory = new Map();
 const inFlightBookmarks = new Map();
+const inFlightTabs = new Map();
+
+let globalKeyHandlerInstalled = false;
 
 // Crear y montar la paleta de comandos
 function createCommandPalette() {
@@ -67,7 +71,7 @@ function createCommandPalette() {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--midori-overlay-bg);
     z-index: 999999999;
     display: none;
     align-items: flex-start;
@@ -80,7 +84,7 @@ function createCommandPalette() {
   const palette = document.createElement('div');
   palette.id = 'midori-command-palette';
   palette.style.cssText = `
-    background: #0F1520;
+    background: var(--midori-palette-bg);
     border: 1px solid rgba(126, 196, 168, 0.1);
     border-radius: 16px;
     width: 90%;
@@ -101,7 +105,7 @@ function createCommandPalette() {
     background: transparent;
     border: none;
     outline: none;
-    color: #fff;
+    color: var(--midori-text);
     font-size: 18px;
     border-bottom: 1px solid rgba(0, 184, 148, 0.1);
     box-sizing: border-box;
@@ -122,7 +126,7 @@ function createCommandPalette() {
   emptyState.style.cssText = `
     text-align: center;
     padding: 40px 20px;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--midori-text-muted);
   `;
   emptyState.innerHTML = `
     <div style="font-size: 48px; margin-bottom: 12px;">🔍</div>
@@ -139,6 +143,22 @@ function createCommandPalette() {
   // Agregar estilos
   const style = document.createElement('style');
   style.textContent = `
+    :root {
+      --midori-palette-bg: #0F1520;
+      --midori-overlay-bg: rgba(0, 0, 0, 0.7);
+      --midori-text: #fff;
+      --midori-text-muted: rgba(255, 255, 255, 0.5);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --midori-palette-bg: #ffffff;
+        --midori-overlay-bg: rgba(15, 21, 32, 0.25);
+        --midori-text: #0F1520;
+        --midori-text-muted: rgba(15, 21, 32, 0.6);
+      }
+    }
+
     @keyframes midoriSlideDown {
       from {
         opacity: 0;
@@ -198,14 +218,14 @@ function createCommandPalette() {
     }
     
     .midori-command-name {
-      color: #fff;
+      color: var(--midori-text);
       font-size: 14px;
       font-weight: 500;
       margin-bottom: 2px;
     }
     
     .midori-command-description {
-      color: rgba(255, 255, 255, 0.5);
+      color: var(--midori-text-muted);
       font-size: 12px;
       white-space: nowrap;
       overflow: hidden;
@@ -232,6 +252,9 @@ function createCommandPalette() {
     .category-utilities { background: rgba(156, 163, 175, 0.15); color: #9ca3af; }
     .category-history { background: rgba(234, 179, 8, 0.15); color: #facc15; }
     .category-bookmarks { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+    .category-tabs { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; }
+    .category-actions { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+    .category-remove { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
   `;
   document.head.appendChild(style);
   
@@ -255,13 +278,25 @@ function createCommandPalette() {
   
   document.body.appendChild(overlay);
   paletteInjected = true;
+
+  if (!globalKeyHandlerInstalled) {
+    globalKeyHandlerInstalled = true;
+    document.addEventListener('keydown', (e) => {
+      if (!paletteOpen) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeCommandPalette();
+      }
+    }, true);
+  }
 }
 
 // Debounce de búsqueda (150ms)
 function debouncedSearch(e) {
   clearTimeout(searchTimeout);
   clearTimeout(remoteRefreshTimeout);
-  const query = e.target.value.trim();
+  const raw = String(e.target.value || '');
+  const query = raw.trim();
   
   if (!query) {
     loadPredefinedCommands();
@@ -332,37 +367,111 @@ export function toggleCommandPalette() {
 // Buscar en todo
 async function searchAll(query, options = {}) {
   const { allowRemote = true } = options;
+  const parsed = parseQuery(query);
   const results = [];
-  const normalizedQuery = String(query || '').trim().toLowerCase();
+  const normalizedQuery = parsed.query.toLowerCase();
+
+  if (parsed.mode === 'help') {
+    return getSlashHelpItems();
+  }
+
+  if (parsed.mode === 'actions') {
+    const actions = getActionCommands();
+    const filtered = !normalizedQuery
+      ? actions
+      : actions.filter((a) => `${a.name} ${a.description}`.toLowerCase().includes(normalizedQuery));
+    return filtered.slice(0, 10);
+  }
+
+  if (parsed.mode === 'tabs') {
+    const tabs = await fetchWithCache({
+      messageType: 'SEARCH_TABS',
+      query: normalizedQuery,
+      cache: tabsCache,
+      inFlight: inFlightTabs,
+    });
+    return tabs.slice(0, 10);
+  }
+
+  if (parsed.mode === 'bookmarks') {
+    const bookmarks = await fetchWithCache({
+      messageType: 'SEARCH_BOOKMARKS',
+      query: normalizedQuery,
+      cache: bookmarksCache,
+      inFlight: inFlightBookmarks,
+    });
+    return bookmarks.slice(0, 10);
+  }
+
+  if (parsed.mode === 'history') {
+    const history = await fetchWithCache({
+      messageType: 'SEARCH_HISTORY',
+      query: normalizedQuery,
+      cache: historyCache,
+      inFlight: inFlightHistory,
+    });
+    return history.slice(0, 10);
+  }
+
+  if (parsed.mode === 'remove') {
+    const [tabs, bookmarks] = await Promise.all([
+      fetchWithCache({
+        messageType: 'SEARCH_TABS',
+        query: normalizedQuery,
+        cache: tabsCache,
+        inFlight: inFlightTabs,
+      }),
+      fetchWithCache({
+        messageType: 'SEARCH_BOOKMARKS',
+        query: normalizedQuery,
+        cache: bookmarksCache,
+        inFlight: inFlightBookmarks,
+      }),
+    ]);
+    const mapped = [];
+    tabs.forEach((t) => mapped.push({ ...t, category: 'remove', removeOp: 'CLOSE_TAB' }));
+    bookmarks.forEach((b) => mapped.push({ ...b, category: 'remove', removeOp: 'REMOVE_BOOKMARK' }));
+    return mapped.slice(0, 10);
+  }
+  
+  const normalizedQueryAll = String(parsed.query || '').trim().toLowerCase();
   
   // Comandos predefinidos
   const commands = getPredefinedCommands();
   commands.forEach(cmd => {
     const searchText = `${cmd.name} ${cmd.description} ${cmd.keywords?.join(' ')}`.toLowerCase();
-    if (searchText.includes(normalizedQuery)) {
+    if (searchText.includes(normalizedQueryAll)) {
       results.push(cmd);
     }
   });
 
-  const cachedHistory = getCachedOrPrefixFiltered(historyCache, normalizedQuery);
-  const cachedBookmarks = getCachedOrPrefixFiltered(bookmarksCache, normalizedQuery);
+  const cachedHistory = getCachedOrPrefixFiltered(historyCache, normalizedQueryAll);
+  const cachedBookmarks = getCachedOrPrefixFiltered(bookmarksCache, normalizedQueryAll);
+  const cachedTabs = getCachedOrPrefixFiltered(tabsCache, normalizedQueryAll);
   results.push(...cachedHistory);
   results.push(...cachedBookmarks);
+  results.push(...cachedTabs);
 
-  if (!allowRemote || normalizedQuery.length < REMOTE_MIN_QUERY_LEN) {
+  if (!allowRemote || normalizedQueryAll.length < REMOTE_MIN_QUERY_LEN) {
     return results.slice(0, 10);
   }
 
-  const [historyRemote, bookmarksRemote] = await Promise.all([
+  const [tabsRemote, historyRemote, bookmarksRemote] = await Promise.all([
+    fetchWithCache({
+      messageType: 'SEARCH_TABS',
+      query: normalizedQueryAll,
+      cache: tabsCache,
+      inFlight: inFlightTabs,
+    }),
     fetchWithCache({
       messageType: 'SEARCH_HISTORY',
-      query: normalizedQuery,
+      query: normalizedQueryAll,
       cache: historyCache,
       inFlight: inFlightHistory,
     }),
     fetchWithCache({
       messageType: 'SEARCH_BOOKMARKS',
-      query: normalizedQuery,
+      query: normalizedQueryAll,
       cache: bookmarksCache,
       inFlight: inFlightBookmarks,
     }),
@@ -370,6 +479,7 @@ async function searchAll(query, options = {}) {
 
   const merged = [];
   merged.push(...results.filter(r => r.category !== 'history' && r.category !== 'bookmarks'));
+  merged.push(...tabsRemote);
   merged.push(...historyRemote);
   merged.push(...bookmarksRemote);
   return merged.slice(0, 10);
@@ -449,6 +559,34 @@ function updateSelection(forceScroll = false) {
 
 // Ejecutar comando
 function executeCommand(command) {
+  if (command.keepOpen && command.action) {
+    command.action();
+    return;
+  }
+
+  if (command.removeOp === 'CLOSE_TAB' && Number.isFinite(command.tabId)) {
+    browserAPI.runtime.sendMessage({ type: 'CLOSE_TAB', tabId: command.tabId });
+    closeCommandPalette();
+    return;
+  }
+  if (command.removeOp === 'REMOVE_BOOKMARK' && command.bookmarkId) {
+    browserAPI.runtime.sendMessage({ type: 'REMOVE_BOOKMARK', bookmarkId: command.bookmarkId });
+    closeCommandPalette();
+    return;
+  }
+
+  if (command.category === 'tabs' && Number.isFinite(command.tabId)) {
+    browserAPI.runtime.sendMessage({ type: 'ACTIVATE_TAB', tabId: command.tabId, windowId: command.windowId });
+    closeCommandPalette();
+    return;
+  }
+
+  if (command.op === 'ACTION_CURRENT_TAB') {
+    browserAPI.runtime.sendMessage({ type: 'ACTION_CURRENT_TAB', action: command.actionId });
+    closeCommandPalette();
+    return;
+  }
+
   if (command.url) {
     browserAPI.runtime.sendMessage({
       type: 'OPEN_URL',
@@ -465,6 +603,11 @@ function executeCommand(command) {
 // Comandos predefinidos
 function getPredefinedCommands() {
   return [
+    { id: 'slash-tabs', name: '/tabs', description: 'Buscar pestañas', icon: '🗂️', category: 'actions', keepOpen: true, action: () => setSearchQuery('/tabs ') },
+    { id: 'slash-bookmarks', name: '/bookmarks', description: 'Buscar marcadores', icon: '⭐', category: 'actions', keepOpen: true, action: () => setSearchQuery('/bookmarks ') },
+    { id: 'slash-history', name: '/history', description: 'Buscar historial', icon: '🕐', category: 'actions', keepOpen: true, action: () => setSearchQuery('/history ') },
+    { id: 'slash-actions', name: '/actions', description: 'Acciones del navegador', icon: '⚡', category: 'actions', keepOpen: true, action: () => setSearchQuery('/actions ') },
+    { id: 'slash-remove', name: '/remove', description: 'Cerrar pestañas o borrar marcadores', icon: '🗑️', category: 'remove', keepOpen: true, action: () => setSearchQuery('/remove ') },
     { id: 'notion', name: 'Notion', description: 'Abrir Notion', icon: '📝', url: 'https://notion.so', category: 'productivity', keywords: ['notion', 'notas', 'workspace'] },
     { id: 'github', name: 'GitHub', description: 'Abrir GitHub', icon: '🐙', url: 'https://github.com', category: 'development', keywords: ['github', 'git', 'código'] },
     { id: 'gmail', name: 'Gmail', description: 'Abrir Gmail', icon: '📧', url: 'https://mail.google.com', category: 'communication', keywords: ['gmail', 'email', 'correo'] },
@@ -476,6 +619,49 @@ function getPredefinedCommands() {
   ];
 }
 
+function setSearchQuery(value) {
+  const searchInput = document.getElementById('midori-search-input');
+  if (!searchInput) return;
+  searchInput.value = String(value || '');
+  searchInput.focus();
+  debouncedSearch({ target: searchInput });
+}
+
+function parseQuery(raw) {
+  const value = String(raw || '').trim();
+  if (!value.startsWith('/')) return { mode: 'all', query: value };
+  if (value === '/') return { mode: 'help', query: '' };
+  const parts = value.split(/\s+/);
+  const head = parts[0].toLowerCase();
+  const rest = value.slice(parts[0].length).trim();
+  if (head === '/tabs') return { mode: 'tabs', query: rest };
+  if (head === '/bookmarks') return { mode: 'bookmarks', query: rest };
+  if (head === '/history') return { mode: 'history', query: rest };
+  if (head === '/actions') return { mode: 'actions', query: rest };
+  if (head === '/remove') return { mode: 'remove', query: rest };
+  return { mode: 'help', query: '' };
+}
+
+function getSlashHelpItems() {
+  return [
+    { id: 'help-tabs', name: '/tabs', description: 'Buscar pestañas abiertas', icon: '🗂️', category: 'actions', keepOpen: true, action: () => setSearchQuery('/tabs ') },
+    { id: 'help-bookmarks', name: '/bookmarks', description: 'Buscar marcadores', icon: '⭐', category: 'actions', keepOpen: true, action: () => setSearchQuery('/bookmarks ') },
+    { id: 'help-history', name: '/history', description: 'Buscar historial', icon: '🕐', category: 'actions', keepOpen: true, action: () => setSearchQuery('/history ') },
+    { id: 'help-actions', name: '/actions', description: 'Ver acciones del navegador', icon: '⚡', category: 'actions', keepOpen: true, action: () => setSearchQuery('/actions ') },
+    { id: 'help-remove', name: '/remove', description: 'Cerrar pestañas o borrar marcadores', icon: '🗑️', category: 'remove', keepOpen: true, action: () => setSearchQuery('/remove ') },
+  ];
+}
+
+function getActionCommands() {
+  return [
+    { id: 'act-reload', name: 'Recargar pestaña', description: 'Recarga la pestaña actual', icon: '🔄', category: 'actions', op: 'ACTION_CURRENT_TAB', actionId: 'reload' },
+    { id: 'act-duplicate', name: 'Duplicar pestaña', description: 'Duplica la pestaña actual', icon: '🧬', category: 'actions', op: 'ACTION_CURRENT_TAB', actionId: 'duplicate' },
+    { id: 'act-pin', name: 'Fijar/Desfijar', description: 'Alterna pin de la pestaña actual', icon: '📌', category: 'actions', op: 'ACTION_CURRENT_TAB', actionId: 'pin_toggle' },
+    { id: 'act-mute', name: 'Silenciar/Activar', description: 'Alterna mute de la pestaña actual', icon: '🔇', category: 'actions', op: 'ACTION_CURRENT_TAB', actionId: 'mute_toggle' },
+    { id: 'act-close', name: 'Cerrar pestaña', description: 'Cierra la pestaña actual', icon: '❌', category: 'actions', op: 'ACTION_CURRENT_TAB', actionId: 'close' },
+  ];
+}
+
 function loadPredefinedCommands() {
   currentResults = getPredefinedCommands();
   renderResults(currentResults);
@@ -483,7 +669,7 @@ function loadPredefinedCommands() {
 
 function createEmptyMessage(text) {
   const el = document.createElement('div');
-  el.style.cssText = 'color: rgba(255,255,255,0.5); padding: 20px; text-align: center;';
+  el.style.cssText = 'color: var(--midori-text-muted); padding: 20px; text-align: center;';
   el.textContent = text;
   return el;
 }
