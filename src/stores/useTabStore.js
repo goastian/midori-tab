@@ -11,7 +11,6 @@ const useTabStore = defineStore('tabStore', {
       default: true,
       class: 'bg-orange',
     },
-    shortcuts: true,
     state: false,
     openLink: 'Self Tab',
     autoTheme: false,
@@ -70,10 +69,6 @@ const useTabStore = defineStore('tabStore', {
       }
     },
 
-    changeShortcuts() {
-      this.shortcuts = !this.shortcuts;
-    },
-
     openLinkTab(url) {
       const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
       if(this.openLink == 'New Tab') {
@@ -87,7 +82,7 @@ const useTabStore = defineStore('tabStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['tabName', 'theme', 'density', 'background', 'shortcuts', 'openLink', 'autoTheme'],
+    paths: ['tabName', 'theme', 'density', 'background', 'openLink', 'autoTheme'],
   }
 })
 

@@ -9,7 +9,6 @@
     <SpaceSwitcher />
     <Minimalist />
     <SettingsModal v-if="tabStore.state" />
-    <CommandPalette v-if="renderCommandPalette" />
     <SmartSuggestions v-if="renderSmartSuggestions" />
     <OnboardingModal v-if="showOnboarding" @close="completeOnboarding" />
   </div>
@@ -19,10 +18,7 @@
   import { defineAsyncComponent } from 'vue';
   import useTabStore from './stores/useTabStore.js';
   import UnsService from './services/UnsService.js';
-  import useCommandsStore from './stores/useCommandsStore.js';
   import SpaceSwitcher from './components/SpaceSwitcher.vue';
-  import { useCommands } from './composables/useCommands.js';
-  import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts.js';
   import { useAutoTheme } from './composables/useAutoTheme.js';
   import useThemeStore from './stores/useThemeStore.js';
 
@@ -32,11 +28,8 @@
         loaded: true,
         backgroundImage: "",
         tabStore: useTabStore(),
-        keyboardShortcutsCleanup: null,
-        runtimeMessageListener: null,
         refreshWallpaperListener: null,
         showOnboarding: false,
-        renderCommandPalette: false,
         renderSmartSuggestions: false,
         imageAuthor: "",
         imageAuthorLink: "",
@@ -48,7 +41,6 @@
     components: {
       Minimalist: defineAsyncComponent(() => import('./pages/Min.vue')),
       SettingsModal: defineAsyncComponent(() => import('./components/SettingsModal.vue')),
-      CommandPalette: defineAsyncComponent(() => import('./components/CommandPalette.vue')),
       SpaceSwitcher,
       SmartSuggestions: defineAsyncComponent(() => import('./components/SmartSuggestions.vue')),
       OnboardingModal: defineAsyncComponent(() => import('./components/OnboardingModal.vue')),
@@ -57,14 +49,6 @@
     mounted() {
       this.load();
       this.loadSettings();
-      // Inicializar commandsStore si no existe
-      const commandsStore = useCommandsStore();
-      if (!commandsStore.shortcuts.openCommandPalette) {
-        commandsStore.resetAllShortcuts();
-      }
-      
-      this.setupKeyboardShortcuts();
-      this.setupRuntimeMessages();
       this.setupWallpaperRefresh();
       this.setupOnboarding();
       this.setupDeferredMounts();
@@ -82,15 +66,6 @@
 
     beforeUnmount() {
       // Limpiar event listeners
-      if (this.keyboardShortcutsCleanup) {
-        this.keyboardShortcutsCleanup();
-      }
-      if (this.runtimeMessageListener) {
-        const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
-        if (browserAPI?.runtime?.onMessage?.removeListener) {
-          browserAPI.runtime.onMessage.removeListener(this.runtimeMessageListener);
-        }
-      }
       if (this.refreshWallpaperListener) {
         window.removeEventListener('midori:refresh-wallpaper', this.refreshWallpaperListener);
       }
@@ -116,64 +91,6 @@
         } catch (e) {
           console.error("Error al cargar la imagen de fondo:", e);
         }
-      },
-
-      setupKeyboardShortcuts() {
-        const commandsStore = useCommandsStore();
-        
-        // Configurar atajos de teclado desde el store
-        const shortcuts = [];
-
-        // Atajo para abrir paleta de comandos
-        if (commandsStore.shortcuts.openCommandPalette.enabled) {
-          const paletteShortcut = commandsStore.shortcuts.openCommandPalette;
-          shortcuts.push({
-            key: paletteShortcut.key,
-            ctrl: paletteShortcut.ctrl,
-            alt: paletteShortcut.alt,
-            shift: paletteShortcut.shift,
-            callback: (e) => {
-              this.toggleCommandPalette();
-            },
-            allowInInput: false,
-          });
-        }
-
-        // Atajo para abrir configuración
-        if (commandsStore.shortcuts.openSettings.enabled) {
-          const settingsShortcut = commandsStore.shortcuts.openSettings;
-          shortcuts.push({
-            key: settingsShortcut.key,
-            ctrl: settingsShortcut.ctrl,
-            alt: settingsShortcut.alt,
-            shift: settingsShortcut.shift,
-            callback: (e) => {
-              this.tabStore.updateState();
-            },
-            allowInInput: false,
-          });
-        }
-        const result = useKeyboardShortcuts(shortcuts);
-        this.keyboardShortcutsCleanup = result.cleanup;
-      },
-
-      setupRuntimeMessages() {
-        const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
-        const listener = (message) => {
-          if (message?.type === 'TOGGLE_COMMAND_PALETTE_NEW_TAB') {
-            this.toggleCommandPalette();
-          }
-        };
-        this.runtimeMessageListener = listener;
-        if (browserAPI?.runtime?.onMessage?.addListener) {
-          browserAPI.runtime.onMessage.addListener(listener);
-        }
-      },
-
-      toggleCommandPalette() {
-        this.renderCommandPalette = true;
-        const { toggleCommandPalette } = useCommands();
-        toggleCommandPalette();
       },
 
       setupDeferredMounts() {

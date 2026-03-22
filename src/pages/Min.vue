@@ -46,11 +46,6 @@
             </button>
         </div>
 
-        <!-- ═══ Command palette hint ═══ -->
-        <div class="cmd-hint">
-            <kbd>{{ cmdKey }}</kbd> {{ cmdLabel }}
-        </div>
-
         <!-- ═══ Widget bottom sheet ═══ -->
         <Teleport to="body">
             <Transition name="sheet-fade">
@@ -166,7 +161,6 @@
 import { defineAsyncComponent, nextTick } from 'vue';
 import { Settings, SlidersHorizontal, Plus, Minus } from 'lucide-vue-next';
 import useTabStore from '../stores/useTabStore';
-import useCommandsStore from '../stores/useCommandsStore';
 import useWidgetsStore from '../stores/useWidgetsStore';
 import useI18nStore from '../stores/useI18nStore.js';
 
@@ -186,7 +180,6 @@ export default {
     data() {
         return {
             tab: useTabStore(),
-            commandsStore: useCommandsStore(),
             widgetsStore: useWidgetsStore(),
             i18n: useI18nStore(),
             showWidgetSheet: false,
@@ -197,19 +190,6 @@ export default {
     },
 
     computed: {
-        cmdKey() {
-            const s = this.commandsStore.shortcuts?.openCommandPalette;
-            if (!s) return '⌘K';
-            const parts = [];
-            if (s.ctrl) parts.push(navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl');
-            if (s.alt) parts.push('Alt');
-            if (s.shift) parts.push('Shift');
-            parts.push(s.key?.toUpperCase() || 'K');
-            return parts.join('+');
-        },
-        cmdLabel() {
-            return this.i18n.$t('dashboard.cmdHint');
-        },
         /** Returns the grid widgets that are enabled, in configured order. */
         activeGridWidgets() {
             return this.widgetsStore.order.filter(
@@ -705,35 +685,6 @@ export default {
 .dialog-btn-secondary:hover {
     background: var(--surface-raised, #0F1520);
     color: var(--color-text, white);
-}
-
-/* ── Command palette hint ── */
-.cmd-hint {
-    position: fixed;
-    bottom: 1rem;
-    right: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.7rem;
-    color: var(--color-text-muted, #5A9A82);
-    opacity: 0.4;
-    transition: opacity 0.12s ease;
-    z-index: 10;
-}
-
-.cmd-hint:hover {
-    opacity: 0.8;
-}
-
-.cmd-hint kbd {
-    padding: 0.12rem 0.35rem;
-    background: var(--surface-raised, rgba(15,21,32,0.7));
-    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-    border-radius: 4px;
-    font-size: 0.65rem;
-    font-family: monospace;
-    color: var(--color-text-secondary, #7EC4A8);
 }
 
 /* ═══ Transitions ═══ */

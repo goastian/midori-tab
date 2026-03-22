@@ -33,14 +33,6 @@
                 <h3 class="section-title-main">{{ i18n.t.general.title }}</h3>
                 <p class="section-subtitle">{{ i18n.t.general.subtitle }}</p>
               </div>
-              <div class="setting-item">
-                <div class="setting-info">
-                  <span class="setting-label">{{ i18n.t.general.shortcuts }}</span>
-                  <span class="setting-description">{{ i18n.t.general.shortcutsDesc }}</span>
-                </div>
-                <Switch @click="settings.changeShortcuts()" :state="settings.shortcuts" />
-              </div>
-
               <div class="setting-item setting-item--stacked">
                 <div class="setting-info">
                   <span class="setting-label">{{ i18n.t.general.openSearchIn }}</span>
@@ -117,47 +109,8 @@
               <ThemePicker />
             </div>
 
-            <!-- Shortcuts Tab -->
-            <div v-if="tab === 2" class="settings-section">
-              <div class="shortcuts-header">
-                <h3 class="section-title">⌨️ {{ i18n.t.shortcutsTab.title }}</h3>
-                <p class="section-description">
-                  {{ i18n.t.shortcutsTab.description }}
-                </p>
-              </div>
-
-              <ShortcutEditor
-                :title="i18n.t.shortcutsTab.openCommandPalette"
-                :shortcut="commandsStore.shortcuts.openCommandPalette"
-                shortcutName="openCommandPalette"
-                @update="updateShortcut"
-                @reset="resetShortcut"
-              />
-
-              <ShortcutEditor
-                :title="i18n.t.shortcutsTab.openSettings"
-                :shortcut="commandsStore.shortcuts.openSettings"
-                shortcutName="openSettings"
-                @update="updateShortcut"
-                @reset="resetShortcut"
-              />
-
-              <div class="shortcuts-info">
-                <p class="info-text">
-                  💡 <strong>Tip:</strong> {{ i18n.t.shortcutsTab.tip }}
-                </p>
-                <p class="info-text">
-                  ⚠️ <strong>Note:</strong> {{ i18n.t.shortcutsTab.note }}
-                </p>
-              </div>
-
-              <button @click="resetAllShortcuts" class="reset-all-btn">
-                {{ i18n.t.shortcutsTab.resetAll }}
-              </button>
-            </div>
-
             <!-- Language Tab -->
-            <div v-if="tab === 3" class="settings-section">
+            <div v-if="tab === 2" class="settings-section">
               <LanguageSelector />
             </div>
           </div>
@@ -178,17 +131,14 @@ import { watch } from 'vue';
 import Switch from './UI/Switch.vue';
 import Dropdown from './UI/Dropdown.vue';
 import Input from './UI/Input.vue';
-import ShortcutEditor from './ShortcutEditor.vue';
 import ThemePicker from './ThemePicker.vue';
 import LanguageSelector from './LanguageSelector.vue';
 import useTabStore from '../stores/useTabStore.js';
-import useCommandsStore from '../stores/useCommandsStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import useThemeStore from '../stores/useThemeStore.js';
 import useSpacesStore from '../stores/useSpacesStore.js';
 import useWidgetsStore from '../stores/useWidgetsStore.js';
 import { useAutoTheme } from '../composables/useAutoTheme.js';
-import { useKeyboardShortcuts } from '../composables/useKeyboardShortcuts.js';
 
 export default {
   name: 'SettingsModal',
@@ -197,7 +147,6 @@ export default {
     Switch,
     Input,
     Dropdown,
-    ShortcutEditor,
     ThemePicker,
     LanguageSelector,
   },
@@ -206,7 +155,6 @@ export default {
     return {
       tab: 0,
       settings: useTabStore(),
-      commandsStore: useCommandsStore(),
       spacesStore: useSpacesStore(),
       widgetsStore: useWidgetsStore(),
       i18n: useI18nStore(),
@@ -220,7 +168,6 @@ export default {
       navKeys: [
         { emoji: '⚙️', titleKey: 'navGeneral', descKey: 'navGeneralDesc' },
         { emoji: '🎨', titleKey: 'navVisual', descKey: 'navVisualDesc' },
-        { emoji: '⌨️', titleKey: 'navShortcuts', descKey: 'navShortcutsDesc' },
         { emoji: '🌐', titleKey: 'navLanguage', descKey: 'navLanguageDesc' },
       ],
       openLinks: ['Self Tab', 'New Tab'],
@@ -280,20 +227,6 @@ export default {
     handleEscape(e) {
       if (e.key === 'Escape' && this.settings.state) {
         this.closeSettings();
-      }
-    },
-
-    updateShortcut(shortcutName, shortcutConfig) {
-      this.commandsStore.updateShortcut(shortcutName, shortcutConfig);
-    },
-
-    resetShortcut(shortcutName) {
-      this.commandsStore.resetShortcut(shortcutName);
-    },
-
-    resetAllShortcuts() {
-      if (confirm(this.i18n.t.shortcutsTab.resetConfirm)) {
-        this.commandsStore.resetAllShortcuts();
       }
     },
 
@@ -556,56 +489,6 @@ export default {
 .check-icon {
   font-size: 1.2rem;
   color: white;
-}
-
-/* ── Shortcuts ── */
-.shortcuts-header {
-  margin-bottom: 0.5rem;
-}
-
-.section-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text, white);
-  margin: 0 0 0.3rem 0;
-}
-
-.section-description {
-  font-size: 0.78rem;
-  color: var(--color-text-muted, #5A9A82);
-  margin: 0;
-}
-
-.shortcuts-info {
-  padding: 0.75rem;
-  background: var(--surface-raised, #0F1520);
-  border: 1px solid rgba(59, 130, 246, 0.15);
-  border-radius: var(--radius-sm, 6px);
-  margin-top: 0.5rem;
-}
-
-.info-text {
-  font-size: 0.78rem;
-  color: var(--color-text, white);
-  margin: 0.3rem 0;
-}
-
-.reset-all-btn {
-  width: 100%;
-  padding: 0.65rem;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  border-radius: var(--radius-sm, 6px);
-  color: var(--color-text, white);
-  font-weight: 500;
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: all 0.1s ease;
-  margin-top: 0.5rem;
-}
-
-.reset-all-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
 }
 
 /* ── Footer ── */

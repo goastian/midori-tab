@@ -40,59 +40,25 @@
 <script>
 import { computed, ref } from 'vue';
 import useI18nStore from '../stores/useI18nStore.js';
-import useCommandsStore from '../stores/useCommandsStore.js';
-import { getBrowserInfo } from '../utils/browserInfo.js';
 
 export default {
   name: 'OnboardingModal',
   emits: ['close'],
   setup(props, { emit }) {
     const i18n = useI18nStore();
-    const commandsStore = useCommandsStore();
     const step = ref(0);
-    const browserInfo = getBrowserInfo();
-
-    const formatShortcut = (s) => {
-      if (!s) return '';
-      const parts = [];
-      const ctrlLabel = browserInfo.isMac ? '⌘' : 'Ctrl';
-      if (s.ctrl) parts.push(ctrlLabel);
-      if (s.alt) parts.push('Alt');
-      if (s.shift) parts.push('Shift');
-      const key = s.key === ' ' ? 'Space' : String(s.key || '').toUpperCase();
-      parts.push(key);
-      return parts.join('+');
-    };
-
-    const format = (text, vars) => {
-      let out = String(text || '');
-      for (const [k, v] of Object.entries(vars || {})) {
-        out = out.replaceAll(`{${k}}`, String(v));
-      }
-      return out;
-    };
-
-    const paletteShortcut = computed(() => formatShortcut(commandsStore.shortcuts?.openCommandPalette));
     const steps = computed(() => ([
-      {
-        title: i18n.$t('onboarding.steps.commandPalette.title'),
-        description: format(i18n.$t('onboarding.steps.commandPalette.description'), { shortcut: paletteShortcut.value }),
-      },
       {
         title: i18n.$t('onboarding.steps.widgets.title'),
         description: i18n.$t('onboarding.steps.widgets.description'),
-      },
-      {
-        title: i18n.$t('onboarding.steps.shortcuts.title'),
-        description: i18n.$t('onboarding.steps.shortcuts.description'),
       },
       {
         title: i18n.$t('onboarding.steps.themeDensity.title'),
         description: i18n.$t('onboarding.steps.themeDensity.description'),
       },
       {
-        title: i18n.$t('onboarding.steps.shortcutConfig.title'),
-        description: i18n.$t(`onboarding.steps.shortcutConfig.${browserInfo.shortcutsHintKey}`),
+        title: i18n.$t('onboarding.steps.shortcuts.title'),
+        description: i18n.$t('onboarding.steps.shortcuts.description'),
       },
     ]));
 
