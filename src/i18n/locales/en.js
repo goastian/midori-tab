@@ -47,51 +47,6 @@ export default {
     availableGradients: 'Available gradients',
   },
 
-  shortcutsTab: {
-    title: 'Keyboard Shortcuts',
-    description: 'Customize keyboard shortcuts to quickly access features.',
-    openCommandPalette: 'Open Command Palette',
-    openSettings: 'Open Settings',
-    tip: 'Click the shortcut box and press the key combination you want to use.',
-    note: 'You must use at least one modifier key (Ctrl, Alt, Shift).',
-    resetAll: 'Reset All Shortcuts',
-    resetConfirm: 'Are you sure you want to reset all shortcuts to their default values?',
-    pressCombo: 'Press the key combination...',
-    enabled: 'Enabled',
-    needModifier: 'You must use at least one modifier key (Ctrl, Alt, Shift)',
-  },
-
-  customShortcuts: {
-    title: 'Custom Shortcuts',
-    description: 'Create quick shortcuts for your favorite websites and apps.',
-    addBtn: 'Add Custom Shortcut',
-    cancel: 'Cancel',
-    name: 'Shortcut Name',
-    namePlaceholder: 'E.g.: My Dashboard',
-    url: 'URL',
-    urlPlaceholder: 'https://example.com',
-    descriptionLabel: 'Description (optional)',
-    descriptionPlaceholder: 'Brief description',
-    emojiIcon: 'Emoji/Icon',
-    category: 'Category',
-    keywords: 'Keywords (comma separated)',
-    keywordsPlaceholder: 'dashboard, work, project',
-    keywordsHint: 'Helps find the shortcut faster in search',
-    save: 'Save Shortcut',
-    preview: 'Preview:',
-    yourShortcuts: 'Your Shortcuts',
-    emptyTitle: 'You don\'t have custom shortcuts yet',
-    emptyHint: 'Click "Add Custom Shortcut" to create one',
-    tip: 'Custom shortcuts will appear in the command palette (Ctrl+Alt+Space) and you can search them by name or keywords.',
-    catCustom: 'Custom',
-    catProductivity: 'Productivity',
-    catCommunication: 'Communication',
-    catDevelopment: 'Development',
-    catDesign: 'Design',
-    catSocial: 'Social',
-    catUtilities: 'Utilities',
-  },
-
   themes: {
     title: 'Themes',
     subtitle: 'Choose a visual theme for your new tab',
@@ -108,7 +63,7 @@ export default {
 
   spaces: {
     title: 'Midori Spaces',
-    subtitle: 'Thematic workspaces: switch widgets, background and shortcuts by context',
+    subtitle: 'Thematic workspaces: switch widgets and background by context',
     enable: 'Enable Spaces',
     enableDesc: 'Switch between personalized workspaces',
     activeSpace: 'Active space',
@@ -135,17 +90,6 @@ export default {
     goodEvening: 'Good evening',
   },
 
-  commandPalette: {
-    searchPlaceholder: 'Search commands, apps, history...',
-    noResults: 'No results found',
-    trySearch: 'Try searching by name, URL or category',
-    yourShortcuts: 'Your Shortcuts',
-    searching: 'Searching...',
-    navigate: 'Navigate',
-    select: 'Select',
-    close: 'Close',
-  },
-
   language: {
     title: 'Language',
     subtitle: 'Select the interface language',
@@ -162,7 +106,6 @@ export default {
       shortcut: 'Shortcut',
       widget: 'Widget',
     },
-    cmdHint: 'Command Palette',
     widgetsSheet: {
       title: 'Add a New Widget',
       close: 'Close',
@@ -202,10 +145,6 @@ export default {
     next: 'Next',
     done: 'Done',
     steps: {
-      commandPalette: {
-        title: 'Command palette',
-        description: 'Use {shortcut} to open the palette on any website.',
-      },
       widgets: {
         title: 'Widgets',
         description: 'Enable widgets from “Widget” and customize your dashboard.',
@@ -217,11 +156,6 @@ export default {
       themeDensity: {
         title: 'Theme and density',
         description: 'Change theme and density from “Quick settings”.',
-      },
-      shortcutConfig: {
-        title: 'Customize shortcuts',
-        chromium: 'On Chrome/Edge/Opera/Vivaldi: open chrome://extensions/shortcuts.',
-        firefox: 'On Firefox: open about:addons → Extensions → Midori Tab.',
       },
     },
   },
