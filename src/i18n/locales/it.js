@@ -14,20 +14,6 @@ export default {
     navSpaces: 'Spazi',
     navSpacesDesc: 'Aree di lavoro tematiche',
     navLanguage: 'Lingua',
-      privacy: {
-        title: 'Midori Privacy',
-        notAvailable: 'Midori Privacy non è installato o non risponde.',
-        stats: {
-          blocked: 'Bloccati',
-          saved: 'Risparmiato',
-          time: 'Tempo',
-        },
-        categories: {
-          trackers: 'Tracker',
-          ads: 'Annunci',
-          fingerprinters: 'Fingerprint',
-        },
-      },
     navLanguageDesc: 'Cambia lingua',
   },
 
@@ -102,6 +88,20 @@ export default {
     title: 'Lingua',
     subtitle: 'Seleziona la lingua dell\'interfaccia',
     current: 'Lingua attuale',
+  },
+  privacy: {
+    title: 'Midori Privacy',
+    notAvailable: 'Midori Privacy non è installato o non risponde.',
+    stats: {
+      blocked: 'Bloccati',
+      saved: 'Risparmiato',
+      time: 'Tempo',
+    },
+    categories: {
+      trackers: 'Tracker',
+      ads: 'Annunci',
+      fingerprinters: 'Fingerprint',
+    },
   },
   calendar: {
     title: 'Calendario',

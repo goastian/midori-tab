@@ -14,20 +14,6 @@ export default {
     navSpaces: 'Пространства',
     navSpacesDesc: 'Тематические рабочие области',
     navLanguage: 'Язык',
-      privacy: {
-        title: 'Midori Privacy',
-        notAvailable: 'Midori Privacy не установлен или не отвечает.',
-        stats: {
-          blocked: 'Заблокировано',
-          saved: 'Сэкономлено',
-          time: 'Время',
-        },
-        categories: {
-          trackers: 'Трекеры',
-          ads: 'Реклама',
-          fingerprinters: 'Отпечатки',
-        },
-      },
     navLanguageDesc: 'Сменить язык',
   },
 
@@ -102,6 +88,20 @@ export default {
     title: 'Язык',
     subtitle: 'Выберите язык интерфейса',
     current: 'Текущий язык',
+  },
+  privacy: {
+    title: 'Midori Privacy',
+    notAvailable: 'Midori Privacy не установлен или не отвечает.',
+    stats: {
+      blocked: 'Заблокировано',
+      saved: 'Сэкономлено',
+      time: 'Время',
+    },
+    categories: {
+      trackers: 'Трекеры',
+      ads: 'Реклама',
+      fingerprinters: 'Отпечатки',
+    },
   },
   calendar: {
     title: 'Календарь',

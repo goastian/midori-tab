@@ -9,20 +9,6 @@ export default {
     navGeneralDesc: 'Personnalisez votre tableau de bord',
     navVisual: 'Visuel',
     navVisualDesc: 'Thèmes et apparence',
-      privacy: {
-        title: 'Midori Privacy',
-        notAvailable: 'Midori Privacy n\'est pas installé ou ne répond pas.',
-        stats: {
-          blocked: 'Bloqués',
-          saved: 'Économisé',
-          time: 'Temps',
-        },
-        categories: {
-          trackers: 'Traceurs',
-          ads: 'Publicités',
-          fingerprinters: 'Empreinte',
-        },
-      },
     navThemes: 'Thèmes',
     navThemesDesc: 'Thèmes prédéfinis et personnalisés',
     navSpaces: 'Spaces',
@@ -102,6 +88,20 @@ export default {
     title: 'Langue',
     subtitle: 'Sélectionnez la langue de l\'interface',
     current: 'Langue actuelle',
+  },
+  privacy: {
+    title: 'Midori Privacy',
+    notAvailable: 'Midori Privacy n\'est pas installé ou ne répond pas.',
+    stats: {
+      blocked: 'Bloqués',
+      saved: 'Économisé',
+      time: 'Temps',
+    },
+    categories: {
+      trackers: 'Traceurs',
+      ads: 'Publicités',
+      fingerprinters: 'Empreinte',
+    },
   },
   calendar: {
     title: 'Calendrier',

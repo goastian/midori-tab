@@ -9,20 +9,6 @@ export default {
     navGeneralDesc: 'Personalize seu painel',
     navVisual: 'Visual',
     navVisualDesc: 'Temas e aparência',
-      privacy: {
-        title: 'Midori Privacy',
-        notAvailable: 'Midori Privacy não está instalado ou não está respondendo.',
-        stats: {
-          blocked: 'Bloqueados',
-          saved: 'Economizado',
-          time: 'Tempo',
-        },
-        categories: {
-          trackers: 'Rastreadores',
-          ads: 'Anúncios',
-          fingerprinters: 'Impressão digital',
-        },
-      },
     navThemes: 'Temas',
     navThemesDesc: 'Temas predefinidos e custom',
     navSpaces: 'Spaces',
@@ -102,6 +88,20 @@ export default {
     title: 'Idioma',
     subtitle: 'Selecione o idioma da interface',
     current: 'Idioma atual',
+  },
+  privacy: {
+    title: 'Midori Privacy',
+    notAvailable: 'Midori Privacy não está instalado ou não está respondendo.',
+    stats: {
+      blocked: 'Bloqueados',
+      saved: 'Economizado',
+      time: 'Tempo',
+    },
+    categories: {
+      trackers: 'Rastreadores',
+      ads: 'Anúncios',
+      fingerprinters: 'Impressão digital',
+    },
   },
   calendar: {
     title: 'Calendário',

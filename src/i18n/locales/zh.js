@@ -22,20 +22,6 @@ export default {
     subtitle: '自定义仪表板',
     openSearchIn: '搜索打开方式',
     openSearchInDesc: '搜索结果的打开位置',
-    privacy: {
-      title: 'Midori Privacy',
-      notAvailable: 'Midori Privacy 未安装或无响应。',
-      stats: {
-        blocked: '已拦截',
-        saved: '已节省',
-        time: '时间',
-      },
-      categories: {
-        trackers: '追踪器',
-        ads: '广告',
-        fingerprinters: '指纹追踪',
-      },
-    },
     tabName: '标签页名称',
     tabNameDesc: '自定义标签页标题',
     selfTab: '当前标签页',
@@ -102,6 +88,20 @@ export default {
     title: '语言',
     subtitle: '选择界面语言',
     current: '当前语言',
+  },
+  privacy: {
+    title: 'Midori Privacy',
+    notAvailable: 'Midori Privacy 未安装或无响应。',
+    stats: {
+      blocked: '已拦截',
+      saved: '已节省',
+      time: '时间',
+    },
+    categories: {
+      trackers: '追踪器',
+      ads: '广告',
+      fingerprinters: '指纹追踪',
+    },
   },
   calendar: {
     title: '日历',
