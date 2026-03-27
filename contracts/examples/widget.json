@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "midori-asset",
+  "type": "widget",
+  "id": "widget-rss-pro",
+  "slug": "rss-pro",
+  "name": "RSS Pro",
+  "status": "published",
+  "author": {
+    "name": "Community Widgets"
+  },
+  "license": "MIT",
+  "tags": ["widget", "rss", "news"],
+  "compatibility": {
+    "app": {
+      "minVersion": "1.0.0",
+      "maxVersion": "1.9.0"
+    },
+    "browsers": [
+      {
+        "id": "chrome",
+        "minVersion": "120.0.0"
+      },
+      {
+        "id": "edge",
+        "minVersion": "120.0.0"
+      }
+    ],
+    "platforms": ["linux", "windows", "macos"]
+  },
+  "distribution": {
+    "format": "zip",
+    "entry": "widget/index.js",
+    "sizeBytes": 98765,
+    "checksum": {
+      "algorithm": "sha256",
+      "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "files": [
+      {
+        "path": "widget/index.js",
+        "sizeBytes": 31300
+      },
+      {
+        "path": "widget/styles.css",
+        "sizeBytes": 9200
+      }
+    ]
+  },
+  "payload": {
+    "entry": "widget/index.js",
+    "permissions": ["network", "storage"],
+    "supportsMultipleInstances": true,
+    "defaultSize": "m"
+  }
+}

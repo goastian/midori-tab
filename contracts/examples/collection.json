@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "midori-asset",
+  "type": "collection",
+  "id": "collection-focus-pack",
+  "slug": "focus-pack",
+  "name": "Focus Pack",
+  "status": "published",
+  "author": {
+    "name": "Midori Curators"
+  },
+  "license": "AGPL-3.0",
+  "tags": ["collection", "productivity"],
+  "compatibility": {
+    "app": {
+      "minVersion": "1.0.0"
+    },
+    "browsers": [
+      {
+        "id": "chrome",
+        "minVersion": "120.0.0"
+      },
+      {
+        "id": "firefox",
+        "minVersion": "121.0.0"
+      }
+    ]
+  },
+  "distribution": {
+    "format": "json",
+    "entry": "collection.json",
+    "sizeBytes": 2048,
+    "checksum": {
+      "algorithm": "sha256",
+      "value": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  },
+  "payload": {
+    "items": [
+      {
+        "assetId": "theme-midori-forest",
+        "assetType": "theme",
+        "version": "1.0.0",
+        "required": true
+      },
+      {
+        "assetId": "widget-rss-pro",
+        "assetType": "widget",
+        "version": "1.1.0"
+      }
+    ]
+  }
+}

@@ -12,7 +12,9 @@
     "build:firefox": "npm run build:manifest:firefox && vite build",
     "package:chrome": "npm run build:chrome && node scripts/package.js chrome",
     "package:firefox": "npm run build:firefox && node scripts/package.js firefox",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "validate:contracts": "node contracts/scripts/validate-examples.mjs",
+    "test:contracts": "node --test contracts/tests/*.test.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
@@ -24,6 +26,7 @@
     "vue": "^3.5.17"
   },
   "devDependencies": {
+    "ajv": "^8.17.1",
     "@types/chrome": "^0.1.3",
     "@types/firefox-webext-browser": "^120.0.4",
     "@vitejs/plugin-vue": "^6.0.0",

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "midori-asset",
+  "type": "wallpaper",
+  "id": "wallpaper-aurora-lake",
+  "slug": "aurora-lake",
+  "name": "Aurora Lake",
+  "status": "published",
+  "author": {
+    "name": "Midori Team"
+  },
+  "license": "CC-BY-4.0",
+  "tags": ["wallpaper", "nature"],
+  "compatibility": {
+    "app": {
+      "minVersion": "1.0.0"
+    },
+    "browsers": [
+      {
+        "id": "midori",
+        "minVersion": "1.0.0"
+      },
+      {
+        "id": "firefox",
+        "minVersion": "121.0.0"
+      }
+    ]
+  },
+  "distribution": {
+    "format": "jpeg",
+    "entry": "images/aurora.jpg",
+    "sizeBytes": 604321,
+    "checksum": {
+      "algorithm": "sha256",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "payload": {
+    "media": [
+      {
+        "url": "https://cdn.midori.app/wallpapers/aurora.jpg",
+        "mime": "image/jpeg",
+        "width": 3840,
+        "height": 2160
+      }
+    ]
+  }
+}

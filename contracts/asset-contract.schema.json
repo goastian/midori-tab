@@ -1,0 +1,611 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://midori.app/schemas/asset-contract.schema.json",
+  "title": "Midori Asset Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "type",
+    "id",
+    "slug",
+    "name",
+    "status",
+    "compatibility",
+    "distribution",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "kind": {
+      "type": "string",
+      "const": "midori-asset"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "theme",
+        "wallpaper",
+        "widget",
+        "animation",
+        "collection",
+        "midori-update"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 280
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 8000
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published",
+        "deprecated",
+        "archived"
+      ]
+    },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https?://"
+        }
+      }
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{1,39}$"
+      },
+      "uniqueItems": true,
+      "maxItems": 20
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "app",
+        "browsers"
+      ],
+      "properties": {
+        "app": {
+          "$ref": "#/$defs/versionRange"
+        },
+        "browsers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/browserCompatibility"
+          }
+        },
+        "platforms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "linux",
+              "windows",
+              "macos",
+              "android",
+              "ios"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "entry",
+        "checksum",
+        "sizeBytes"
+      ],
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "zip",
+            "css",
+            "png",
+            "jpeg",
+            "gif",
+            "webm",
+            "svg"
+          ]
+        },
+        "entry": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checksum": {
+          "$ref": "#/$defs/checksum"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sizeBytes"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "checksum": {
+                "$ref": "#/$defs/checksum"
+              }
+            }
+          }
+        }
+      }
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "versionRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minVersion"
+      ],
+      "properties": {
+        "minVersion": {
+          "$ref": "#/$defs/semver"
+        },
+        "maxVersion": {
+          "$ref": "#/$defs/semver"
+        }
+      }
+    },
+    "checksum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "sha256",
+            "sha512"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64,128}$"
+        }
+      }
+    },
+    "browserCompatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "minVersion"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": [
+            "chrome",
+            "firefox",
+            "edge",
+            "opera",
+            "vivaldi",
+            "midori"
+          ]
+        },
+        "minVersion": {
+          "$ref": "#/$defs/semver"
+        },
+        "maxVersion": {
+          "$ref": "#/$defs/semver"
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "stable",
+              "beta",
+              "nightly",
+              "esr"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "themePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tokens"
+      ],
+      "properties": {
+        "tokens": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "minProperties": 1
+        },
+        "modes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "light": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "dark": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "wallpaperPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "media"
+      ],
+      "properties": {
+        "media": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "url",
+              "mime"
+            ],
+            "properties": {
+              "url": {
+                "type": "string",
+                "pattern": "^https?://"
+              },
+              "mime": {
+                "type": "string",
+                "enum": [
+                  "image/jpeg",
+                  "image/png",
+                  "image/webp",
+                  "video/webm",
+                  "image/gif"
+                ]
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "fps": {
+                "type": "number",
+                "minimum": 1
+              },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "widgetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry",
+        "permissions"
+      ],
+      "properties": {
+        "entry": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "network",
+              "storage",
+              "bookmarks",
+              "history",
+              "tabs"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "supportsMultipleInstances": {
+          "type": "boolean"
+        },
+        "defaultSize": {
+          "type": "string",
+          "enum": [
+            "s",
+            "m",
+            "l"
+          ]
+        }
+      }
+    },
+    "animationPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "keyframes"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "enum": [
+            "background",
+            "widget",
+            "page"
+          ]
+        },
+        "keyframes": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "collectionPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assetId",
+              "assetType",
+              "version"
+            ],
+            "properties": {
+              "assetId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"
+              },
+              "assetType": {
+                "type": "string",
+                "enum": [
+                  "theme",
+                  "wallpaper",
+                  "widget",
+                  "animation"
+                ]
+              },
+              "version": {
+                "$ref": "#/$defs/semver"
+              },
+              "required": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "midoriUpdatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "releaseNotes",
+        "downloadUrl"
+      ],
+      "properties": {
+        "channel": {
+          "type": "string",
+          "enum": [
+            "stable",
+            "beta",
+            "nightly"
+          ]
+        },
+        "releaseNotes": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        },
+        "downloadUrl": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "mandatoryFromVersion": {
+          "$ref": "#/$defs/semver"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "theme"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/themePayload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "wallpaper"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/wallpaperPayload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "widget"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/widgetPayload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "animation"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/animationPayload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "collection"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/collectionPayload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "midori-update"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/midoriUpdatePayload"
+          }
+        }
+      }
+    }
+  ],
+  "$comment": "Type payload definitions are located below to keep one canonical contract file.",
+  "$defs2": {}
+}

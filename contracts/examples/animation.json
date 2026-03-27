@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "midori-asset",
+  "type": "animation",
+  "id": "animation-soft-fade",
+  "slug": "soft-fade",
+  "name": "Soft Fade",
+  "status": "published",
+  "author": {
+    "name": "Midori Team"
+  },
+  "license": "AGPL-3.0",
+  "tags": ["animation", "ui"],
+  "compatibility": {
+    "app": {
+      "minVersion": "1.0.0"
+    },
+    "browsers": [
+      {
+        "id": "chrome",
+        "minVersion": "120.0.0"
+      },
+      {
+        "id": "firefox",
+        "minVersion": "121.0.0"
+      }
+    ]
+  },
+  "distribution": {
+    "format": "css",
+    "entry": "animations/soft-fade.css",
+    "sizeBytes": 1120,
+    "checksum": {
+      "algorithm": "sha256",
+      "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  },
+  "payload": {
+    "target": "widget",
+    "keyframes": "@keyframes softFade { from { opacity: 0; } to { opacity: 1; } }",
+    "durationMs": 400
+  }
+}

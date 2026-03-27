@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "midori-asset",
+  "type": "theme",
+  "id": "theme-midori-forest",
+  "slug": "midori-forest",
+  "name": "Midori Forest",
+  "summary": "Palette verde con modo claro y oscuro.",
+  "status": "published",
+  "author": {
+    "name": "Midori Team",
+    "url": "https://astian.org"
+  },
+  "license": "AGPL-3.0",
+  "tags": ["theme", "green", "official"],
+  "compatibility": {
+    "app": {
+      "minVersion": "1.0.0",
+      "maxVersion": "2.0.0"
+    },
+    "browsers": [
+      {
+        "id": "chrome",
+        "minVersion": "120.0.0"
+      },
+      {
+        "id": "firefox",
+        "minVersion": "121.0.0",
+        "channels": ["stable", "esr"]
+      }
+    ],
+    "platforms": ["linux", "windows", "macos"]
+  },
+  "distribution": {
+    "format": "json",
+    "entry": "theme.json",
+    "sizeBytes": 1536,
+    "checksum": {
+      "algorithm": "sha256",
+      "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  },
+  "payload": {
+    "tokens": {
+      "--color-primary": "#2d6a4f",
+      "--color-text": "#1b2e1b"
+    },
+    "modes": {
+      "light": {
+        "--color-bg": "#E2EFE2"
+      },
+      "dark": {
+        "--color-bg": "#0E1A0E"
+      }
+    }
+  }
+}

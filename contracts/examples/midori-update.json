@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "midori-asset",
+  "type": "midori-update",
+  "id": "midori-update-1-1-0",
+  "slug": "midori-update-1-1-0",
+  "name": "Midori Update 1.1.0",
+  "status": "published",
+  "author": {
+    "name": "Midori Release Team"
+  },
+  "license": "Proprietary",
+  "tags": ["update", "release"],
+  "compatibility": {
+    "app": {
+      "minVersion": "1.0.0",
+      "maxVersion": "1.1.0"
+    },
+    "browsers": [
+      {
+        "id": "midori",
+        "minVersion": "1.0.0"
+      }
+    ],
+    "platforms": ["linux", "windows", "macos"]
+  },
+  "distribution": {
+    "format": "json",
+    "entry": "releases/1.1.0.json",
+    "sizeBytes": 1400,
+    "checksum": {
+      "algorithm": "sha256",
+      "value": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  },
+  "payload": {
+    "channel": "stable",
+    "releaseNotes": "Mejoras de rendimiento y correcciones de compatibilidad.",
+    "downloadUrl": "https://downloads.midori.app/releases/1.1.0"
+  }
+}
