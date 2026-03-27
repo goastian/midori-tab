@@ -70,10 +70,13 @@ const useTabStore = defineStore('tabStore', {
       const body = document.getElementsByTagName('body')[0];
       switch(this.background.type) {
         case 'Solid':
-          this.background.default ? '' : body.style.backgroundColor = this.background.color;
+          if (!this.background.default) {
+            body.style.backgroundColor = this.background.color;
+          }
           body.className = '';
           break;
         case 'Gradient':
+          body.style.backgroundColor = '';
           if(this.background.default) {
             body.className = '';
             body.classList.add(this.background.class);
@@ -82,6 +85,12 @@ const useTabStore = defineStore('tabStore', {
           }
           break;
         case 'Unsplash':
+        case 'MarketplaceWallpaper':
+          body.style.backgroundColor = '';
+          body.className = '';
+          break;
+        default:
+          body.style.backgroundColor = '';
           body.className = '';
       }
     },

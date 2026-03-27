@@ -1,10 +1,10 @@
 <template>
   <div class="viewport" :class="{ 'bg-cl' : tabStore.effectiveTheme !== 'light' }">
-    <img :src="backgroundImage" class="background" v-if="tabStore.background.type == 'Unsplash'" />
-    <div class="credits" v-if="tabStore.background.type == 'Unsplash'">
+    <img :src="backgroundImage" class="background" v-if="showImageBackground && backgroundImage" />
+    <div class="credits" v-if="showCredits">
       📷 Photo by 
       <a :href="imageAuthorLink" target="_blank" rel="noopener noreferrer">{{ imageAuthor }}</a> 
-      on <a :href="imageLink" target="_blank" rel="noopener noreferrer">Unsplash</a>
+      on <a :href="imageLink" target="_blank" rel="noopener noreferrer">{{ imageLabel }}</a>
     </div>
     <SpaceSwitcher />
     <Minimalist />
@@ -46,6 +46,29 @@
       OnboardingModal: defineAsyncComponent(() => import('./components/OnboardingModal.vue')),
     },
 
+    computed: {
+      showImageBackground() {
+        return ['Unsplash', 'MarketplaceWallpaper'].includes(this.tabStore.background?.type);
+      },
+
+      showCredits() {
+        return Boolean(this.showImageBackground && this.imageAuthor && this.imageAuthorLink && this.imageLink);
+      },
+
+      imageLabel() {
+        return this.tabStore.background?.type === 'MarketplaceWallpaper' ? 'Marketplace' : 'Unsplash';
+      },
+    },
+
+    watch: {
+      'tabStore.background': {
+        handler() {
+          this.load();
+        },
+        deep: true,
+      },
+    },
+
     mounted() {
       this.load();
       this.loadSettings();
@@ -81,6 +104,23 @@
       },
 
       async load() {
+        if (this.tabStore.background?.type === 'MarketplaceWallpaper') {
+          const background = this.tabStore.background;
+          this.backgroundImage = background.imageUrl || '';
+          this.imageAuthor = background.authorName || '';
+          this.imageAuthorLink = background.authorUrl || '';
+          this.imageLink = background.sourceUrl || background.imageUrl || '';
+          return;
+        }
+
+        if (this.tabStore.background?.type !== 'Unsplash') {
+          this.backgroundImage = '';
+          this.imageAuthor = '';
+          this.imageAuthorLink = '';
+          this.imageLink = '';
+          return;
+        }
+
         try {
           const uns = new UnsService();
           await uns.setImagen();
@@ -105,7 +145,11 @@
       },
 
       setupWallpaperRefresh() {
-        const listener = () => this.load();
+        const listener = () => {
+          if (this.tabStore.background?.type === 'Unsplash') {
+            this.load();
+          }
+        };
         this.refreshWallpaperListener = listener;
         window.addEventListener('midori:refresh-wallpaper', listener);
       },

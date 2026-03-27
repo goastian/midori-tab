@@ -106,6 +106,16 @@
 
               <div class="separator"></div>
 
+              <div class="marketplace-shortcut">
+                <div class="setting-info">
+                  <span class="setting-label">{{ i18n.$t('marketplace.wallpaperCtaTitle') }}</span>
+                  <span class="setting-description">{{ i18n.$t('marketplace.wallpaperCtaDescription') }}</span>
+                </div>
+                <button class="marketplace-shortcut-btn" type="button" @click="openMarketplace('wallpaper')">
+                  {{ i18n.$t('marketplace.openAssets') }}
+                </button>
+              </div>
+
               <ThemePicker />
             </div>
 
@@ -246,6 +256,11 @@ export default {
         const themeStore = useThemeStore();
         themeStore.applyTheme(this.settings.theme);
       }
+    },
+
+    openMarketplace(type) {
+      window.dispatchEvent(new CustomEvent('midori:open-marketplace', { detail: { type } }));
+      this.closeSettings();
     },
   },
 };
@@ -443,6 +458,29 @@ export default {
   margin: 0.35rem 0;
 }
 
+.marketplace-shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: var(--radius-md, 10px);
+  background: linear-gradient(135deg, rgba(4, 164, 105, 0.12), rgba(15, 21, 32, 0.88));
+  border: 1px solid rgba(4, 164, 105, 0.18);
+}
+
+.marketplace-shortcut-btn {
+  border: none;
+  background: var(--color-primary, #04A469);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
 /* ── Gradients ── */
 .gradients-section {
   display: flex;
@@ -576,6 +614,11 @@ export default {
 
   .gradients-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .marketplace-shortcut {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

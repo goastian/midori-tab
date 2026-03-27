@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { resolveBuiltinWidgetKey } from '../utils/marketplaceAssets.js';
 
 /** Default widget order */
 const DEFAULT_ORDER = ['search', 'bookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
@@ -20,6 +21,7 @@ const useWidgetsStore = defineStore('widgetsStore', {
     },
     /** Ordered list of widget keys — determines render order on the page */
     order: [...DEFAULT_ORDER],
+    installedMarketplaceWidgets: {},
   }),
 
   getters: {
@@ -47,12 +49,43 @@ const useWidgetsStore = defineStore('widgetsStore', {
     resetOrder() {
       this.order = [...DEFAULT_ORDER];
     },
+
+    installMarketplaceWidget(asset) {
+      const builtinWidgetKey = resolveBuiltinWidgetKey(asset);
+
+      this.installedMarketplaceWidgets[asset.slug] = {
+        slug: asset.slug,
+        name: asset.name,
+        version: asset.version,
+        builtinWidgetKey,
+        supported: Boolean(builtinWidgetKey),
+        installedAt: new Date().toISOString(),
+      };
+
+      if (builtinWidgetKey && !this.order.includes(builtinWidgetKey)) {
+        this.order.push(builtinWidgetKey);
+      }
+
+      return builtinWidgetKey;
+    },
+
+    enableInstalledMarketplaceWidget(slug) {
+      const installedWidget = this.installedMarketplaceWidgets[slug];
+      if (!installedWidget?.builtinWidgetKey) return false;
+
+      this.enabled[installedWidget.builtinWidgetKey] = true;
+      if (!this.order.includes(installedWidget.builtinWidgetKey)) {
+        this.order.push(installedWidget.builtinWidgetKey);
+      }
+
+      return true;
+    },
   },
 
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['enabled', 'order'],
+    paths: ['enabled', 'order', 'installedMarketplaceWidgets'],
     afterRestore(ctx) {
       const store = ctx.store;
       // Migrate from old flat format { search: true } to new { enabled: { search: true } }
@@ -74,6 +107,10 @@ const useWidgetsStore = defineStore('widgetsStore', {
         if (!store.order.includes(key)) {
           store.order.push(key);
         }
+      }
+
+      if (!store.installedMarketplaceWidgets || typeof store.installedMarketplaceWidgets !== 'object') {
+        store.installedMarketplaceWidgets = {};
       }
     },
   },

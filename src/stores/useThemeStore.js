@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { buildMarketplaceThemeDefinition } from '../utils/marketplaceAssets.js';
 
 /**
  * Each theme has a `light` and `dark` variant.
@@ -274,6 +275,7 @@ const PREDEFINED_THEMES = {
 const useThemeStore = defineStore('themeStore', {
   state: () => ({
     activeThemeId: 'midori',
+    marketplaceThemes: {},
     customTheme: {
       id: 'custom',
       name: 'Custom',
@@ -321,11 +323,12 @@ const useThemeStore = defineStore('themeStore', {
 
   getters: {
     allThemes() {
-      return [...Object.values(PREDEFINED_THEMES), this.customTheme];
+      return [...Object.values(PREDEFINED_THEMES), ...Object.values(this.marketplaceThemes), this.customTheme];
     },
 
     activeTheme(state) {
       if (state.activeThemeId === 'custom') return state.customTheme;
+      if (state.marketplaceThemes[state.activeThemeId]) return state.marketplaceThemes[state.activeThemeId];
       return PREDEFINED_THEMES[state.activeThemeId] || PREDEFINED_THEMES.midori;
     },
   },
@@ -334,6 +337,14 @@ const useThemeStore = defineStore('themeStore', {
     setTheme(themeId) {
       this.activeThemeId = themeId;
       this.applyTheme();
+    },
+
+    installMarketplaceTheme(asset) {
+      const theme = buildMarketplaceThemeDefinition(asset);
+      if (!theme) return null;
+
+      this.marketplaceThemes[theme.id] = theme;
+      return theme.id;
     },
 
     applyTheme(mode) {
@@ -393,7 +404,7 @@ const useThemeStore = defineStore('themeStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['activeThemeId', 'customTheme'],
+    paths: ['activeThemeId', 'marketplaceThemes', 'customTheme'],
   },
 });
 

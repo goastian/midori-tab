@@ -26,6 +26,23 @@
       </button>
     </div>
 
+    <div class="marketplace-toggle-card">
+      <div class="setting-info">
+        <span class="setting-label">{{ i18n.$t('marketplace.themeCtaTitle') }}</span>
+        <span class="setting-description">{{ i18n.$t('marketplace.themeCtaDescription') }}</span>
+      </div>
+      <button class="marketplace-toggle-btn" type="button" @click="showMarketplace = !showMarketplace">
+        {{ showMarketplace ? i18n.$t('common.close') : i18n.$t('marketplace.openThemes') }}
+      </button>
+    </div>
+
+    <MarketplaceBrowser
+      v-if="showMarketplace"
+      :title="i18n.$t('marketplace.title')"
+      :types="['theme']"
+      default-type="theme"
+    />
+
     <!-- Auto Adapt per theme -->
     <div class="setting-item">
       <div class="setting-info">
@@ -92,6 +109,7 @@
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue';
 import useThemeStore from '../stores/useThemeStore.js';
 import useTabStore from '../stores/useTabStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
@@ -100,12 +118,17 @@ import { useAutoTheme } from '../composables/useAutoTheme.js';
 export default {
   name: 'ThemePicker',
 
+  components: {
+    MarketplaceBrowser: defineAsyncComponent(() => import('./MarketplaceBrowser.vue')),
+  },
+
   data() {
     return {
       themeStore: useThemeStore(),
       tabStore: useTabStore(),
       i18n: useI18nStore(),
       editVariant: 'dark',
+      showMarketplace: false,
     };
   },
 
@@ -279,6 +302,28 @@ export default {
 .setting-label { font-weight: 500; color: var(--color-text, white); font-size: 0.95rem; }
 .setting-description { font-size: 0.8rem; color: var(--color-text-muted, #5A9A82); }
 
+.marketplace-toggle-card {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.95rem 1rem;
+  border-radius: var(--radius-md, 10px);
+  background: linear-gradient(135deg, rgba(4, 164, 105, 0.12), rgba(15, 21, 32, 0.84));
+  border: 1px solid rgba(4, 164, 105, 0.18);
+}
+
+.marketplace-toggle-btn {
+  border: none;
+  background: var(--color-primary, #04A469);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* Toggle */
 .toggle-btn {
   background: none;
@@ -439,5 +484,12 @@ export default {
 .color-input::-webkit-color-swatch {
   border: 2px solid var(--color-border, rgba(126,196,168,0.1));
   border-radius: 6px;
+}
+
+@media (max-width: 720px) {
+  .marketplace-toggle-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 </style>

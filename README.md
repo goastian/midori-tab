@@ -67,3 +67,10 @@ yarn install
 npm run build
 # or
 yarn build
+
+# Marketplace backend origin
+VITE_MARKETPLACE_API_BASE_URL=http://localhost
+
+```
+
+`VITE_MARKETPLACE_API_BASE_URL` It should point to the origin of the marketplace. The extension client automatically resolves `/api/v1`..

@@ -65,6 +65,14 @@ const useSpacesStore = defineStore('spacesStore', {
       }
     },
 
+    setActiveSpaceBackground(background) {
+      const activeSpace = this.spaces.find(space => space.id === this.activeSpaceId);
+      if (!activeSpace) return;
+
+      activeSpace.background = { ...background };
+      this.applySpace(activeSpace);
+    },
+
     addSpace(name, icon, color) {
       const id = `space-${Date.now()}`;
       this.spaces.push({

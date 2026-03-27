@@ -99,12 +99,42 @@ export default {
   common: {
     on: 'On',
     off: 'Off',
+    close: 'Close',
+  },
+
+  marketplace: {
+    title: 'Marketplace',
+    close: 'Close marketplace',
+    subtitle: 'Browse remote themes, wallpapers and safe widget integrations on demand.',
+    searchPlaceholder: 'Search assets',
+    loading: 'Loading catalog...',
+    empty: 'No assets matched this filter.',
+    unconfigured: 'Marketplace is disabled until a backend URL is configured.',
+    install: 'Install',
+    apply: 'Apply',
+    enable: 'Enable',
+    active: 'Active',
+    installed: 'Installed',
+    incompatible: 'Not compatible',
+    noDescription: 'No description available yet.',
+    openThemes: 'Browse remote themes',
+    openAssets: 'Open catalog',
+    themeCtaTitle: 'Marketplace themes',
+    themeCtaDescription: 'Install remote palettes only when you need them, without bloating startup.',
+    wallpaperCtaTitle: 'Marketplace wallpapers and widgets',
+    wallpaperCtaDescription: 'Open the remote catalog for wallpapers and widget packs from the dashboard.',
+    types: {
+      theme: 'Themes',
+      wallpaper: 'Wallpapers',
+      widget: 'Widgets',
+    },
   },
 
   dashboard: {
     actions: {
       shortcut: 'Shortcut',
       widget: 'Widget',
+      marketplace: 'Marketplace',
     },
     widgetsSheet: {
       title: 'Add a New Widget',

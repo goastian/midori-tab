@@ -105,12 +105,42 @@ export default {
   common: {
     on: 'On',
     off: 'Off',
+    close: 'Cerrar',
+  },
+
+  marketplace: {
+    title: 'Marketplace',
+    close: 'Cerrar marketplace',
+    subtitle: 'Explora themes, fondos y widgets remotos solo cuando los abras.',
+    searchPlaceholder: 'Buscar assets',
+    loading: 'Cargando catálogo...',
+    empty: 'No hay assets para este filtro.',
+    unconfigured: 'El marketplace está desactivado hasta configurar la URL del backend.',
+    install: 'Instalar',
+    apply: 'Aplicar',
+    enable: 'Activar',
+    active: 'Activo',
+    installed: 'Instalado',
+    incompatible: 'No compatible',
+    noDescription: 'Todavía no hay descripción disponible.',
+    openThemes: 'Explorar themes remotos',
+    openAssets: 'Abrir catálogo',
+    themeCtaTitle: 'Themes del marketplace',
+    themeCtaDescription: 'Instala paletas remotas solo cuando las necesites, sin penalizar el arranque.',
+    wallpaperCtaTitle: 'Fondos y widgets del marketplace',
+    wallpaperCtaDescription: 'Abre desde el dashboard el catálogo remoto de fondos y packs de widgets.',
+    types: {
+      theme: 'Themes',
+      wallpaper: 'Fondos',
+      widget: 'Widgets',
+    },
   },
 
   dashboard: {
     actions: {
       shortcut: 'Atajo',
       widget: 'Widget',
+      marketplace: 'Marketplace',
     },
     widgetsSheet: {
       title: 'Añadir un widget',

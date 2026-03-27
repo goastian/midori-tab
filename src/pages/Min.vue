@@ -44,6 +44,10 @@
                 <Plus v-else :size="14" :stroke-width="2" />
                 <span>{{ i18n.$t('dashboard.actions.widget') }}</span>
             </button>
+            <button class="action-btn" type="button" @click="openMarketplace()" :aria-label="i18n.$t('dashboard.actions.marketplace')">
+                <Store :size="14" :stroke-width="2" />
+                <span>{{ i18n.$t('dashboard.actions.marketplace') }}</span>
+            </button>
         </div>
 
         <!-- ═══ Widget bottom sheet ═══ -->
@@ -69,6 +73,25 @@
                             <span class="sheet-item-label">{{ w.label }}</span>
                         </button>
                     </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <Teleport to="body">
+            <Transition name="sheet-fade">
+                <div v-if="showMarketplaceSheet" class="sheet-overlay" @click="showMarketplaceSheet = false"></div>
+            </Transition>
+            <Transition name="sheet-slide">
+                <div v-if="showMarketplaceSheet" class="marketplace-sheet">
+                    <div class="sheet-header">
+                        <span class="sheet-title">{{ i18n.$t('marketplace.title') }}</span>
+                        <button class="sheet-close" type="button" @click="showMarketplaceSheet = false" :aria-label="i18n.$t('marketplace.close')">✕</button>
+                    </div>
+                    <MarketplaceBrowser
+                        :types="['wallpaper', 'widget']"
+                        :default-type="activeMarketplaceType"
+                        :title="i18n.$t('marketplace.title')"
+                    />
                 </div>
             </Transition>
         </Teleport>
@@ -159,7 +182,7 @@
 
 <script>
 import { defineAsyncComponent, nextTick } from 'vue';
-import { Settings, SlidersHorizontal, Plus, Minus } from 'lucide-vue-next';
+import { Settings, SlidersHorizontal, Plus, Minus, Store } from 'lucide-vue-next';
 import useTabStore from '../stores/useTabStore';
 import useWidgetsStore from '../stores/useWidgetsStore';
 import useI18nStore from '../stores/useI18nStore.js';
@@ -183,10 +206,20 @@ export default {
             widgetsStore: useWidgetsStore(),
             i18n: useI18nStore(),
             showWidgetSheet: false,
+            showMarketplaceSheet: false,
+            activeMarketplaceType: 'wallpaper',
             showShortcutDialog: false,
             showQuickSettings: false,
             shortcutForm: { url: '', title: '' },
         };
+    },
+
+    mounted() {
+        window.addEventListener('midori:open-marketplace', this.handleOpenMarketplace);
+    },
+
+    beforeUnmount() {
+        window.removeEventListener('midori:open-marketplace', this.handleOpenMarketplace);
     },
 
     computed: {
@@ -249,6 +282,16 @@ export default {
             this.widgetsStore.toggle(key);
         },
 
+        openMarketplace(type = 'wallpaper') {
+            this.activeMarketplaceType = type;
+            this.showMarketplaceSheet = true;
+        },
+
+        handleOpenMarketplace(event) {
+            const requestedType = event?.detail?.type || 'wallpaper';
+            this.openMarketplace(requestedType);
+        },
+
         /** Submits the shortcut form and adds a bookmark to BookmarkGrid. */
         submitShortcut() {
             const { url, title } = this.shortcutForm;
@@ -271,6 +314,7 @@ export default {
         SlidersHorizontal,
         Plus,
         Minus,
+        Store,
         Logo: defineAsyncComponent(() => import('../components/Logo.vue')),
         SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
         BookmarkGrid: defineAsyncComponent(() => import('../components/BookmarkGrid.vue')),
@@ -280,6 +324,7 @@ export default {
         NotesWidget: defineAsyncComponent(() => import('../components/NotesWidget.vue')),
         TodoWidget: defineAsyncComponent(() => import('../components/TodoWidget.vue')),
         LazyMount: defineAsyncComponent(() => import('../components/LazyMount.vue')),
+        MarketplaceBrowser: defineAsyncComponent(() => import('../components/MarketplaceBrowser.vue')),
     },
 };
 </script>
@@ -476,6 +521,23 @@ export default {
     border-radius: var(--radius-lg, 16px) var(--radius-lg, 16px) 0 0;
     padding: 1.25rem 2rem 2rem;
     box-shadow: 0 -4px 24px rgba(0,0,0,0.2);
+}
+
+.marketplace-sheet {
+    position: fixed;
+    left: 50%;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    width: min(980px, calc(100vw - 1.5rem));
+    max-height: min(78vh, 780px);
+    overflow: auto;
+    z-index: 8001;
+    background: color-mix(in srgb, var(--surface-base, #080D14) 92%, transparent);
+    border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+    border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.32);
+    padding: 1rem;
+    backdrop-filter: blur(20px);
 }
 
 .sheet-header {
@@ -805,5 +867,13 @@ export default {
 
 :global([data-density='compact']) .dash-bookmarks {
     max-width: 680px;
+}
+
+@media (max-width: 640px) {
+    .marketplace-sheet {
+        width: calc(100vw - 1rem);
+        bottom: 0.5rem;
+        max-height: 84vh;
+    }
 }
 </style>
