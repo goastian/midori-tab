@@ -4,7 +4,7 @@ import useThemeStore from './useThemeStore.js';
 const useTabStore = defineStore('tabStore', {
   state: () => ({
     tabName: 'New Tab',
-    theme: 'dark',
+    theme: 'light',
     density: 'comfortable',
     background: {
       type: 'Unsplash',
@@ -13,14 +13,31 @@ const useTabStore = defineStore('tabStore', {
     },
     state: false,
     openLink: 'Self Tab',
-    autoTheme: false,
+    autoTheme: true,
   }),
 
+  getters: {
+    effectiveTheme(state) {
+      if (!state.autoTheme) return state.theme;
+      if (typeof window !== 'undefined' && window.matchMedia) {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      return state.theme;
+    },
+  },
+
   actions: {
+    resolveTheme() {
+      return this.effectiveTheme;
+    },
+
     loadSettings () {
-      document.documentElement.setAttribute('data-theme', this.theme);
+      const resolvedTheme = this.resolveTheme();
+      document.documentElement.setAttribute('data-theme', resolvedTheme);
       document.documentElement.setAttribute('data-density', this.density);
       document.title = this.tabName;
+      const themeStore = useThemeStore();
+      themeStore.applyTheme(resolvedTheme);
       this.changeBackground();
     },
 

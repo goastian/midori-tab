@@ -1,5 +1,5 @@
 <template>
-  <div class="viewport" :class="{ 'bg-cl' : tabStore.theme !== 'light' }">
+  <div class="viewport" :class="{ 'bg-cl' : tabStore.effectiveTheme !== 'light' }">
     <img :src="backgroundImage" class="background" v-if="tabStore.background.type == 'Unsplash'" />
     <div class="credits" v-if="tabStore.background.type == 'Unsplash'">
       📷 Photo by 

@@ -1,19 +1,21 @@
 import useTabStore from '../stores/useTabStore.js';
 import useThemeStore from '../stores/useThemeStore.js';
 
-let intervalId = null;
+let mediaQuery = null;
+let mediaQueryListener = null;
 
 export function useAutoTheme() {
   const tabStore = useTabStore();
 
-  function getThemeForCurrentTime() {
-    const hour = new Date().getHours();
-    // Light: 7am - 7pm, Dark: 7pm - 7am
-    return (hour >= 7 && hour < 19) ? 'light' : 'dark';
+  function getThemeForCurrentSystem() {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return tabStore.theme || 'light';
   }
 
   function applyAutoTheme() {
-    const desired = getThemeForCurrentTime();
+    const desired = getThemeForCurrentSystem();
     if (tabStore.theme !== desired) {
       tabStore.theme = desired;
       document.documentElement.setAttribute('data-theme', desired);
@@ -25,16 +27,28 @@ export function useAutoTheme() {
 
   function start() {
     applyAutoTheme();
-    if (intervalId) clearInterval(intervalId);
-    intervalId = setInterval(applyAutoTheme, 60_000);
-  }
+    if (typeof window === 'undefined' || !window.matchMedia) return;
 
-  function stop() {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
+    mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQueryListener = () => applyAutoTheme();
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', mediaQueryListener);
+    } else if (mediaQuery.addListener) {
+      mediaQuery.addListener(mediaQueryListener);
     }
   }
 
-  return { start, stop, applyAutoTheme, getThemeForCurrentTime };
+  function stop() {
+    if (mediaQuery && mediaQueryListener) {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', mediaQueryListener);
+      } else if (mediaQuery.removeListener) {
+        mediaQuery.removeListener(mediaQueryListener);
+      }
+    }
+    mediaQuery = null;
+    mediaQueryListener = null;
+  }
+
+  return { start, stop, applyAutoTheme, getThemeForCurrentSystem };
 }

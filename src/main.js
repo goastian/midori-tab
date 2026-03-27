@@ -10,6 +10,8 @@ import './styles/tokens.css'
 import './styles/animations.css'
 import './style.css'
 import useI18nStore from './stores/useI18nStore.js'
+import useTabStore from './stores/useTabStore.js'
+import useThemeStore from './stores/useThemeStore.js'
 import { getBrowserInfo } from './utils/browserInfo.js'
 
 const app = createApp(App)
@@ -24,5 +26,11 @@ document.documentElement.lang = i18n.locale
 
 const browserInfo = getBrowserInfo()
 document.documentElement.setAttribute('data-browser', browserInfo.id)
+
+const tabStore = useTabStore(pinia)
+const themeStore = useThemeStore(pinia)
+const initialTheme = tabStore.resolveTheme()
+document.documentElement.setAttribute('data-theme', initialTheme)
+themeStore.applyTheme(initialTheme)
 
 app.mount('#app')
