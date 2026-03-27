@@ -25,115 +25,107 @@
       </button>
     </div>
 
-    <div class="cal-agenda">
-      <div class="cal-agenda-header">
-        <div>
-          <div class="cal-agenda-title">{{ selectedDateLabel }}</div>
-          <div class="cal-agenda-subtitle">
-            {{ selectedDayEvents.length ? `${selectedDayEvents.length} evento${selectedDayEvents.length === 1 ? '' : 's'}` : 'Sin eventos programados' }}
+    <!-- Agenda / Form — toggled inline inside the widget -->
+    <Transition name="cal-view" mode="out-in">
+      <div v-if="!composerOpen" key="agenda" class="cal-agenda">
+        <div class="cal-agenda-header">
+          <div>
+            <div class="cal-agenda-title">{{ selectedDateLabel }}</div>
+            <div class="cal-agenda-subtitle">{{ agendaSubtitle }}</div>
           </div>
+          <button class="cal-primary-btn" type="button" @click="openComposer(selectedDate)">
+            + {{ i18n.t.calendar.newEvent }}
+          </button>
         </div>
-        <button class="cal-primary-btn" type="button" @click="openComposer(selectedDate)">
-          + Nuevo
-        </button>
-      </div>
 
-      <div v-if="selectedDayEvents.length" class="cal-event-list">
-        <article v-for="event in selectedDayEvents" :key="event.id" class="cal-event-card">
-          <div class="cal-event-top">
-            <div>
-              <div class="cal-event-title">{{ event.title }}</div>
-              <div class="cal-event-meta">
-                <span>{{ event.time || 'Sin hora' }}</span>
-                <span v-if="event.location">• {{ event.location }}</span>
+        <div v-if="selectedDayEvents.length" class="cal-event-list">
+          <article v-for="event in selectedDayEvents" :key="event.id" class="cal-event-card">
+            <div class="cal-event-top">
+              <div class="cal-event-info">
+                <div class="cal-event-title">{{ event.title }}</div>
+                <div class="cal-event-meta">
+                  <span>{{ event.time || i18n.t.calendar.noTime }}</span>
+                  <span v-if="event.location">· {{ event.location }}</span>
+                </div>
+              </div>
+              <div class="cal-event-actions">
+                <button class="cal-ghost-btn" type="button" @click="openComposer(event.date, event)">{{ i18n.t.calendar.edit }}</button>
+                <button class="cal-ghost-btn danger" type="button" @click="removeEvent(event.id)">{{ i18n.t.calendar.delete }}</button>
               </div>
             </div>
-            <div class="cal-event-actions">
-              <button class="cal-ghost-btn" type="button" @click="openComposer(event.date, event)">Editar</button>
-              <button class="cal-ghost-btn danger" type="button" @click="removeEvent(event.id)">Borrar</button>
-            </div>
-          </div>
-          <p v-if="event.notes" class="cal-event-notes">{{ event.notes }}</p>
-          <div class="cal-event-reminder">
-            {{ reminderCopy(event.reminderMinutes) }}
-          </div>
-        </article>
+            <p v-if="event.notes" class="cal-event-notes">{{ event.notes }}</p>
+            <div class="cal-event-reminder">{{ reminderCopy(event.reminderMinutes) }}</div>
+          </article>
+        </div>
+        <p v-else class="cal-empty-state">{{ i18n.t.calendar.noEventsHint }}</p>
       </div>
-      <p v-else class="cal-empty-state">
-        Elige un día y crea un evento con ubicación, notas y recordatorio.
-      </p>
-    </div>
+
+      <div v-else key="form" class="cal-form-panel" role="form" :aria-label="i18n.t.calendar.newEvent">
+        <div class="cal-form-panel-header">
+          <button class="cal-back-btn" type="button" @click="closeComposer">‹</button>
+          <span class="cal-form-panel-title">{{ editingEventId ? i18n.t.calendar.editEvent : i18n.t.calendar.newEvent }}</span>
+          <button class="cal-close-btn" type="button" @click="closeComposer">✕</button>
+        </div>
+
+        <div class="cal-form-grid">
+          <label class="cal-field cal-field-full">
+            <span class="cal-label">{{ i18n.t.calendar.fieldTitle }}</span>
+            <input v-model.trim="draft.title" class="cal-input" type="text" :placeholder="i18n.t.calendar.fieldTitlePlaceholder" />
+          </label>
+
+          <label class="cal-field">
+            <span class="cal-label">{{ i18n.t.calendar.fieldDate }}</span>
+            <input v-model="draft.date" class="cal-input" type="date" />
+          </label>
+
+          <label class="cal-field">
+            <span class="cal-label">{{ i18n.t.calendar.fieldTime }}</span>
+            <input v-model="draft.time" class="cal-input" type="time" />
+          </label>
+
+          <label class="cal-field cal-field-full">
+            <span class="cal-label">{{ i18n.t.calendar.fieldLocation }}</span>
+            <input v-model.trim="draft.location" class="cal-input" type="text" :placeholder="i18n.t.calendar.fieldLocationPlaceholder" />
+          </label>
+
+          <label class="cal-field cal-field-full">
+            <span class="cal-label">{{ i18n.t.calendar.fieldReminder }}</span>
+            <select v-model.number="draft.reminderMinutes" class="cal-input cal-select">
+              <option v-for="option in reminderOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="cal-field cal-field-full">
+            <span class="cal-label">{{ i18n.t.calendar.fieldNotes }}</span>
+            <textarea v-model.trim="draft.notes" class="cal-input cal-textarea" rows="3" :placeholder="i18n.t.calendar.fieldNotesPlaceholder"></textarea>
+          </label>
+        </div>
+
+        <p v-if="formError" class="cal-form-error">{{ formError }}</p>
+
+        <div class="cal-form-actions">
+          <button class="cal-ghost-btn" type="button" @click="closeComposer">{{ i18n.t.calendar.cancel }}</button>
+          <button class="cal-primary-btn" type="button" @click="saveEvent">
+            {{ editingEventId ? i18n.t.calendar.saveChanges : i18n.t.calendar.createEvent }}
+          </button>
+        </div>
+      </div>
+    </Transition>
 
     <div class="cal-today-bar">
       <span class="cal-today-label">{{ todayFormatted }}</span>
     </div>
   </div>
 
+  <!-- Reminder notifications: bottom-right corner ONLY -->
   <Teleport to="body">
-    <Transition name="cal-composer-pop">
-      <div v-if="composerOpen" class="cal-composer-shell">
-        <div class="cal-composer" role="dialog" aria-modal="true" aria-label="Editor de evento" @click.stop>
-          <div class="cal-composer-header">
-            <div>
-              <div class="cal-composer-kicker">Calendario</div>
-              <h3 class="cal-composer-title">{{ editingEventId ? 'Editar evento' : 'Nuevo evento' }}</h3>
-            </div>
-            <button class="cal-close-btn" type="button" @click="closeComposer">✕</button>
-          </div>
-
-          <div class="cal-form-grid">
-            <label class="cal-field cal-field-full">
-              <span class="cal-label">Título</span>
-              <input v-model.trim="draft.title" class="cal-input" type="text" placeholder="Reunión, cita, entrega..." />
-            </label>
-
-            <label class="cal-field">
-              <span class="cal-label">Fecha</span>
-              <input v-model="draft.date" class="cal-input" type="date" />
-            </label>
-
-            <label class="cal-field">
-              <span class="cal-label">Hora</span>
-              <input v-model="draft.time" class="cal-input" type="time" />
-            </label>
-
-            <label class="cal-field cal-field-full">
-              <span class="cal-label">Ubicación</span>
-              <input v-model.trim="draft.location" class="cal-input" type="text" placeholder="Oficina, videollamada, dirección..." />
-            </label>
-
-            <label class="cal-field cal-field-full">
-              <span class="cal-label">Recordatorio</span>
-              <select v-model.number="draft.reminderMinutes" class="cal-input cal-select">
-                <option v-for="option in reminderOptions" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
-            </label>
-
-            <label class="cal-field cal-field-full">
-              <span class="cal-label">Notas</span>
-              <textarea v-model.trim="draft.notes" class="cal-input cal-textarea" rows="4" placeholder="Detalles extra, asistentes, contexto..."></textarea>
-            </label>
-          </div>
-
-          <p v-if="formError" class="cal-form-error">{{ formError }}</p>
-
-          <div class="cal-composer-actions">
-            <button class="cal-ghost-btn" type="button" @click="closeComposer">Cancelar</button>
-            <button class="cal-primary-btn" type="button" @click="saveEvent">{{ editingEventId ? 'Guardar cambios' : 'Crear evento' }}</button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
-
-  <Teleport to="body">
-    <TransitionGroup name="cal-reminder-stack" tag="div" :class="['cal-reminder-stack', { shifted: composerOpen }]">
+    <TransitionGroup name="cal-reminder-stack" tag="div" class="cal-reminder-stack">
       <aside v-for="reminder in activeReminders" :key="reminder.id" class="cal-reminder-popup">
         <div class="cal-reminder-header">
-          <span class="cal-reminder-badge">Recordatorio</span>
-          <button class="cal-close-btn small" type="button" @click="dismissReminder(reminder.id)">✕</button>
+          <span class="cal-reminder-badge">{{ i18n.t.calendar.reminderBadge }}</span>
+          <button class="cal-reminder-close" type="button" @click="dismissReminder(reminder.id)">✕</button>
         </div>
         <div class="cal-reminder-title">{{ reminder.title }}</div>
         <div class="cal-reminder-meta">{{ formatEventMoment(reminder) }}</div>
@@ -145,6 +137,8 @@
 </template>
 
 <script>
+import useI18nStore from '../stores/useI18nStore.js';
+
 const STORAGE_KEY = 'midori_calendar_events';
 const REMINDER_CHECK_INTERVAL = 30000;
 
@@ -221,6 +215,7 @@ export default {
     }
 
     return {
+      i18n: useI18nStore(),
       viewMonth: now.getMonth(),
       viewYear: now.getFullYear(),
       selectedDate,
@@ -231,26 +226,29 @@ export default {
       formError: '',
       activeReminders: [],
       reminderTimer: null,
-      reminderOptions: [
-        { value: 0, label: 'Sin recordatorio' },
-        { value: 5, label: '5 minutos antes' },
-        { value: 15, label: '15 minutos antes' },
-        { value: 30, label: '30 minutos antes' },
-        { value: 60, label: '1 hora antes' },
-        { value: 1440, label: '1 día antes' },
-      ],
     };
   },
 
   computed: {
+    currentLocale() {
+      return this.i18n.locale || undefined;
+    },
     year() {
       return this.viewYear;
     },
     monthName() {
-      return new Date(this.viewYear, this.viewMonth).toLocaleString(undefined, { month: 'long' });
+      return new Date(this.viewYear, this.viewMonth).toLocaleString(this.currentLocale, { month: 'long' });
     },
     dayLabels() {
-      return ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+      const formatter = new Intl.DateTimeFormat(this.currentLocale, { weekday: 'short' });
+      const baseMonday = new Date(Date.UTC(2024, 0, 1));
+
+      return Array.from({ length: 7 }, (_, index) => {
+        const day = new Date(baseMonday);
+        day.setUTCDate(baseMonday.getUTCDate() + index);
+        const label = formatter.format(day).replace('.', '');
+        return label.charAt(0).toUpperCase() + label.slice(1);
+      });
     },
     cells() {
       const first = new Date(this.viewYear, this.viewMonth, 1);
@@ -287,15 +285,31 @@ export default {
     selectedDateLabel() {
       const date = parseEventDateTime(this.selectedDate, '12:00');
       return date
-        ? date.toLocaleDateString(undefined, {
+        ? date.toLocaleDateString(this.currentLocale, {
             weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
           })
-        : 'Fecha no válida';
+        : (this.i18n.t.calendar.dateInvalid || '');
     },
     todayFormatted() {
-      return new Date().toLocaleDateString(undefined, {
+      return new Date().toLocaleDateString(this.currentLocale, {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
       });
+    },
+    agendaSubtitle() {
+      const c = this.i18n.t.calendar;
+      if (!this.selectedDayEvents.length) return c.noEvents;
+      return c.eventsCount.replace('{n}', this.selectedDayEvents.length);
+    },
+    reminderOptions() {
+      const c = this.i18n.t.calendar;
+      return [
+        { value: 0, label: c.reminderNone },
+        { value: 5, label: c.reminder5 },
+        { value: 15, label: c.reminder15 },
+        { value: 30, label: c.reminder30 },
+        { value: 60, label: c.reminder60 },
+        { value: 1440, label: c.reminder1440 },
+      ];
     },
   },
 
@@ -361,11 +375,11 @@ export default {
     saveEvent() {
       const title = this.draft.title.trim();
       if (!title) {
-        this.formError = 'El título es obligatorio.';
+        this.formError = this.i18n.t.calendar.errorTitleRequired;
         return;
       }
       if (!this.draft.date) {
-        this.formError = 'La fecha es obligatoria.';
+        this.formError = this.i18n.t.calendar.errorDateRequired;
         return;
       }
 
@@ -413,20 +427,21 @@ export default {
     },
 
     reminderCopy(minutes) {
-      if (!minutes) return 'Sin recordatorio';
-      if (minutes < 60) return `Avisar ${minutes} min antes`;
-      if (minutes === 60) return 'Avisar 1 hora antes';
+      const c = this.i18n.t.calendar;
+      if (!minutes) return c.reminderNone;
+      if (minutes < 60) return c.remindMinutes.replace('{n}', minutes);
+      if (minutes === 60) return c.remindHour;
       if (minutes % 1440 === 0) {
         const days = minutes / 1440;
-        return `Avisar ${days} día${days === 1 ? '' : 's'} antes`;
+        return days === 1 ? c.remindDay : c.remindDays.replace('{n}', days);
       }
-      return `Avisar ${Math.round(minutes / 60)} horas antes`;
+      return c.remindHours.replace('{n}', Math.round(minutes / 60));
     },
 
     formatEventMoment(event) {
       const date = parseEventDateTime(event.date, event.time);
-      if (!date) return 'Fecha no disponible';
-      return date.toLocaleString(undefined, {
+      if (!date) return this.i18n.t.calendar.dateUnavailable;
+      return date.toLocaleString(this.currentLocale, {
         weekday: 'short',
         day: 'numeric',
         month: 'short',
@@ -509,8 +524,7 @@ export default {
 .cal-header,
 .cal-agenda-header,
 .cal-event-top,
-.cal-composer-header,
-.cal-composer-actions,
+.cal-form-actions,
 .cal-reminder-header {
   display: flex;
   align-items: center;
@@ -521,7 +535,7 @@ export default {
 .cal-month,
 .cal-agenda-title,
 .cal-event-title,
-.cal-composer-title,
+.cal-form-panel-title,
 .cal-reminder-title {
   color: var(--color-text, #C4F0E0);
 }
@@ -585,7 +599,7 @@ export default {
 }
 
 .cal-cell:hover {
-  background: rgba(126, 196, 168, 0.08);
+  background: var(--color-accent-bg);
   transform: translateY(-1px);
 }
 
@@ -594,12 +608,12 @@ export default {
 }
 
 .cal-cell.today {
-  background: rgba(4, 164, 105, 0.2);
+  background: var(--color-accent-bg);
 }
 
 .cal-cell.selected {
-  outline: 1px solid rgba(126, 196, 168, 0.38);
-  background: rgba(4, 164, 105, 0.14);
+  outline: 1px solid var(--color-border-hover);
+  background: var(--color-accent-bg);
 }
 
 .cal-cell-day {
@@ -618,8 +632,8 @@ export default {
 }
 
 .cal-agenda {
-  background: rgba(6, 10, 16, 0.55);
-  border: 1px solid rgba(126, 196, 168, 0.08);
+  background: var(--surface-sunken);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 0.65rem;
   display: flex;
@@ -628,7 +642,7 @@ export default {
 }
 
 .cal-agenda-title,
-.cal-composer-title,
+.cal-form-panel-title,
 .cal-reminder-title {
   font-size: 0.92rem;
   font-weight: 700;
@@ -641,7 +655,6 @@ export default {
 .cal-reminder-meta,
 .cal-reminder-location,
 .cal-today-label,
-.cal-composer-kicker,
 .cal-label {
   color: var(--color-text-muted, #5A9A82);
 }
@@ -651,8 +664,7 @@ export default {
 .cal-event-reminder,
 .cal-reminder-meta,
 .cal-reminder-location,
-.cal-today-label,
-.cal-composer-kicker {
+.cal-today-label {
   font-size: 0.72rem;
 }
 
@@ -676,7 +688,7 @@ export default {
 
 .cal-ghost-btn,
 .cal-close-btn {
-  background: rgba(30, 45, 61, 0.65);
+  background: var(--surface-overlay);
   color: var(--color-text-muted, #5A9A82);
   padding: 0.35rem 0.65rem;
 }
@@ -711,8 +723,13 @@ export default {
 .cal-event-card {
   padding: 0.55rem;
   border-radius: 10px;
-  background: rgba(15, 21, 32, 0.92);
-  border: 1px solid rgba(126, 196, 168, 0.08);
+  background: var(--surface-raised);
+  border: 1px solid var(--color-border);
+}
+
+.cal-event-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .cal-event-actions {
@@ -747,40 +764,74 @@ export default {
   text-align: center;
 }
 
-.cal-composer-shell {
-  position: fixed;
-  right: 1rem;
-  bottom: 1rem;
-  z-index: 10010;
-  pointer-events: none;
+/* ===== Inline Form Panel ===== */
+.cal-form-panel {
+  background: var(--surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
-.cal-composer,
-.cal-reminder-popup {
-  width: min(380px, calc(100vw - 2rem));
-  border-radius: 18px;
-  border: 1px solid rgba(126, 196, 168, 0.12);
-  background: rgba(8, 13, 20, 0.96);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.32);
+.cal-form-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.cal-composer {
-  pointer-events: auto;
-  padding: 0.9rem;
+.cal-back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted, #5A9A82);
+  font-size: 1.1rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius-sm, 6px);
+  transition: background var(--transition-fast, 0.1s ease), color var(--transition-fast, 0.1s ease);
 }
 
-.cal-composer-kicker {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 0.1rem;
+.cal-back-btn:hover {
+  background: var(--color-accent-bg, rgba(4,164,105,0.08));
+  color: var(--color-text, #C4F0E0);
+}
+
+.cal-form-panel-title {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text, #C4F0E0);
 }
 
 .cal-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
-  margin-top: 0.8rem;
+}
+
+.cal-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* ===== View transition ===== */
+.cal-view-enter-active,
+.cal-view-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.cal-view-enter-from {
+  opacity: 0;
+  transform: translateX(6px);
+}
+
+.cal-view-leave-to {
+  opacity: 0;
+  transform: translateX(-6px);
 }
 
 .cal-field {
@@ -800,8 +851,8 @@ export default {
 
 .cal-input {
   width: 100%;
-  background: rgba(6, 10, 16, 0.95);
-  border: 1px solid rgba(126, 196, 168, 0.1);
+  background: var(--surface-sunken);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   color: var(--color-text, #C4F0E0);
   font-size: 0.82rem;
@@ -825,11 +876,7 @@ export default {
 
 .cal-form-error {
   color: #f7b0a0;
-  margin-top: 0.75rem;
-}
-
-.cal-composer-actions {
-  margin-top: 0.85rem;
+  margin-top: 0;
 }
 
 .cal-reminder-stack {
@@ -843,11 +890,13 @@ export default {
   pointer-events: none;
 }
 
-.cal-reminder-stack.shifted {
-  bottom: calc(1rem + 430px);
-}
-
 .cal-reminder-popup {
+  width: min(340px, calc(100vw - 2rem));
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--surface-base);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
   padding: 0.85rem;
   pointer-events: auto;
 }
@@ -857,27 +906,38 @@ export default {
   align-items: center;
   padding: 0.2rem 0.45rem;
   border-radius: 999px;
-  background: rgba(4, 164, 105, 0.18);
-  color: #b8f3db;
+  background: var(--color-accent-bg);
+  color: var(--color-text);
   font-size: 0.66rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
+.cal-reminder-close {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted, #5A9A82);
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+}
+
+.cal-reminder-close:hover {
+  background: var(--surface-overlay);
+  color: var(--color-text, #C4F0E0);
+}
+
 .cal-reminder-notes {
   margin-top: 0.45rem;
 }
 
-.cal-composer-pop-enter-active,
-.cal-composer-pop-leave-active,
 .cal-reminder-stack-enter-active,
 .cal-reminder-stack-leave-active {
   transition: all 0.18s ease;
 }
 
-.cal-composer-pop-enter-from,
-.cal-composer-pop-leave-to,
 .cal-reminder-stack-enter-from,
 .cal-reminder-stack-leave-to {
   opacity: 0;
@@ -889,24 +949,18 @@ export default {
     grid-template-columns: 1fr;
   }
 
-  .cal-composer-shell,
   .cal-reminder-stack {
     right: 0.75rem;
     left: 0.75rem;
   }
 
-  .cal-composer,
   .cal-reminder-popup {
     width: 100%;
   }
 
-  .cal-reminder-stack.shifted {
-    bottom: calc(1rem + 520px);
-  }
-
   .cal-event-top,
   .cal-agenda-header,
-  .cal-composer-actions {
+  .cal-form-actions {
     align-items: flex-start;
     flex-direction: column;
   }
