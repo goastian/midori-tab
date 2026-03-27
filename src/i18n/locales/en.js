@@ -159,6 +159,20 @@ export default {
       },
     },
   },
+  privacy: {
+    title: 'Midori Privacy',
+    notAvailable: 'Midori Privacy is not installed or not responding.',
+    stats: {
+      blocked: 'Blocked',
+      saved: 'Saved',
+      time: 'Time',
+    },
+    categories: {
+      trackers: 'Trackers',
+      ads: 'Ads',
+      fingerprinters: 'Fingerprint',
+    },
+  },
   calendar: {
     title: 'Calendar',
     newEvent: 'New event',

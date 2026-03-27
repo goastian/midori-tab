@@ -2,44 +2,44 @@
   <div class="privacy-widget">
     <div class="pw-header">
       <span class="pw-icon">🛡️</span>
-      <span class="pw-title">Midori Privacy</span>
-      <span v-if="!available" class="pw-badge pw-badge--off">Off</span>
+      <span class="pw-title">{{ i18n.$t('privacy.title') }}</span>
+      <span v-if="!available" class="pw-badge pw-badge--off">{{ i18n.$t('common.off') }}</span>
       <span v-else class="pw-badge pw-badge--on">{{ grade }}</span>
     </div>
 
     <div v-if="!available" class="pw-empty">
-      <p class="pw-empty-text">Midori Privacy no está instalado o no responde.</p>
+      <p class="pw-empty-text">{{ i18n.$t('privacy.notAvailable') }}</p>
     </div>
 
     <div v-else class="pw-stats">
       <div class="pw-stat">
         <span class="pw-stat-value">{{ formattedBlocked }}</span>
-        <span class="pw-stat-label">Bloqueados</span>
+        <span class="pw-stat-label">{{ i18n.$t('privacy.stats.blocked') }}</span>
       </div>
       <div class="pw-stat">
         <span class="pw-stat-value">{{ formattedBandwidth }}</span>
-        <span class="pw-stat-label">Ahorrado</span>
+        <span class="pw-stat-label">{{ i18n.$t('privacy.stats.saved') }}</span>
       </div>
       <div class="pw-stat">
         <span class="pw-stat-value">{{ formattedTime }}</span>
-        <span class="pw-stat-label">Tiempo</span>
+        <span class="pw-stat-label">{{ i18n.$t('privacy.stats.time') }}</span>
       </div>
     </div>
 
     <div v-if="available && categories" class="pw-categories">
       <div class="pw-cat" v-if="categories.trackers">
         <span class="pw-cat-dot pw-cat-dot--tracker"></span>
-        <span class="pw-cat-label">Trackers</span>
+        <span class="pw-cat-label">{{ i18n.$t('privacy.categories.trackers') }}</span>
         <span class="pw-cat-count">{{ categories.trackers }}</span>
       </div>
       <div class="pw-cat" v-if="categories.ads">
         <span class="pw-cat-dot pw-cat-dot--ad"></span>
-        <span class="pw-cat-label">Ads</span>
+        <span class="pw-cat-label">{{ i18n.$t('privacy.categories.ads') }}</span>
         <span class="pw-cat-count">{{ categories.ads }}</span>
       </div>
       <div class="pw-cat" v-if="categories.fingerprinters">
         <span class="pw-cat-dot pw-cat-dot--fp"></span>
-        <span class="pw-cat-label">Fingerprint</span>
+        <span class="pw-cat-label">{{ i18n.$t('privacy.categories.fingerprinters') }}</span>
         <span class="pw-cat-count">{{ categories.fingerprinters }}</span>
       </div>
     </div>
@@ -47,6 +47,8 @@
 </template>
 
 <script>
+import useI18nStore from '../stores/useI18nStore.js';
+
 /**
  * Privacy statistics widget.
  * Communicates with the Midori Privacy extension via runtime.sendMessage
@@ -100,6 +102,7 @@ export default {
 
   data() {
     return {
+      i18n: useI18nStore(),
       available: false,
       totalBlocked: 0,
       categories: null,

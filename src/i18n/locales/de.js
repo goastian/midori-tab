@@ -89,6 +89,20 @@ export default {
     subtitle: 'Wählen Sie die Sprache der Benutzeroberfläche',
     current: 'Aktuelle Sprache',
   },
+    privacy: {
+      title: 'Midori Privacy',
+      notAvailable: 'Midori Privacy ist nicht installiert oder antwortet nicht.',
+      stats: {
+        blocked: 'Blockiert',
+        saved: 'Gespart',
+        time: 'Zeit',
+      },
+      categories: {
+        trackers: 'Tracker',
+        ads: 'Anzeigen',
+        fingerprinters: 'Fingerprint',
+      },
+    },
   calendar: {
     title: 'Kalender',
     newEvent: 'Neues Ereignis',

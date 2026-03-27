@@ -89,6 +89,20 @@ export default {
     subtitle: 'インターフェースの言語を選択',
     current: '現在の言語',
   },
+  privacy: {
+    title: 'Midori Privacy',
+    notAvailable: 'Midori Privacy がインストールされていないか、応答していません。',
+    stats: {
+      blocked: 'ブロック済み',
+      saved: '節約',
+      time: '時間',
+    },
+    categories: {
+      trackers: 'トラッカー',
+      ads: '広告',
+      fingerprinters: 'フィンガープリント',
+    },
+  },
   calendar: {
     title: 'カレンダー',
     newEvent: '新しいイベント',
