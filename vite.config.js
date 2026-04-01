@@ -3,6 +3,8 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { resolve } from 'path'
 
+import { APP_VERSION } from './version.config.js'
+
 export default defineConfig({
   plugins: [
     vue(),
@@ -17,6 +19,7 @@ export default defineConfig({
   ],
   define: {
     'process.env': {},
+    __MIDORI_APP_VERSION__: JSON.stringify(APP_VERSION),
   },
   build: {
     minify: 'esbuild',

@@ -1,28 +1,6 @@
+import { APP_VERSION } from './appVersion.js';
 import { getBrowserInfo } from './browserInfo.js';
-
-const APP_VERSION = import.meta.env.VITE_MIDORI_APP_VERSION || '1.0.10';
-
-function toVersionParts(version) {
-  return String(version || '')
-    .split(/[^0-9]+/)
-    .filter(Boolean)
-    .map(part => Number.parseInt(part, 10) || 0);
-}
-
-function compareVersions(left, right) {
-  const leftParts = toVersionParts(left);
-  const rightParts = toVersionParts(right);
-  const size = Math.max(leftParts.length, rightParts.length);
-
-  for (let index = 0; index < size; index += 1) {
-    const leftValue = leftParts[index] || 0;
-    const rightValue = rightParts[index] || 0;
-    if (leftValue > rightValue) return 1;
-    if (leftValue < rightValue) return -1;
-  }
-
-  return 0;
-}
+import { compareVersions } from './semver.js';
 
 function isVersionCompatible(currentVersion, minVersion, maxVersion) {
   if (minVersion && compareVersions(currentVersion, minVersion) < 0) return false;

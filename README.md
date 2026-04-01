@@ -74,3 +74,22 @@ VITE_MARKETPLACE_API_BASE_URL=http://localhost
 ```
 
 `VITE_MARKETPLACE_API_BASE_URL` It should point to the origin of the marketplace. The extension client automatically resolves `/api/v1`..
+
+## 🛠️ Development
+
+Build targets:
+
+```bash
+npm run build:chrome
+npm run build:firefox
+```
+
+## 🔢 Versioning
+
+`package.json` is the single source of truth for the extension version.
+
+- `build-manifest.js` injects `package.json.version` into the generated `manifest/manifest.json` for every target.
+- `vite.config.js` injects the same version into the app bundle through `__MIDORI_APP_VERSION__`.
+- `manifest/main.json` and browser override manifests must not define their own version values.
+
+If the version changes, update only `package.json` and rebuild the target manifest.
