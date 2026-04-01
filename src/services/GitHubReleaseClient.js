@@ -51,6 +51,15 @@ export default class GitHubReleaseClient {
   async getLatestStableRelease(options = {}) {
     const { headers = {}, signal } = options
     const response = await this.#fetchReleases({ headers, signal })
+    if (response.notModified) {
+      return {
+        release: null,
+        etag: response.etag,
+        status: response.status,
+        notModified: true,
+      }
+    }
+
     const stableReleases = response.payload
       .map(normalizeRelease)
       .filter(release => release && !release.isDraft && !release.isPrerelease)
@@ -60,6 +69,7 @@ export default class GitHubReleaseClient {
       release: stableReleases[0] || null,
       etag: response.etag,
       status: response.status,
+      notModified: false,
     }
   }
 
@@ -91,6 +101,15 @@ export default class GitHubReleaseClient {
         signal: controller?.signal || signal,
       })
 
+      if (response.status === 304) {
+        return {
+          payload: [],
+          etag: response.headers.get('etag') || '',
+          status: response.status,
+          notModified: true,
+        }
+      }
+
       if (!response.ok) {
         throw new Error(`GitHub releases request failed with status ${response.status}.`)
       }
@@ -100,6 +119,7 @@ export default class GitHubReleaseClient {
         payload: Array.isArray(payload) ? payload : [],
         etag: response.headers.get('etag') || '',
         status: response.status,
+        notModified: false,
       }
     } catch (error) {
       if (error?.name === 'AbortError' || controller?.signal?.aborted) {
