@@ -14,6 +14,7 @@
   "host_permissions": [
     "https://api.rss2json.com/*",
     "https://api.unsplash.com/*",
+    "https://api.github.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
     "http://marketplace.astian.org/*"

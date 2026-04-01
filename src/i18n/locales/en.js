@@ -242,4 +242,10 @@ export default {
     dateInvalid: 'Invalid date',
     dateUnavailable: 'Date unavailable',
   },
+  updateNotice: {
+    title: 'Midori update available',
+    message: 'A new Midori version ({version}) is ready to download.',
+    download: 'Download',
+    defer: 'Update later',
+  },
 };
