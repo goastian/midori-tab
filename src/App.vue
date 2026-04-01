@@ -39,7 +39,7 @@
 </template>
 
 <script>
-  import { defineAsyncComponent } from 'vue';
+  import { defineAsyncComponent, markRaw } from 'vue';
   import { APP_VERSION } from './utils/appVersion.js';
   import { getBrowserInfo } from './utils/browserInfo.js';
   import MidoriUpdateService from './services/MidoriUpdateService.js';
@@ -66,7 +66,7 @@
         imageAuthorLink: "",
         imageLink: "",
         autoTheme: null,
-        updateService: new MidoriUpdateService(),
+        updateService: markRaw(new MidoriUpdateService()),
         updateNotice: {
           visible: false,
           latestVersion: '',
