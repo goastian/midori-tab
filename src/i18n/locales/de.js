@@ -142,4 +142,10 @@ export default {
     dateInvalid: 'Ungültiges Datum',
     dateUnavailable: 'Datum nicht verfügbar',
   },
+  updateNotice: {
+    title: 'Midori-Update verfügbar',
+    message: 'Eine neue Midori-Version ({version}) steht zum Download bereit.',
+    download: 'Herunterladen',
+    defer: 'Später aktualisieren',
+  },
 };

@@ -14,7 +14,8 @@
     "package:firefox": "npm run build:firefox && node scripts/package.js firefox",
     "preview": "vite preview",
     "validate:contracts": "node contracts/scripts/validate-examples.mjs",
-    "test:contracts": "node --test contracts/tests/*.test.mjs"
+    "test:contracts": "node --test contracts/tests/*.test.mjs",
+    "test:update": "node --test tests/**/*.test.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

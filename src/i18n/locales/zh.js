@@ -142,4 +142,10 @@ export default {
     dateInvalid: '无效日期',
     dateUnavailable: '日期不可用',
   },
+  updateNotice: {
+    title: 'Midori 有可用更新',
+    message: '新的 Midori 版本 ({version}) 已可下载。',
+    download: '下载',
+    defer: '稍后更新',
+  },
 };

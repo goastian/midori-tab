@@ -142,4 +142,10 @@ export default {
     dateInvalid: '無効な日付',
     dateUnavailable: '日付不明',
   },
+  updateNotice: {
+    title: 'Midori の更新があります',
+    message: '新しい Midori バージョン ({version}) をダウンロードできます。',
+    download: 'ダウンロード',
+    defer: 'あとで更新',
+  },
 };

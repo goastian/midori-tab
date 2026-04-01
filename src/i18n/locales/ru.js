@@ -142,4 +142,10 @@ export default {
     dateInvalid: 'Неверная дата',
     dateUnavailable: 'Дата недоступна',
   },
+  updateNotice: {
+    title: 'Доступно обновление Midori',
+    message: 'Новая версия Midori ({version}) готова к загрузке.',
+    download: 'Скачать',
+    defer: 'Обновить позже',
+  },
 };
