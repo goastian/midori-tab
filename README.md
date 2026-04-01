@@ -12,16 +12,13 @@ Midori Tab replaces the default new tab experience with a fast, privacy-friendly
 
 ## 📋 Table of Contents
 
-1. [Features](#-features)  
-2. [Demo / Screenshots](#-demo--screenshots)  
-3. [Installation](#-installation)  
-4. [Usage](#-usage)  
-5. [Configuration](#-configuration)  
-6. [Development](#-development)  
-7. [Project Structure](#-project-structure)  
-8. [Contributing](#-contributing)  
-9. [License](#-license)  
-10. [Credits](#-credits)
+- [🌿 Midori Tab](#-midori-tab)
+  - [📋 Table of Contents](#-table-of-contents)
+  - [✨ Features](#-features)
+  - [🖼️ Demo / Screenshots](#️-demo--screenshots)
+  - [⚙️ Installation](#️-installation)
+  - [🛠️ Development](#️-development)
+  - [🔢 Versioning](#-versioning)
 
 ---
 
