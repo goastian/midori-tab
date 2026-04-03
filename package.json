@@ -15,7 +15,12 @@
     "preview": "vite preview",
     "validate:contracts": "node contracts/scripts/validate-examples.mjs",
     "test:contracts": "node --test contracts/tests/*.test.mjs",
-    "test:update": "node --test tests/**/*.test.mjs"
+    "test:update": "node --test tests/**/*.test.mjs",
+    "test:omni-legacy": "node --check omni/src/content.js && node --check omni/src/search-utils.js && node --check omni/src/runtime-messages.js && node --check omni/src/content-dom.js && node --check omni/src/search-engine.js && node --check omni/src/action-engine.js && ! grep -RIn \"jquery.js\\|virtualized-list.min.js\\|\\$(\" omni/src/content.js omni/src/search-utils.js omni/src/runtime-messages.js omni/src/content-dom.js omni/src/search-engine.js omni/src/action-engine.js omni/src/manifest.json omni/src/newtab.html",
+    "test:omni-legacy-utils": "node --test tests/omni-legacy-utils.test.mjs",
+    "test:omni-legacy-runtime": "node --test tests/omni-legacy-runtime.test.mjs",
+    "test:omni-legacy-search": "node --test tests/omni-legacy-search-engine.test.mjs",
+    "test:omni-legacy-actions": "node --test tests/omni-legacy-action-engine.test.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

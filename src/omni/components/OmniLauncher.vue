@@ -340,6 +340,11 @@ export default {
   font-family: inherit;
 }
 
+.omni-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .omni-input::placeholder {
   color: var(--color-text-muted, #63687b);
 }

@@ -170,8 +170,9 @@ export default {
   height: 1.25rem;
   font-size: 0.75rem;
   font-family: inherit;
-  background: var(--color-primary, #6068d2);
-  color: #fff;
+  background: var(--color-bg, #1e2128);
+  color: var(--color-text-secondary, #c5c6ca);
+  border: 1px solid var(--color-border, #35373e);
   border-radius: 4px;
 }
 </style>

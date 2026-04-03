@@ -376,14 +376,14 @@
 
       .omni-cs-search-row {
         display: flex; align-items: center;
-        padding: 0 1rem;
+        padding: 0 16px;
         border-bottom: 1px solid var(--omni-border);
         flex-shrink: 0;
       }
-      .omni-cs-search-icon { font-size: 1.1rem; margin-right: .5rem; }
+      .omni-cs-search-icon { font-size: 18px; margin-right: 8px; }
       .omni-cs-input {
         all: unset; flex: 1;
-        height: 3.25rem; font-size: 1.1rem; font-weight: 400;
+        height: 52px; font-size: 18px; font-weight: 400;
         color: var(--omni-text);
         caret-color: var(--omni-accent);
       }
@@ -398,8 +398,8 @@
       .omni-cs-list::-webkit-scrollbar-thumb { background: rgba(127,127,127,.4); border-radius: 3px; }
 
       .omni-cs-item {
-        display: flex; align-items: center; gap: .75rem;
-        padding: .55rem 1rem; cursor: pointer;
+        display: flex; align-items: center; gap: 12px;
+        padding: 9px 16px; cursor: pointer;
         transition: background .1s;
       }
       .omni-cs-item:hover, .omni-cs-item--selected {
@@ -407,7 +407,7 @@
       }
 
       .omni-cs-icon {
-        width: 1.5rem; height: 1.5rem; font-size: 1.2rem;
+        width: 24px; height: 24px; font-size: 19px;
         display: flex; align-items: center; justify-content: center;
         flex-shrink: 0; border-radius: 4px;
       }
@@ -415,31 +415,31 @@
 
       .omni-cs-body { flex: 1; min-width: 0; }
       .omni-cs-title {
-        font-size: .875rem; font-weight: 500;
+        font-size: 14px; font-weight: 500;
         color: var(--omni-text); white-space: nowrap;
         overflow: hidden; text-overflow: ellipsis;
       }
       .omni-cs-desc {
-        font-size: .75rem; color: var(--omni-text3);
+        font-size: 12px; color: var(--omni-text3);
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
 
       .omni-cs-keys { display: flex; gap: .2rem; flex-shrink: 0; }
       .omni-cs-key {
         display: inline-flex; align-items: center; justify-content: center;
-        font-size: .7rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .25rem;
+        font-size: 11px; min-width: 20px; height: 20px; padding: 0 4px;
         background: var(--omni-kbd); border-radius: 4px;
         color: var(--omni-text); font-family: inherit;
       }
 
       .omni-cs-footer {
         display: flex; align-items: center; justify-content: space-between;
-        padding: .5rem 1rem;
+        padding: 8px 16px;
         border-top: 1px solid var(--omni-border);
         flex-shrink: 0;
       }
-      .omni-cs-count { font-size: .75rem; color: var(--omni-text3); }
-      .omni-cs-hint { font-size: .72rem; color: var(--omni-text3); }
+      .omni-cs-count { font-size: 12px; color: var(--omni-text3); }
+      .omni-cs-hint { font-size: 11px; color: var(--omni-text3); }
 
       @media (prefers-reduced-motion: reduce) {
         .omni-cs-dialog, .omni-cs-backdrop { transition: none !important; }

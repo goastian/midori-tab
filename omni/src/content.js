@@ -1,455 +1,473 @@
-// Workaround to capture Esc key on certain sites
-var isOpen = false;
-document.onkeyup = (e) => {
-	if (e.key == "Escape" && isOpen) {
-		chrome.runtime.sendMessage({request:"close-omni"})
-	}
-}
+// Omni legacy content script (modernized): vanilla JS runtime without jQuery/virtualized-list.
+(function () {
+  if (window.__omniLegacyLoaded) return;
+  window.__omniLegacyLoaded = true;
 
-$(document).ready(() => {
-	var actions = [];
-	var isFiltered = false;
+  const state = {
+    isOpen: false,
+    actions: [],
+    visibleItems: [],
+    selectedIndex: 0,
+    downKeys: new Set(),
+    newTabUrl: chrome.runtime.getURL('newtab.html'),
+  };
 
-	// Append the omni into the current page
-	$.get(chrome.runtime.getURL('/content.html'), (data) => {
-		$(data).appendTo('body');
+  const dom = {
+    root: null,
+    list: null,
+    input: null,
+    results: null,
+    toast: null,
+    toastText: null,
+    toastImg: null,
+  };
 
-		// Get checkmark image for toast
-		$("#omni-extension-toast img").attr("src", chrome.runtime.getURL("assets/check.svg"));
+  const legacyUtils = window.OmniLegacyUtils || {};
+  const runtimeApi = window.OmniLegacyRuntime || {};
+  const domApi = window.OmniLegacyDom || {};
+  const searchApi = window.OmniLegacySearch || {};
+  const actionsApi = window.OmniLegacyActions || {};
+  let listRenderer = null;
+  let searchEngine = null;
+  let actionEngine = null;
 
-		// Request actions from the background
-		chrome.runtime.sendMessage({request:"get-actions"}, (response) => {
-			actions = response.actions;
-		});
+  function q(sel, root) {
+    return (root || document).querySelector(sel);
+  }
 
-		// New tab page workaround
-		if (window.location.href == "chrome-extension://mpanekjjajcabgnlbabmopeenljeoggm/newtab.html") {
-			isOpen = true;
-			$("#omni-extension").removeClass("omni-closing");
-			window.setTimeout(() => {
-				$("#omni-extension input").focus();
-			}, 100);
-		}
-	});
+  function qa(sel, root) {
+    return Array.from((root || document).querySelectorAll(sel));
+  }
 
-	function renderAction(action, index, keys, img) {
-		var skip = "";
-		if (action.action == "search" || action.action == "goto") {
-			skip = "style='display:none'";
-		}
-		if (index != 0) {
-			$("#omni-extension #omni-list").append("<div class='omni-item' "+skip+" data-index='"+index+"' data-type='"+action.type+"'>"+img+"<div class='omni-item-details'><div class='omni-item-name'>"+action.title+"</div><div class='omni-item-desc'>"+action.desc+"</div></div>"+keys+"<div class='omni-select'>Select <span class='omni-shortcut'>⏎</span></div></div>");
-		} else {
-			$("#omni-extension #omni-list").append("<div class='omni-item omni-item-active' "+skip+" data-index='"+index+"' data-type='"+action.type+"'>"+img+"<div class='omni-item-details'><div class='omni-item-name'>"+action.title+"</div><div class='omni-item-desc'>"+action.desc+"</div></div>"+keys+"<div class='omni-select'>Select <span class='omni-shortcut'>⏎</span></div></div>");
-		}
-		if (!action.emoji) {
-			var loadimg = new Image();
-			loadimg.src = action.favIconUrl;
+  function escapeHtml(text) {
+    if (typeof legacyUtils.escapeHtml === 'function') {
+      return legacyUtils.escapeHtml(text);
+    }
+    return String(text || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
-			// Favicon doesn't load, use a fallback
-			loadimg.onerror = () => {
-				$(".omni-item[data-index='"+index+"'] img").attr("src", chrome.runtime.getURL("/assets/globe.svg"));
-			}
-		}
-	}
+  function sendRuntimeMessage(payload, callback) {
+    if (typeof runtimeApi.sendMessage === 'function') {
+      runtimeApi.sendMessage(payload, callback);
+      return;
+    }
+    try {
+      chrome.runtime.sendMessage(payload, (response) => {
+        if (chrome.runtime.lastError) {
+          if (typeof callback === 'function') callback(null);
+          return;
+        }
+        if (typeof callback === 'function') callback(response);
+      });
+    } catch (_) {
+      if (typeof callback === 'function') callback(null);
+    }
+  }
 
-	// Add actions to the omni
-	function populateOmni() {
-		$("#omni-extension #omni-list").html("");
-		actions.forEach((action, index) => {
-			var keys = "";
-			if (action.keycheck) {
-					keys = "<div class='omni-keys'>";
-					action.keys.forEach(function(key){
-						keys += "<span class='omni-shortcut'>"+key+"</span>";
-					});
-					keys += "</div>";
-			}
-			
-			// Check if the action has an emoji or a favicon
-			if (!action.emoji) {
-				var onload = 'if ("naturalHeight" in this) {if (this.naturalHeight + this.naturalWidth === 0) {this.onerror();return;}} else if (this.width + this.height == 0) {this.onerror();return;}';
-				var img = "<img src='"+action.favIconUrl+"' alt='favicon' onload='"+onload+"' onerror='this.src=&quot;"+chrome.runtime.getURL("/assets/globe.svg")+"&quot;' class='omni-icon'>";
-				renderAction(action, index, keys, img);
-			} else {
-				var img = "<span class='omni-emoji-action'>"+action.emojiChar+"</span>";
-				renderAction(action, index, keys, img);
-			}
-		})
-		$(".omni-extension #omni-results").html(actions.length+" results");
-	}
+  function updateResultsCount() {
+    if (!dom.results) return;
+    dom.results.textContent = state.visibleItems.length + ' results';
+  }
 
-	// Add filtered actions to the omni
-	function populateOmniFilter(actions) {
-		isFiltered = true;
-		$("#omni-extension #omni-list").html("");
-		const renderRow = (index) => {
-			const action = actions[index]
-			var keys = "";
-			if (action.keycheck) {
-					keys = "<div class='omni-keys'>";
-					action.keys.forEach(function(key){
-						keys += "<span class='omni-shortcut'>"+key+"</span>";
-					});
-					keys += "</div>";
-			}
-			var img = "<img src='"+action.favIconUrl+"' alt='favicon' onerror='this.src=&quot;"+chrome.runtime.getURL("/assets/globe.svg")+"&quot;' class='omni-icon'>";
-			if (action.emoji) {
-				img = "<span class='omni-emoji-action'>"+action.emojiChar+"</span>"
-			}
-			if (index != 0) {
-				return $("<div class='omni-item' data-index='"+index+"' data-type='"+action.type+"' data-url='"+action.url+"'>"+img+"<div class='omni-item-details'><div class='omni-item-name'>"+action.title+"</div><div class='omni-item-desc'>"+action.url+"</div></div>"+keys+"<div class='omni-select'>Select <span class='omni-shortcut'>⏎</span></div></div>")[0]
-			} else {
-				return $("<div class='omni-item omni-item-active' data-index='"+index+"' data-type='"+action.type+"' data-url='"+action.url+"'>"+img+"<div class='omni-item-details'><div class='omni-item-name'>"+action.title+"</div><div class='omni-item-desc'>"+action.url+"</div></div>"+keys+"<div class='omni-select'>Select <span class='omni-shortcut'>⏎</span></div></div>")[0]
-			}
-		}
-		actions.length && new VirtualizedList.default($("#omni-extension #omni-list")[0], {
-			height: 400,
-			rowHeight: 60,
-			rowCount: actions.length,
-			renderRow,
-			onMount: () => $(".omni-extension #omni-results").html(actions.length+" results"),
-		});
-	}
+  function setSelectedIndex(idx) {
+    if (listRenderer && typeof listRenderer.setSelectedIndex === 'function') {
+      const next = listRenderer.setSelectedIndex(idx);
+      state.selectedIndex = next;
+      return;
+    }
 
-	// Open the omni
-	function openOmni() {
-		chrome.runtime.sendMessage({request:"get-actions"}, (response) => {
-			isOpen = true;
-			actions = response.actions;
-			$("#omni-extension input").val("");
-			populateOmni();
-			$("html, body").stop();
-			$("#omni-extension").removeClass("omni-closing");
-			window.setTimeout(() => {
-				$("#omni-extension input").focus();
-				focusLock.on($("#omni-extension input").get(0));
-				$("#omni-extension input").focus();
-			}, 100);
-		});
-	}
+    if (!state.visibleItems.length) {
+      state.selectedIndex = 0;
+      return;
+    }
+    const next = Math.max(0, Math.min(idx, state.visibleItems.length - 1));
+    state.selectedIndex = next;
 
-	// Close the omni
-	function closeOmni() {
-		if (window.location.href == "chrome-extension://mpanekjjajcabgnlbabmopeenljeoggm/newtab.html") {
-			chrome.runtime.sendMessage({request:"restore-new-tab"});
-		} else {
-			isOpen = false;
-			$("#omni-extension").addClass("omni-closing");
-		}
-	}
+    const nodes = qa('.omni-item', dom.list);
+    nodes.forEach((node, i) => {
+      if (i === next) {
+        node.classList.add('omni-item-active');
+      } else {
+        node.classList.remove('omni-item-active');
+      }
+    });
 
-	// Hover over an action in the omni
-	function hoverItem() {
-		$(".omni-item-active").removeClass("omni-item-active");
-		$(this).addClass("omni-item-active");
-	}
+    const active = nodes[next];
+    if (active) {
+      active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }
 
-	// Show a toast when an action has been performed
-	function showToast(action) {
-		$("#omni-extension-toast span").html('"'+action.title+'" has been successfully performed');
-		$("#omni-extension-toast").addClass("omni-show-toast");
-		setTimeout(() => {
-			$(".omni-show-toast").removeClass("omni-show-toast");
-		}, 3000)
-	}
+  function createKeysHtml(action) {
+    if (!action.keycheck || !Array.isArray(action.keys) || !action.keys.length) return '';
+    const keys = action.keys.map((key) => '<span class="omni-shortcut">' + escapeHtml(key) + '</span>').join('');
+    return '<div class="omni-keys">' + keys + '</div>';
+  }
 
-	// Autocomplete commands. Since they all start with different letters, it can be the default behavior
-	function checkShortHand(e, value) {
-		var el = $(".omni-extension input");
-		if (e.keyCode != 8) {
-			if (value == "/t") {
-				el.val("/tabs ")
-			} else if (value == "/b") {
-				el.val("/bookmarks ")
-			} else if (value == "/h") {
-				el.val("/history ");
-			} else if (value == "/r") {
-				el.val("/remove ");
-			} else if (value == "/a") {
-				el.val("/actions ");
-			}
-		} else {
-			if (value == "/tabs" || value == "/bookmarks" || value == "/actions" || value == "/remove" || value == "/history") {
-				el.val("");
-			}
-		}
-	}
+  function createIconHtml(action) {
+    if (action.emoji) {
+      return '<span class="omni-emoji-action">' + escapeHtml(action.emojiChar || '📄') + '</span>';
+    }
+    const src = escapeHtml(action.favIconUrl || chrome.runtime.getURL('/assets/globe.svg'));
+    const fallback = escapeHtml(chrome.runtime.getURL('/assets/globe.svg'));
+    return '<img src="' + src + '" alt="favicon" class="omni-icon" onerror="this.src=\'' + fallback + '\'">';
+  }
 
-	// Add protocol
-	function addhttp(url) {
-			if (!/^(?:f|ht)tps?\:\/\//.test(url)) {
-					url = "http://" + url;
-			}
-			return url;
-	}
+  function createItemNode(item, idx) {
+    const node = document.createElement('div');
+    node.className = 'omni-item' + (idx === state.selectedIndex ? ' omni-item-active' : '');
+    node.dataset.index = String(idx);
+    node.dataset.type = item.type || '';
+    if (item.url) node.dataset.url = item.url;
 
-	// Check if valid url
-	function validURL(str) {
-		var pattern = new RegExp('^(https?:\\/\\/)?'+ // protocol
-			'((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // domain name
-			'((\\d{1,3}\\.){3}\\d{1,3}))'+ // OR ip (v4) address
-			'(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
-			'(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
-			'(\\#[-a-z\\d_]*)?$','i'); // fragment locator
-		return !!pattern.test(str);
-	}
+    const title = escapeHtml(item.title || '');
+    const desc = escapeHtml(item.desc || item.url || '');
+    node.innerHTML =
+      createIconHtml(item) +
+      '<div class="omni-item-details">' +
+      '<div class="omni-item-name">' + title + '</div>' +
+      '<div class="omni-item-desc">' + desc + '</div>' +
+      '</div>' +
+      createKeysHtml(item) +
+      '<div class="omni-select">Select <span class="omni-shortcut">⏎</span></div>';
 
-	// Search for an action in the omni
-	function search(e) {
-		if (e.keyCode == 37 || e.keyCode == 38 || e.keyCode == 39 || e.keyCode == 40 || e.keyCode == 13 || e.keyCode == 37) {
-			return;
-		}
-		var value = $(this).val().toLowerCase();
-		checkShortHand(e, value);
-		value = $(this).val().toLowerCase();
-		if (value.startsWith("/history")) {
-			$(".omni-item[data-index='"+actions.findIndex(x => x.action == "search")+"']").hide();
-			$(".omni-item[data-index='"+actions.findIndex(x => x.action == "goto")+"']").hide();
-			var tempvalue = value.replace("/history ", "");
-			var query = "";
-			if (tempvalue != "/history") {
-				query = value.replace("/history ", "");
-			}
-			chrome.runtime.sendMessage({request:"search-history", query:query}, (response) => {
-				populateOmniFilter(response.history);
-			});
-		} else if (value.startsWith("/bookmarks")) {
-			$(".omni-item[data-index='"+actions.findIndex(x => x.action == "search")+"']").hide();
-			$(".omni-item[data-index='"+actions.findIndex(x => x.action == "goto")+"']").hide();
-			var tempvalue = value.replace("/bookmarks ", "");
-			if (tempvalue != "/bookmarks" && tempvalue != "") {
-				var query = value.replace("/bookmarks ", "");
-				chrome.runtime.sendMessage({request:"search-bookmarks", query:query}, (response) => {
-					populateOmniFilter(response.bookmarks);
-				});
-			} else {
-				populateOmniFilter(actions.filter(x => x.type == "bookmark"));
-			}
-		} else {
-			if (isFiltered) {
-				populateOmni();
-				isFiltered = false;
-			}
-			$(".omni-extension #omni-list .omni-item").filter(function(){
-				if (value.startsWith("/tabs")) {
-					$(".omni-item[data-index='"+actions.findIndex(x => x.action == "search")+"']").hide();
-					$(".omni-item[data-index='"+actions.findIndex(x => x.action == "goto")+"']").hide();
-					var tempvalue = value.replace("/tabs ", "");
-					if (tempvalue == "/tabs") {
-						$(this).toggle($(this).attr("data-type") == "tab");
-					} else {
-						tempvalue = value.replace("/tabs ", "");
-						$(this).toggle(($(this).find(".omni-item-name").text().toLowerCase().indexOf(tempvalue) > -1 || $(this).find(".omni-item-desc").text().toLowerCase().indexOf(tempvalue) > -1) && $(this).attr("data-type") == "tab");
-					}
-				} else if (value.startsWith("/remove")) {
-					$(".omni-item[data-index='"+actions.findIndex(x => x.action == "search")+"']").hide();
-					$(".omni-item[data-index='"+actions.findIndex(x => x.action == "goto")+"']").hide();
-					var tempvalue = value.replace("/remove ", "")
-					if (tempvalue == "/remove") {
-						$(this).toggle($(this).attr("data-type") == "bookmark" || $(this).attr("data-type") == "tab");
-					} else {
-						tempvalue = value.replace("/remove ", "");
-						$(this).toggle(($(this).find(".omni-item-name").text().toLowerCase().indexOf(tempvalue) > -1 || $(this).find(".omni-item-desc").text().toLowerCase().indexOf(tempvalue) > -1) && ($(this).attr("data-type") == "bookmark" || $(this).attr("data-type") == "tab"));
-					}
-				} else if (value.startsWith("/actions")) {
-					$(".omni-item[data-index='"+actions.findIndex(x => x.action == "search")+"']").hide();
-					$(".omni-item[data-index='"+actions.findIndex(x => x.action == "goto")+"']").hide();
-					var tempvalue = value.replace("/actions ", "")
-					if (tempvalue == "/actions") {
-						$(this).toggle($(this).attr("data-type") == "action");
-					} else {
-						tempvalue = value.replace("/actions ", "");
-						$(this).toggle(($(this).find(".omni-item-name").text().toLowerCase().indexOf(tempvalue) > -1 || $(this).find(".omni-item-desc").text().toLowerCase().indexOf(tempvalue) > -1) && $(this).attr("data-type") == "action");
-					}
-				} else {
-					$(this).toggle($(this).find(".omni-item-name").text().toLowerCase().indexOf(value) > -1 || $(this).find(".omni-item-desc").text().toLowerCase().indexOf(value) > -1);
-					if (value == "") {
-						$(".omni-item[data-index='"+actions.findIndex(x => x.action == "search")+"']").hide();
-						$(".omni-item[data-index='"+actions.findIndex(x => x.action == "goto")+"']").hide();
-					} else if (!validURL(value)) {
-						$(".omni-item[data-index='"+actions.findIndex(x => x.action == "search")+"']").show();
-						$(".omni-item[data-index='"+actions.findIndex(x => x.action == "goto")+"']").hide();
-						$(".omni-item[data-index='"+actions.findIndex(x => x.action == "search")+"'] .omni-item-name").html('\"'+value+'\"');
-					} else {
-						$(".omni-item[data-index='"+actions.findIndex(x => x.action == "search")+"']").hide();
-						$(".omni-item[data-index='"+actions.findIndex(x => x.action == "goto")+"']").show();
-						$(".omni-item[data-index='"+actions.findIndex(x => x.action == "goto")+"'] .omni-item-name").html(value);
-					}
-				}
-			});
-		}
-		
-		$(".omni-extension #omni-results").html($("#omni-extension #omni-list .omni-item:visible").length+" results");
-		$(".omni-item-active").removeClass("omni-item-active");
-		$(".omni-extension #omni-list .omni-item:visible").first().addClass("omni-item-active");
-	}
+    node.addEventListener('mouseover', () => {
+      setSelectedIndex(idx);
+    });
 
-	// Handle actions from the omni
-	function handleAction(e) {
-		var action = actions[$(".omni-item-active").attr("data-index")];
-		closeOmni();
-		if ($(".omni-extension input").val().toLowerCase().startsWith("/remove")) {
-			chrome.runtime.sendMessage({request:"remove", type:action.type, action:action});
-		} else if ($(".omni-extension input").val().toLowerCase().startsWith("/history")) {
-			if (e.ctrlKey || e.metaKey) {
-				window.open($(".omni-item-active").attr("data-url"));
-			} else {
-				window.open($(".omni-item-active").attr("data-url"), "_self");
-			}
-		} else if ($(".omni-extension input").val().toLowerCase().startsWith("/bookmarks")) {
-			if (e.ctrlKey || e.metaKey) {
-				window.open($(".omni-item-active").attr("data-url"));
-			} else {
-				window.open($(".omni-item-active").attr("data-url"), "_self");
-			}
-		} else {
-			chrome.runtime.sendMessage({request:action.action, tab:action, query:$(".omni-extension input").val()});
-			switch (action.action) {
-				case "bookmark":
-					if (e.ctrlKey || e.metaKey) {
-						window.open(action.url);
-					} else {
-						window.open(action.url, "_self");
-					}
-					break;
-				case "scroll-bottom":
-					window.scrollTo(0,document.body.scrollHeight);
-					showToast(action);
-					break;
-				case "scroll-top":
-					window.scrollTo(0,0);
-					break;
-				case "navigation":
-					if (e.ctrlKey || e.metaKey) {
-						window.open(action.url);
-					} else {
-						window.open(action.url, "_self");
-					}
-					break;
-				case "fullscreen":
-					var elem = document.documentElement;
-					elem.requestFullscreen();
-					break;
-				case "new-tab":
-					window.open("");
-					break;
-				case "email":
-					window.open("mailto:");
-					break;
-				case "url":
-					if (e.ctrlKey || e.metaKey) {
-						window.open(action.url);
-					} else {
-						window.open(action.url, "_self");
-					}
-					break;
-				case "goto":
-					if (e.ctrlKey || e.metaKey) {
-						window.open(addhttp($(".omni-extension input").val()));
-					} else {
-						window.open(addhttp($(".omni-extension input").val()), "_self");
-					}
-					break;
-				case "print":
-					window.print();
-					break;
-				case "remove-all":
-				case "remove-history":
-				case "remove-cookies":
-				case "remove-cache":
-				case "remove-local-storage":
-				case "remove-passwords":
-					showToast(action);
-					break;
-			}
-		}
+    node.addEventListener('click', (e) => {
+      setSelectedIndex(idx);
+      handleAction(e);
+    });
 
-		// Fetch actions again
-		chrome.runtime.sendMessage({request:"get-actions"}, (response) => {
-			actions = response.actions;
-			populateOmni();
-		});
-	}
+    return node;
+  }
 
-	// Customize the shortcut to open the Omni box
-	function openShortcuts() {
-		chrome.runtime.sendMessage({request:"extensions/shortcuts"});
-	}
+  function renderItems(items) {
+    state.visibleItems = items.slice(0, 300);
+    state.selectedIndex = 0;
 
+    if (listRenderer && typeof listRenderer.render === 'function') {
+      state.visibleItems = listRenderer.render(state.visibleItems, state.selectedIndex);
+      state.selectedIndex = listRenderer.setSelectedIndex(0);
+      return;
+    }
 
-	// Check which keys are down
-	var down = [];
+    if (!dom.list) return;
+    dom.list.innerHTML = '';
 
-	$(document).keydown((e) => {
-		down[e.keyCode] = true;
-		if (down[38]) {
-			// Up key
-			if ($(".omni-item-active").prevAll("div").not(":hidden").first().length) {
-				var previous = $(".omni-item-active").prevAll("div").not(":hidden").first();
-				$(".omni-item-active").removeClass("omni-item-active");
-				previous.addClass("omni-item-active");
-				previous[0].scrollIntoView({block:"nearest", inline:"nearest"});
-			}
-		} else if (down[40]) {
-			// Down key
-			if ($(".omni-item-active").nextAll("div").not(":hidden").first().length) {
-				var next = $(".omni-item-active").nextAll("div").not(":hidden").first();
-				$(".omni-item-active").removeClass("omni-item-active");
-				next.addClass("omni-item-active");
-				next[0].scrollIntoView({block:"nearest", inline:"nearest"});
-			}
-		} else if (down[27] && isOpen) {
-			// Esc key
-			closeOmni();
-		} else if (down[13] && isOpen) {
-			// Enter key
-			handleAction(e);
-		}
-	}).keyup((e) => {
-		if (down[18] && down[16] && down[80]) {
-			if (actions.find(x => x.action == "pin") != undefined) {
-				chrome.runtime.sendMessage({request:"pin-tab"});
-			} else {
-				chrome.runtime.sendMessage({request:"unpin-tab"});
-			}
-			chrome.runtime.sendMessage({request:"get-actions"}, (response) => {
-				actions = response.actions;
-				populateOmni();
-			});
-		} else if (down[18] && down[16] && down[77]) {
-			if (actions.find(x => x.action == "mute") != undefined) {
-				chrome.runtime.sendMessage({request:"mute-tab"});
-			} else {
-				chrome.runtime.sendMessage({request:"unmute-tab"});
-			}
-			chrome.runtime.sendMessage({request:"get-actions"}, (response) => {
-				actions = response.actions;
-				populateOmni();
-			});
-		} else if (down[18] && down[16] && down[67]) {
-			window.open("mailto:");
-		}
+    const frag = document.createDocumentFragment();
+    state.visibleItems.forEach((item, idx) => {
+      frag.appendChild(createItemNode(item, idx));
+    });
+    dom.list.appendChild(frag);
+    updateResultsCount();
+  }
 
-		down = [];
-	});
+  function addHttp(url) {
+    if (typeof legacyUtils.addHttp === 'function') {
+      return legacyUtils.addHttp(url);
+    }
+    return /^(?:f|ht)tps?\:\/\//.test(url) ? url : 'http://' + url;
+  }
 
-	// Recieve messages from background
-	chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-		if (message.request == "open-omni") {
-			if (isOpen) {
-				closeOmni();
-			} else {
-				openOmni();
-			}
-		} else if (message.request == "close-omni") {
-			closeOmni();
-		}
-	});
+  function filterByText(list, query) {
+    if (typeof legacyUtils.filterByText === 'function') {
+      return legacyUtils.filterByText(list, query);
+    }
+    return list.filter((item) => {
+      const title = String(item.title || '').toLowerCase();
+      const desc = String(item.desc || item.url || '').toLowerCase();
+      return title.includes(query) || desc.includes(query);
+    });
+  }
 
-	$(document).on("click", "#open-page-omni-extension-thing", openShortcuts);
-	$(document).on("mouseover", ".omni-extension .omni-item:not(.omni-item-active)", hoverItem);
-	$(document).on("keyup", ".omni-extension input", search);
-	$(document).on("click", ".omni-item-active", handleAction);
-	$(document).on("click", ".omni-extension #omni-overlay", closeOmni);
-});
+  function runSearch(value) {
+    if (!searchEngine || typeof searchEngine.applyQuery !== 'function') {
+      const fallback = filterByText(state.actions, String(value || '').toLowerCase());
+      renderItems(fallback);
+      return;
+    }
+    searchEngine.applyQuery(value || '', renderItems);
+  }
+
+  function applySearch(e) {
+    if (!dom.input) return;
+
+    const keyCode = e && typeof e.keyCode === 'number' ? e.keyCode : 0;
+    if ([37, 38, 39, 40, 13].includes(keyCode)) return;
+
+    if (searchEngine && typeof searchEngine.normalizeShortcut === 'function') {
+      const normalized = searchEngine.normalizeShortcut(keyCode, dom.input.value.toLowerCase());
+      if (normalized !== dom.input.value) {
+        dom.input.value = normalized;
+      }
+    }
+
+    runSearch(dom.input.value);
+  }
+
+  function showToast(action) {
+    if (!dom.toast || !dom.toastText) return;
+    dom.toastText.textContent = '"' + (action.title || 'Action') + '" has been successfully performed';
+    dom.toast.classList.add('omni-show-toast');
+    window.setTimeout(() => {
+      if (dom.toast) dom.toast.classList.remove('omni-show-toast');
+    }, 3000);
+  }
+
+  function closeOmni() {
+    if (window.location.href === state.newTabUrl) {
+      sendRuntimeMessage({ request: 'restore-new-tab' });
+      return;
+    }
+    state.isOpen = false;
+    if (dom.root) dom.root.classList.add('omni-closing');
+  }
+
+  function openOmni() {
+    refreshActions(() => {
+      state.isOpen = true;
+      if (!dom.root || !dom.input) return;
+      dom.input.value = '';
+      dom.root.classList.remove('omni-closing');
+      runSearch('');
+      window.setTimeout(() => {
+        dom.input.focus();
+        if (window.focusLock && typeof window.focusLock.on === 'function') {
+          window.focusLock.on(dom.input);
+        }
+        dom.input.focus();
+      }, 100);
+    });
+  }
+
+  function refreshActions(onDone) {
+    sendRuntimeMessage({ request: 'get-actions' }, (response) => {
+      state.actions = (response && response.actions) || [];
+      if (typeof onDone === 'function') onDone();
+    });
+  }
+
+  function handleAction(e) {
+    const action = state.visibleItems[state.selectedIndex];
+    if (!action) return;
+
+    const queryValue = dom.input ? dom.input.value : '';
+
+    if (actionEngine && typeof actionEngine.execute === 'function') {
+      actionEngine.execute(action, { queryValue: queryValue, event: e });
+    } else {
+      closeOmni();
+      sendRuntimeMessage({ request: action.action, tab: action, query: queryValue });
+    }
+
+    refreshActions(() => {
+      if (state.isOpen) runSearch(dom.input ? dom.input.value : '');
+    });
+  }
+
+  function moveSelection(delta) {
+    if (!state.visibleItems.length) return;
+    setSelectedIndex(state.selectedIndex + delta);
+  }
+
+  function openShortcuts() {
+    sendRuntimeMessage({ request: 'extensions/shortcuts' });
+  }
+
+  function onDocumentKeydown(e) {
+    state.downKeys.add(e.keyCode);
+
+    if (!state.isOpen) return;
+
+    if (e.keyCode === 38) {
+      e.preventDefault();
+      moveSelection(-1);
+    } else if (e.keyCode === 40) {
+      e.preventDefault();
+      moveSelection(1);
+    } else if (e.keyCode === 27) {
+      e.preventDefault();
+      closeOmni();
+    } else if (e.keyCode === 13) {
+      e.preventDefault();
+      handleAction(e);
+    }
+  }
+
+  function onDocumentKeyup(e) {
+    if (state.downKeys.has(18) && state.downKeys.has(16) && state.downKeys.has(80)) {
+      if (state.actions.find((x) => x.action === 'pin')) {
+        sendRuntimeMessage({ request: 'pin-tab' });
+      } else {
+        sendRuntimeMessage({ request: 'unpin-tab' });
+      }
+      refreshActions(() => {
+        if (state.isOpen) runSearch(dom.input ? dom.input.value : '');
+      });
+    } else if (state.downKeys.has(18) && state.downKeys.has(16) && state.downKeys.has(77)) {
+      if (state.actions.find((x) => x.action === 'mute')) {
+        sendRuntimeMessage({ request: 'mute-tab' });
+      } else {
+        sendRuntimeMessage({ request: 'unmute-tab' });
+      }
+      refreshActions(() => {
+        if (state.isOpen) runSearch(dom.input ? dom.input.value : '');
+      });
+    } else if (state.downKeys.has(18) && state.downKeys.has(16) && state.downKeys.has(67)) {
+      window.open('mailto:');
+    }
+
+    if (e.key === 'Escape' && state.isOpen) {
+      sendRuntimeMessage({ request: 'close-omni' });
+    }
+
+    state.downKeys.clear();
+  }
+
+  function onRuntimeMessage(message) {
+    if (message.request === 'open-omni') {
+      if (state.isOpen) closeOmni();
+      else openOmni();
+    } else if (message.request === 'close-omni') {
+      closeOmni();
+    }
+  }
+
+  function attachUiListeners() {
+    if (!dom.input || !dom.root) return;
+
+    dom.input.addEventListener('keyup', applySearch);
+
+    const overlay = q('#omni-overlay', dom.root);
+    if (overlay) {
+      overlay.addEventListener('click', closeOmni);
+    }
+
+    const shortcutsButton = q('#open-page-omni-extension-thing', dom.root);
+    if (shortcutsButton) {
+      shortcutsButton.addEventListener('click', openShortcuts);
+    }
+  }
+
+  function injectTemplateAndBoot() {
+    fetch(chrome.runtime.getURL('/content.html'))
+      .then((res) => res.text())
+      .then((html) => {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = html;
+        const children = Array.from(wrap.children);
+        children.forEach((child) => document.body.appendChild(child));
+
+        dom.root = q('#omni-extension');
+        dom.list = q('#omni-list');
+        dom.input = q('#omni-extension input');
+        dom.results = q('#omni-results');
+        dom.toast = q('#omni-extension-toast');
+        dom.toastText = q('#omni-extension-toast span');
+        dom.toastImg = q('#omni-extension-toast img');
+
+        if (typeof domApi.createRenderer === 'function') {
+          listRenderer = domApi.createRenderer({
+            listEl: dom.list,
+            resultsEl: dom.results,
+            escapeHtml: escapeHtml,
+            getFallbackIconUrl: function () {
+              return chrome.runtime.getURL('/assets/globe.svg');
+            },
+            onHover: function (idx) {
+              setSelectedIndex(idx);
+            },
+            onSelect: function (idx, e) {
+              setSelectedIndex(idx);
+              handleAction(e);
+            },
+          });
+        }
+
+        if (typeof searchApi.createSearchEngine === 'function') {
+          searchEngine = searchApi.createSearchEngine({
+            getActions: function () {
+              return state.actions;
+            },
+            sendMessage: sendRuntimeMessage,
+            filterByText: filterByText,
+            validURL:
+              typeof legacyUtils.validURL === 'function'
+                ? legacyUtils.validURL
+                : function (str) {
+                    return /^(https?:\/\/)?((([a-z\d]([a-z\d-]*[a-z\d])*)\.)+[a-z]{2,}|((\d{1,3}\.){3}\d{1,3}))(\:\d+)?(\/[-a-z\d%_.~+]*)*(\?[;&a-z\d%_.~+=-]*)?(\#[-a-z\d_]*)?$/i.test(
+                      str || ''
+                    );
+                  },
+          });
+        }
+
+        if (typeof actionsApi.createActionEngine === 'function') {
+          actionEngine = actionsApi.createActionEngine({
+            sendMessage: sendRuntimeMessage,
+            addHttp: addHttp,
+            showToast: showToast,
+            closeOmni: closeOmni,
+            windowRef: window,
+            documentRef: document,
+          });
+        }
+
+        if (dom.toastImg) {
+          dom.toastImg.src = chrome.runtime.getURL('assets/check.svg');
+        }
+
+        attachUiListeners();
+
+        refreshActions();
+
+        if (window.location.href === state.newTabUrl) {
+          state.isOpen = true;
+          if (dom.root) dom.root.classList.remove('omni-closing');
+          window.setTimeout(() => {
+            if (dom.input) dom.input.focus();
+          }, 100);
+        }
+      })
+      .catch(() => {
+        // Ignore template injection errors in unsupported contexts.
+      });
+  }
+
+  function destroy() {
+    document.removeEventListener('keydown', onDocumentKeydown, true);
+    document.removeEventListener('keyup', onDocumentKeyup, true);
+    window.removeEventListener('pagehide', destroy);
+    if (typeof runtimeApi.removeMessageListener === 'function') {
+      runtimeApi.removeMessageListener(onRuntimeMessage);
+    } else {
+      try {
+        chrome.runtime.onMessage.removeListener(onRuntimeMessage);
+      } catch (_) {
+        // noop
+      }
+    }
+  }
+
+  document.addEventListener('keydown', onDocumentKeydown, true);
+  document.addEventListener('keyup', onDocumentKeyup, true);
+  if (typeof runtimeApi.addMessageListener === 'function') {
+    runtimeApi.addMessageListener(onRuntimeMessage);
+  } else {
+    try {
+      chrome.runtime.onMessage.addListener(onRuntimeMessage);
+    } catch (_) {
+      // Ignore missing runtime context.
+    }
+  }
+  window.addEventListener('pagehide', destroy);
+
+  injectTemplateAndBoot();
+})();
