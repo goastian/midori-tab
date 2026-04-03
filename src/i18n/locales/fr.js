@@ -148,4 +148,21 @@ export default {
     download: 'Télécharger',
     defer: 'Mettre à jour plus tard',
   },
+  omni: {
+    label: 'Menu de commandes',
+    placeholder: 'Tapez une commande ou recherchez…',
+    resultsLabel: 'Search results',
+    results: 'résultats',
+    navigate: 'naviguer',
+    select: 'sélectionner',
+    openInNewTab: 'nouvel onglet',
+    dismiss: 'fermer',
+    noResults: 'Aucun résultat',
+    categories: {
+      tabs: 'Onglets',
+      bookmarks: 'Favoris',
+      history: 'Historique',
+      actions: 'Actions',
+    },
+  },
 };

@@ -248,4 +248,21 @@ export default {
     download: 'Download',
     defer: 'Update later',
   },
+  omni: {
+    label: 'Command Menu',
+    placeholder: 'Type a command or search…',
+    resultsLabel: 'Search results',
+    results: 'results',
+    navigate: 'navigate',
+    select: 'select',
+    openInNewTab: 'new tab',
+    dismiss: 'dismiss',
+    noResults: 'No results found',
+    categories: {
+      tabs: 'Tabs',
+      bookmarks: 'Bookmarks',
+      history: 'History',
+      actions: 'Actions',
+    },
+  },
 };

@@ -148,4 +148,21 @@ export default {
     download: 'Скачать',
     defer: 'Обновить позже',
   },
+  omni: {
+    label: 'Меню команд',
+    placeholder: 'Введите команду или поиск…',
+    resultsLabel: 'Search results',
+    results: 'результатов',
+    navigate: 'навигация',
+    select: 'выбрать',
+    openInNewTab: 'новая вкладка',
+    dismiss: 'закрыть',
+    noResults: 'Нет результатов',
+    categories: {
+      tabs: 'Вкладки',
+      bookmarks: 'Закладки',
+      history: 'История',
+      actions: 'Действия',
+    },
+  },
 };
