@@ -8,7 +8,6 @@
     actions: [],
     visibleItems: [],
     selectedIndex: 0,
-    downKeys: new Set(),
     newTabUrl: chrome.runtime.getURL('newtab.html'),
   };
 
@@ -27,9 +26,13 @@
   const domApi = window.OmniLegacyDom || {};
   const searchApi = window.OmniLegacySearch || {};
   const actionsApi = window.OmniLegacyActions || {};
+  const inputApi = window.OmniLegacyInputController || {};
+  const lifecycleApi = window.OmniLegacyLifecycle || {};
   let listRenderer = null;
   let searchEngine = null;
   let actionEngine = null;
+  let inputController = null;
+  let lifecycleController = null;
 
   function q(sel, root) {
     return (root || document).querySelector(sel);
@@ -282,53 +285,15 @@
   }
 
   function onDocumentKeydown(e) {
-    state.downKeys.add(e.keyCode);
-
-    if (!state.isOpen) return;
-
-    if (e.keyCode === 38) {
-      e.preventDefault();
-      moveSelection(-1);
-    } else if (e.keyCode === 40) {
-      e.preventDefault();
-      moveSelection(1);
-    } else if (e.keyCode === 27) {
-      e.preventDefault();
-      closeOmni();
-    } else if (e.keyCode === 13) {
-      e.preventDefault();
-      handleAction(e);
+    if (inputController && typeof inputController.onDocumentKeydown === 'function') {
+      inputController.onDocumentKeydown(e);
     }
   }
 
   function onDocumentKeyup(e) {
-    if (state.downKeys.has(18) && state.downKeys.has(16) && state.downKeys.has(80)) {
-      if (state.actions.find((x) => x.action === 'pin')) {
-        sendRuntimeMessage({ request: 'pin-tab' });
-      } else {
-        sendRuntimeMessage({ request: 'unpin-tab' });
-      }
-      refreshActions(() => {
-        if (state.isOpen) runSearch(dom.input ? dom.input.value : '');
-      });
-    } else if (state.downKeys.has(18) && state.downKeys.has(16) && state.downKeys.has(77)) {
-      if (state.actions.find((x) => x.action === 'mute')) {
-        sendRuntimeMessage({ request: 'mute-tab' });
-      } else {
-        sendRuntimeMessage({ request: 'unmute-tab' });
-      }
-      refreshActions(() => {
-        if (state.isOpen) runSearch(dom.input ? dom.input.value : '');
-      });
-    } else if (state.downKeys.has(18) && state.downKeys.has(16) && state.downKeys.has(67)) {
-      window.open('mailto:');
+    if (inputController && typeof inputController.onDocumentKeyup === 'function') {
+      inputController.onDocumentKeyup(e);
     }
-
-    if (e.key === 'Escape' && state.isOpen) {
-      sendRuntimeMessage({ request: 'close-omni' });
-    }
-
-    state.downKeys.clear();
   }
 
   function onRuntimeMessage(message) {
@@ -420,6 +385,28 @@
           });
         }
 
+        if (typeof inputApi.createInputController === 'function') {
+          inputController = inputApi.createInputController({
+            isOpen: function () {
+              return state.isOpen;
+            },
+            moveSelection: moveSelection,
+            closeOmni: closeOmni,
+            handleAction: handleAction,
+            sendMessage: sendRuntimeMessage,
+            hasAction: function (actionName) {
+              return !!state.actions.find(function (x) {
+                return x.action === actionName;
+              });
+            },
+            refreshActions: refreshActions,
+            runSearch: runSearch,
+            getInputValue: function () {
+              return dom.input ? dom.input.value : '';
+            },
+          });
+        }
+
         if (dom.toastImg) {
           dom.toastImg.src = chrome.runtime.getURL('assets/check.svg');
         }
@@ -441,33 +428,30 @@
       });
   }
 
-  function destroy() {
-    document.removeEventListener('keydown', onDocumentKeydown, true);
-    document.removeEventListener('keyup', onDocumentKeyup, true);
-    window.removeEventListener('pagehide', destroy);
-    if (typeof runtimeApi.removeMessageListener === 'function') {
-      runtimeApi.removeMessageListener(onRuntimeMessage);
+  if (typeof lifecycleApi.createLifecycleController === 'function') {
+    lifecycleController = lifecycleApi.createLifecycleController({
+      documentRef: document,
+      windowRef: window,
+      onDocumentKeydown: onDocumentKeydown,
+      onDocumentKeyup: onDocumentKeyup,
+      onRuntimeMessage: onRuntimeMessage,
+      addMessageListener: runtimeApi.addMessageListener,
+      removeMessageListener: runtimeApi.removeMessageListener,
+    });
+    lifecycleController.attach();
+  } else {
+    document.addEventListener('keydown', onDocumentKeydown, true);
+    document.addEventListener('keyup', onDocumentKeyup, true);
+    if (typeof runtimeApi.addMessageListener === 'function') {
+      runtimeApi.addMessageListener(onRuntimeMessage);
     } else {
       try {
-        chrome.runtime.onMessage.removeListener(onRuntimeMessage);
+        chrome.runtime.onMessage.addListener(onRuntimeMessage);
       } catch (_) {
-        // noop
+        // Ignore missing runtime context.
       }
     }
   }
-
-  document.addEventListener('keydown', onDocumentKeydown, true);
-  document.addEventListener('keyup', onDocumentKeyup, true);
-  if (typeof runtimeApi.addMessageListener === 'function') {
-    runtimeApi.addMessageListener(onRuntimeMessage);
-  } else {
-    try {
-      chrome.runtime.onMessage.addListener(onRuntimeMessage);
-    } catch (_) {
-      // Ignore missing runtime context.
-    }
-  }
-  window.addEventListener('pagehide', destroy);
 
   injectTemplateAndBoot();
 })();

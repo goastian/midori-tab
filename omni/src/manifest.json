@@ -34,7 +34,7 @@
 				"<all_urls>"
 			],
 			"run_at": "document_end",
-			"js": ["focus.js", "search-utils.js", "runtime-messages.js", "content-dom.js", "search-engine.js", "action-engine.js", "content.js"],
+			"js": ["focus.js", "search-utils.js", "runtime-messages.js", "content-dom.js", "search-engine.js", "action-engine.js", "input-controller.js", "lifecycle-controller.js", "content.js"],
 			"css": ["content.css"]
 		}
 	],
