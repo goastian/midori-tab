@@ -1,25 +1,6 @@
 <template>
   <div class="search-box">
     <div class="search-inner">
-      <button class="engine-btn" @click.stop="toggleEngineMenu" ref="engineBtn">
-        <img :src="currentEngine.logo" :alt="currentEngine.label" class="engine-logo" />
-        <span class="engine-arrow" :class="{ open: engineMenuOpen }">▾</span>
-      </button>
-
-      <Transition name="fade">
-        <ul v-if="engineMenuOpen" class="engine-menu" ref="engineMenu">
-          <li
-            v-for="eng in engines"
-            :key="eng.id"
-            :class="{ active: eng.id === currentEngine.id }"
-            @click.stop="selectEngine(eng)"
-          >
-            <img :src="eng.logo" :alt="eng.label" class="engine-menu-logo" />
-            <span>{{ eng.label }}</span>
-          </li>
-        </ul>
-      </Transition>
-
       <input
         ref="input"
         v-model="query"
@@ -42,22 +23,12 @@
 import { Search } from 'lucide-vue-next';
 import useI18nStore from '../stores/useI18nStore.js';
 
-const ENGINES = [
-  {
-    id: 'astiango',
-    logo: 'https://astian.org/wp-content/uploads/2025/06/favicon-1.png',
-    label: 'AstianGO',
-    url: 'https://astiango.com/?q=',
-  },
-  {
-    id: 'qwant',
-    logo: 'https://www.qwant.com/favicon.ico',
-    label: 'Qwant',
-    url: 'https://www.qwant.com/?l=es&q=',
-  },
-];
-
-const ENGINE_STORAGE_KEY = 'midori_search_engine';
+const DEFAULT_ENGINE = {
+  id: 'astiango',
+  logo: 'https://astian.org/wp-content/uploads/2025/06/favicon-1.png',
+  label: 'AstianGO',
+  url: 'https://astiango.com/?q=',
+};
 
 export default {
   name: 'SearchBox',
@@ -72,20 +43,15 @@ export default {
   },
 
   data() {
-    const savedId = localStorage.getItem(ENGINE_STORAGE_KEY);
-    const saved = ENGINES.find(e => e.id === savedId);
     return {
       query: '',
-      engines: ENGINES,
-      currentEngine: saved || ENGINES[0],
-      engineMenuOpen: false,
       i18n: useI18nStore(),
     };
   },
 
   computed: {
     placeholder() {
-      return this.i18n.t.search?.placeholder || `Buscar con ${this.currentEngine.label}...`;
+      return this.i18n.t.search?.placeholder || `Buscar con ${DEFAULT_ENGINE.label}...`;
     },
     searchLabel() {
       return this.i18n.t.search?.button || 'Buscar';
@@ -93,11 +59,11 @@ export default {
   },
 
   methods: {
-    /** Performs browser search using the selected engine. */
+    /** Performs browser search using the default engine. */
     search() {
       const q = this.query.trim();
       if (!q) return;
-      const url = `${this.currentEngine.url}${encodeURIComponent(q)}`;
+      const url = `${DEFAULT_ENGINE.url}${encodeURIComponent(q)}`;
       const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
       if (this.searchTarget === 'New Tab') {
         browserAPI.tabs.create({ url });
@@ -110,35 +76,6 @@ export default {
     onInput() {
       // placeholder for future suggestions
     },
-
-    toggleEngineMenu() {
-      this.engineMenuOpen = !this.engineMenuOpen;
-    },
-
-    selectEngine(eng) {
-      this.currentEngine = eng;
-      this.engineMenuOpen = false;
-      localStorage.setItem(ENGINE_STORAGE_KEY, eng.id);
-      this.$refs.input?.focus();
-    },
-
-    handleClickOutside(event) {
-      if (
-        this.$refs.engineBtn &&
-        !this.$refs.engineBtn.contains(event.target) &&
-        this.$refs.engineMenu &&
-        !this.$refs.engineMenu.contains(event.target)
-      ) {
-        this.engineMenuOpen = false;
-      }
-    },
-  },
-
-  mounted() {
-    document.addEventListener('click', this.handleClickOutside);
-  },
-  beforeUnmount() {
-    document.removeEventListener('click', this.handleClickOutside);
   },
 };
 </script>
@@ -165,84 +102,6 @@ export default {
   border-radius: var(--radius-sm, 6px);
   padding: 0.25rem 0.5rem;
   position: relative;
-}
-
-/* Engine selector button */
-.engine-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.35rem 0.5rem;
-  border-radius: var(--radius-sm, 6px);
-  transition: background var(--transition-fast, 0.1s ease);
-  flex-shrink: 0;
-}
-
-.engine-btn:hover {
-  background: var(--color-accent-bg, rgba(4,164,105,0.08));
-}
-
-.engine-logo {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  object-fit: contain;
-}
-
-.engine-arrow {
-  font-size: 0.65rem;
-  color: var(--color-text-muted, #5A9A82);
-  transition: transform 0.15s ease;
-}
-
-.engine-arrow.open {
-  transform: rotate(180deg);
-}
-
-/* Engine dropdown menu */
-.engine-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 30;
-  background: var(--surface-overlay, #1E2D3D);
-  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-sm, 6px);
-  box-shadow: var(--shadow-lg, 0 4px 16px rgba(0,0,0,0.14));
-  list-style: none;
-  padding: 4px;
-  min-width: 160px;
-}
-
-.engine-menu li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-sm, 6px);
-  cursor: pointer;
-  font-size: 0.85rem;
-  color: var(--color-text, #C4F0E0);
-  transition: background var(--transition-fast, 0.1s ease);
-}
-
-.engine-menu li:hover {
-  background: var(--color-accent-bg, rgba(4,164,105,0.08));
-}
-
-.engine-menu li.active {
-  background: var(--color-accent-bg, rgba(4,164,105,0.08));
-  font-weight: 600;
-}
-
-.engine-menu-logo {
-  width: 18px;
-  height: 18px;
-  border-radius: 3px;
-  object-fit: contain;
 }
 
 /* Search input */
@@ -280,15 +139,5 @@ export default {
 
 .search-btn:hover {
   background: var(--color-primary-hover, #4de0b2);
-}
-
-/* Transitions */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.1s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 </style>
