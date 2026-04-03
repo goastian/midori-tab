@@ -165,4 +165,21 @@ export default {
       actions: '操作',
     },
   },
+  omni: {
+    label: '命令菜单',
+    placeholder: '输入命令或搜索…',
+    resultsLabel: 'Search results',
+    results: '结果',
+    navigate: '导航',
+    select: '选择',
+    openInNewTab: '新标签页',
+    dismiss: '关闭',
+    noResults: '无结果',
+    categories: {
+      tabs: '标签页',
+      bookmarks: '书签',
+      history: '历史记录',
+      actions: '操作',
+    },
+  },
 };

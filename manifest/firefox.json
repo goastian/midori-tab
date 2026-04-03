@@ -1,4 +1,34 @@
 {
+  "manifest_version": 2,
+  "permissions": [
+    "storage",
+    "identity",
+    "tabs",
+    "activeTab",
+    "bookmarks",
+    "history",
+    "browsingData",
+    "search",
+    "https://api.rss2json.com/*",
+    "https://api.unsplash.com/*",
+    "https://api.github.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "http://marketplace.astian.org/*"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "browser_action": {
+    "default_icon": {
+      "16": "icons/16.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    },
+    "default_title": "Open Midori command menu"
+  },
+  "web_accessible_resources": ["globe.svg", "icons/*", "assets/*"],
   "browser_specific_settings": {
     "gecko": {
       "id": "midoritabs@astian.org",

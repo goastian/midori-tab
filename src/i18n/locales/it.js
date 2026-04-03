@@ -165,4 +165,21 @@ export default {
       actions: 'Azioni',
     },
   },
+  omni: {
+    label: 'Menu comandi',
+    placeholder: 'Digita un comando o cerca…',
+    resultsLabel: 'Search results',
+    results: 'risultati',
+    navigate: 'naviga',
+    select: 'seleziona',
+    openInNewTab: 'nuova scheda',
+    dismiss: 'chiudi',
+    noResults: 'Nessun risultato',
+    categories: {
+      tabs: 'Schede',
+      bookmarks: 'Segnalibri',
+      history: 'Cronologia',
+      actions: 'Azioni',
+    },
+  },
 };

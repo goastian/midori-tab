@@ -165,4 +165,21 @@ export default {
       actions: 'アクション',
     },
   },
+  omni: {
+    label: 'コマンドメニュー',
+    placeholder: 'コマンドまたは検索を入力…',
+    resultsLabel: 'Search results',
+    results: '件',
+    navigate: '移動',
+    select: '選択',
+    openInNewTab: '新しいタブ',
+    dismiss: '閉じる',
+    noResults: '結果なし',
+    categories: {
+      tabs: 'タブ',
+      bookmarks: 'ブックマーク',
+      history: '履歴',
+      actions: 'アクション',
+    },
+  },
 };

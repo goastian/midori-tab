@@ -9,7 +9,13 @@
   "permissions": [
     "storage",
     "identity",
-    "tabs"
+    "tabs",
+    "activeTab",
+    "bookmarks",
+    "history",
+    "browsingData",
+    "scripting",
+    "search"
   ],
   "host_permissions": [
     "https://api.rss2json.com/*",
@@ -18,6 +24,41 @@
     "http://localhost/*",
     "http://127.0.0.1/*",
     "http://marketplace.astian.org/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "open-omni": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "Command+Shift+K"
+      },
+      "description": "Open command menu"
+    }
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/16.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    },
+    "default_title": "Open Midori command menu"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "exclude_matches": ["chrome://*/*", "chrome-extension://*/*"],
+      "run_at": "document_idle",
+      "js": ["omni-content.js"],
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["globe.svg", "icons/*", "assets/*"],
+      "matches": ["<all_urls>"]
+    }
   ],
   "icons": {
     "16": "icons/16.png",
