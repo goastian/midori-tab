@@ -1,0 +1,537 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.w{padding:1.5rem 0;font-size:14px;color:var(--color-text-primary)}
+.h1{font-size:20px;font-weight:500;margin-bottom:4px}
+.h2{font-size:16px;font-weight:500;margin-bottom:12px}
+.sub-head{font-size:12px;color:var(--color-text-secondary);letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;font-weight:500}
+.cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.5rem}
+.cat-btn{padding:6px 12px;border-radius:20px;border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-size:12px;transition:all .15s;display:flex;align-items:center;gap:5px}
+.cat-btn .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cat-btn.on{font-weight:500;border-color:transparent}
+.feat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.feat{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:12px;padding:14px;cursor:pointer;transition:border-color .15s;display:flex;flex-direction:column;gap:8px}
+.feat:hover{border-color:var(--color-border-secondary)}
+.feat.expanded{border-color:var(--color-border-primary)}
+.feat-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.feat-name{font-weight:500;font-size:14px;line-height:1.3}
+.feat-meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
+.chip{display:inline-block;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:500;white-space:nowrap}
+.p1{background:#FCEBEB;color:#A32D2D}.p2{background:#FAEEDA;color:#854F0B}.p3{background:#EAF3DE;color:#3B6D11}
+.e1{background:#EEEDFE;color:#3C3489}.e2{background:#E1F5EE;color:#085041}.e3{background:#F1EFE8;color:#444441}
+.feat-desc{font-size:13px;color:var(--color-text-secondary);line-height:1.5;display:none}
+.feat.expanded .feat-desc{display:block}
+.cmd{display:inline-block;font-family:var(--font-mono);font-size:11px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:4px;padding:1px 5px;color:var(--color-text-primary)}
+.feat-detail{display:none;border-top:0.5px solid var(--color-border-tertiary);padding-top:10px;margin-top:2px}
+.feat.expanded .feat-detail{display:block}
+.example-row{display:flex;align-items:baseline;gap:6px;margin:4px 0;font-size:12px}
+.ex-label{color:var(--color-text-secondary);min-width:60px}
+.chevron{font-size:16px;color:var(--color-text-tertiary);transition:transform .2s;flex-shrink:0;line-height:1}
+.feat.expanded .chevron{transform:rotate(90deg)}
+.stats-row{display:flex;gap:8px;margin-bottom:1.5rem;flex-wrap:wrap}
+.stat{background:var(--color-background-secondary);border-radius:8px;padding:10px 14px;text-align:center;flex:1;min-width:80px}
+.stat-n{font-size:20px;font-weight:500}
+.stat-l{font-size:11px;color:var(--color-text-secondary);margin-top:1px}
+.cat-color-tab{width:3px;border-radius:3px;flex-shrink:0;align-self:stretch;min-height:14px}
+.hint{font-size:12px;color:var(--color-text-secondary);margin-bottom:14px}
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-bar select{font-size:12px;padding:4px 8px;border-radius:20px;border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer}
+.count-badge{background:var(--color-background-secondary);border-radius:10px;padding:2px 7px;font-size:11px;color:var(--color-text-secondary);margin-left:auto}
+</style>
+
+<div class="w">
+<div style="margin-bottom:1.5rem">
+  <div class="h1">Explorador de características — Omni 2.0</div>
+  <div style="color:var(--color-text-secondary);font-size:13px;margin-top:3px">Haz clic en cualquier tarjeta para ver detalles, ejemplos de uso y notas de implementación</div>
+</div>
+
+<div class="stats-row" id="stats-row"></div>
+
+<div class="filter-bar">
+  <select id="prio-filter" onchange="renderFeats()">
+    <option value="">Todas las prioridades</option>
+    <option value="1">Alta prioridad</option>
+    <option value="2">Media prioridad</option>
+    <option value="3">Baja prioridad</option>
+  </select>
+  <select id="effort-filter" onchange="renderFeats()">
+    <option value="">Todos los esfuerzos</option>
+    <option value="1">Esfuerzo alto</option>
+    <option value="2">Esfuerzo medio</option>
+    <option value="3">Esfuerzo bajo</option>
+  </select>
+  <span class="count-badge" id="count-badge">— funciones</span>
+</div>
+
+<div class="cats" id="cat-buttons"></div>
+<div class="feat-grid" id="feat-grid"></div>
+</div>
+
+<script>
+const CATS = [
+  {id:'nav',    label:'Navegación y tabs',    color:'#378ADD', bg:'#E6F1FB'},
+  {id:'search', label:'Búsqueda avanzada',    color:'#534AB7', bg:'#EEEDFE'},
+  {id:'prod',   label:'Productividad',        color:'#1D9E75', bg:'#E1F5EE'},
+  {id:'ai',     label:'IA e inteligencia',    color:'#BA7517', bg:'#FAEEDA'},
+  {id:'access', label:'Accesibilidad',        color:'#D85A30', bg:'#FAECE7'},
+  {id:'custom', label:'Personalización',      color:'#D4537E', bg:'#FBEAF0'},
+  {id:'collab', label:'Colaboración',         color:'#639922', bg:'#EAF3DE'},
+  {id:'sec',    label:'Seguridad y privacidad',color:'#5F5E5A',bg:'#F1EFE8'},
+  {id:'dev',    label:'Developer tools',      color:'#185FA5', bg:'#E6F1FB'},
+  {id:'media',  label:'Multimedia',           color:'#993556', bg:'#FBEAF0'},
+  {id:'wellness',label:'Bienestar digital',   color:'#3B6D11', bg:'#EAF3DE'},
+  {id:'ext',    label:'Extensibilidad',       color:'#3C3489', bg:'#EEEDFE'},
+];
+
+const FEATS = [
+  {cat:'nav', name:'Abrir en nueva pestaña con Ctrl+Enter', p:1, e:3,
+   desc:'Al seleccionar cualquier resultado, mantener Ctrl (o Cmd en Mac) mientras se presiona Enter para abrir en nueva pestaña en background. Comportamiento estándar en Alfred, Raycast y launchers modernos. Fix del issue #122 y #129.',
+   cmds:[], examples:['Seleccionar un bookmark + Ctrl+Enter → nueva pestaña','Historial + Shift+Enter → nueva ventana'],
+   note:'Solo requiere pasar el flag {active: false} a chrome.tabs.create()'},
+  {cat:'nav', name:'Sesiones de tabs guardadas', p:1, e:2,
+   desc:'Guardar el conjunto de tabs actuales como una sesión con nombre. Restaurar cualquier sesión desde el launcher. Las sesiones se guardan en chrome.storage.sync, replicándose entre dispositivos del mismo usuario.',
+   cmds:['/save-session trabajo','/sessions','/restore trabajo'],
+   examples:['Guardar tabs del proyecto actual','Restaurar sesión de investigación'],
+   note:'Usar chrome.tabs.query + chrome.storage.sync. Ver también la API de Tab Groups.'},
+  {cat:'nav', name:'Tab Groups desde el launcher', p:2, e:2,
+   desc:'Crear, renombrar, colapsar y gestionar Chrome Tab Groups directamente desde Omni. Agrupar tabs por dominio, proyecto o categoría con un solo comando.',
+   cmds:['/group trabajo','/ungroup','/collapse-group'],
+   examples:['Agrupar todas las tabs de github.com como "dev"','Colapsar grupo "noticias"'],
+   note:'chrome.tabGroups API disponible desde Chrome 89.'},
+  {cat:'nav', name:'Navegación entre iframes y paneles', p:2, e:2,
+   desc:'Mostrar en los resultados no solo tabs sino también iframes embebidos, sidebars (Gmail, Notion), y paneles de devtools. Útil para usuarios power con layouts complejos.',
+   cmds:['/panels','/frames'],
+   examples:['Buscar dentro de iframe de Figma embed'],
+   note:'Requiere comunicación entre content scripts de distintos contextos.'},
+  {cat:'nav', name:'Historial de navegación en árbol', p:3, e:2,
+   desc:'Visualizar el historial como un árbol de navegación (qué páginas llevaron a cuáles) en lugar de lista plana. Ver "cómo llegué aquí" y volver al punto de bifurcación.',
+   cmds:['/history-tree','/back-to'],
+   examples:['Ver el camino completo de investigación','Volver a la página raíz de esta sesión'],
+   note:'Disponible con chrome.history + almacenamiento de referrer en session storage.'},
+  {cat:'nav', name:'Previsualización de tab al hover', p:2, e:2,
+   desc:'Al navegar por resultados de tabs con el teclado, mostrar un thumbnail de la tab en tiempo real en el panel lateral del launcher. Evita abrir una tab solo para ver si es la correcta.',
+   cmds:[],
+   examples:['Ver preview de 5 tabs con el mismo título "Stack Overflow"'],
+   note:'chrome.tabs.captureVisibleTab() — requiere permiso "tabs" ya presente.'},
+  {cat:'nav', name:'Merge y split de ventanas', p:2, e:2,
+   desc:'Mover todas las tabs de una ventana a otra con un comando, o extraer tabs seleccionadas a nueva ventana. Gestión de ventanas sin arrastrar.',
+   cmds:['/merge-windows','/move-tab nueva-ventana'],
+   examples:['Juntar todas las ventanas en una','Extraer 3 tabs de investigación'],
+   note:'chrome.windows.create() + chrome.tabs.move()'},
+  {cat:'nav', name:'Modo "focus" — cerrar distracciones', p:2, e:2,
+   desc:'Con un comando, cerrar o suprimir todas las tabs excepto las marcadas como "esenciales". Silenciar notificaciones del navegador. Activar un timer de focus integrado.',
+   cmds:['/focus 25min','/focus-end'],
+   examples:['Cerrar 47 tabs de noticias de un golpe','Activar Pomodoro de 25 min'],
+   note:'Guardar tabs antes de cerrar para poder restaurarlas.'},
+
+  {cat:'search', name:'Búsqueda fuzzy con tolerancia a errores', p:1, e:3,
+   desc:'Reemplazar el simple includes() por un motor de búsqueda fuzzy (Fuse.js o similar). Tolera errores tipográficos, transpone caracteres y pondera por relevancia. Escribir "gthub" debe encontrar GitHub.',
+   cmds:[],
+   examples:['gthub → GitHub.com','recat → React docs','fgiura → Figma'],
+   note:'Fuse.js pesa solo 24 KB. Alternativa: implementar Bitap algorithm nativo.'},
+  {cat:'search', name:'Búsqueda por URL parcial', p:1, e:3,
+   desc:'Fix del issue #130. La búsqueda actual solo compara títulos de páginas. Debe también buscar en las URLs de tabs, bookmarks e historial.',
+   cmds:[],
+   examples:['github.com/issues → finds all GitHub issues tabs','notion.so/123 → direct match'],
+   note:'Cambio mínimo: añadir item.url.toLowerCase() al filtro existente.'},
+  {cat:'search', name:'Búsqueda en contenido de la página actual', p:2, e:2,
+   desc:'Buscar texto dentro del contenido de la página activa, no solo en el título. Comando /find para resaltar ocurrencias, similar a Ctrl+F pero desde el launcher con más inteligencia.',
+   cmds:['/find asíncrono'],
+   examples:['Buscar todos los precios en una página de producto','Encontrar la sección de API docs que menciona "tokens"'],
+   note:'Ejecutar querySelectorAll + textContent desde el content script.'},
+  {cat:'search', name:'Búsqueda semántica con embeddings locales', p:2, e:1,
+   desc:'Indexar el historial y bookmarks con vectores de texto usando transformers.js (ONNX en el navegador). Búsqueda por significado: "artículo de CSS que leí la semana pasada" sin recordar el título.',
+   cmds:['/semantic artículo css grid layouts'],
+   examples:['Buscar "react performance optimization" y encontrar tabs con esos conceptos aunque no aparezca esa frase exacta'],
+   note:'transformers.js puede correr all-MiniLM-L6-v2 en browser. Indexado incremental en background.'},
+  {cat:'search', name:'Filtros avanzados por fecha, dominio, tipo', p:2, e:2,
+   desc:'Añadir modificadores de búsqueda: filtrar por fecha de visita, por dominio específico, por tipo de contenido (video, artículo, herramienta). Sintaxis inspirada en Gmail y Notion.',
+   cmds:['/history from:github.com','after:2025-01-01 react','site:mdn.dev','/bookmarks tag:css'],
+   examples:['Historial de github.com de esta semana','Bookmarks con tag "diseño"'],
+   note:'Parser de tokens de búsqueda similar al de Notion filters.'},
+  {cat:'search', name:'Búsqueda en múltiples motores', p:2, e:3,
+   desc:'Atajos de búsqueda personalizados para buscar directamente en Google, DuckDuckGo, MDN, npm, PyPI, Wikipedia, YouTube, etc. desde el launcher. Similar a los bangs de DuckDuckGo.',
+   cmds:['!mdn fetch API','!npm react-query','!yt tutorial typescript'],
+   examples:['!gh alyssaxuu/omni → GitHub search','!mdn Array.prototype.map'],
+   note:'Array configurable de {trigger, url} en opciones de extensión.'},
+  {cat:'search', name:'Historial de búsquedas en Omni', p:3, e:3,
+   desc:'Guardar las últimas N búsquedas realizadas en Omni para recuperarlas rápidamente. Accesible con flecha arriba en el campo de búsqueda.',
+   cmds:[],
+   examples:['↑ para recuperar última búsqueda','Ver las 10 búsquedas recientes en Omni'],
+   note:'chrome.storage.local, máximo 50 entradas con FIFO.'},
+
+  {cat:'prod', name:'Comandos / snippets personalizados', p:1, e:2,
+   desc:'El usuario define sus propios comandos con alias. Un comando puede abrir URLs, pegar texto, ejecutar múltiples acciones o combinaciones. Guardado en las opciones de la extensión.',
+   cmds:['/me → pega email personal','/gh → abre github.com','/standup → abre Notion+Slack+Jira'],
+   examples:['Alias /jira para abrir el tablero del sprint actual','Comando /call que abre Google Meet en nueva tab'],
+   note:'JSON editable en opciones. Sintaxis: {trigger, type: "url"|"text"|"multi", payload}.'},
+  {cat:'prod', name:'Snippets de texto con variables dinámicas', p:1, e:2,
+   desc:'Plantillas de texto con variables que se resuelven en el momento: {{fecha}}, {{url_actual}}, {{titulo_actual}}, {{portapapeles}}, {{hora}}. Al seleccionar el snippet, se copia al portapapeles o se pega directamente.',
+   cmds:['/snip daily-report','/snip firma-email'],
+   examples:['Insertar plantilla de daily standup con fecha de hoy','Plantilla de bug report con URL de la página actual'],
+   note:'Variables resueltas con content script antes de copiar al portapapeles.'},
+  {cat:'prod', name:'Gestor de portapapeles (clipboard history)', p:1, e:2,
+   desc:'Registrar el historial de los últimos N items copiados. Acceder a copias anteriores desde el launcher y pegar cualquiera de ellas. El historial se limpia al cerrar el navegador por privacidad.',
+   cmds:['/clip','/clipboard'],
+   examples:['Recuperar un texto que copié hace 10 minutos','Ver el historial de 20 copias recientes'],
+   note:'Escuchar evento "copy" en background + clipboard API. Requiere permiso "clipboardRead".'},
+  {cat:'prod', name:'Notas rápidas ancladas al tab actual', p:2, e:2,
+   desc:'Crear notas de texto asociadas a una URL específica. Cuando vuelves a esa página, la nota aparece disponible en Omni. Ideal para marcar pendientes, anotar hallazgos, o recordatorios contextuales.',
+   cmds:['/note Esta API está deprecada','/notes'],
+   examples:['Nota en github.com/issue/123: "revisar el jueves"','Nota en artículo MDN: "comparar con la spec nueva"'],
+   note:'chrome.storage.local con key = URL normalizada. Sync opcional.'},
+  {cat:'prod', name:'Contador Pomodoro integrado', p:2, e:3,
+   desc:'Timer de productividad Pomodoro directamente desde el launcher. Notificaciones del navegador cuando termina cada bloque. Badge en el ícono de la extensión muestra el tiempo restante.',
+   cmds:['/pomodoro','/pomodoro 45','/break'],
+   examples:['/pomodoro 25 → arranca timer','Notificación: "Tiempo! Toma un descanso"'],
+   note:'chrome.alarms API para timers en background. Badge con chrome.action.setBadgeText().'},
+  {cat:'prod', name:'Lista de tareas de contexto rápido', p:2, e:2,
+   desc:'Una lista de tareas liviana accesible desde el launcher. Sin integración externa, sin sincronización: solo un lugar rápido para agregar y tachar pendientes mientras navegas.',
+   cmds:['/todo Revisar el PR de Juan','/todo','/done 2'],
+   examples:['Agregar tarea desde cualquier página sin cambiar de contexto','Ver las tareas pendientes'],
+   note:'chrome.storage.sync. No reemplaza gestores de tareas externos, solo es el "sticky note" del navegador.'},
+  {cat:'prod', name:'Temporizador de tabs (tab hibernation)', p:2, e:2,
+   desc:'Configurar tabs para que se descarguen automáticamente de memoria después de N minutos de inactividad, o marcar tabs para cerrarse automáticamente después de un tiempo definido.',
+   cmds:['/sleep-tabs','/tab-timer 30min'],
+   examples:['Hibernar tabs con más de 30 min de inactividad','Cerrar esta tab en 1 hora'],
+   note:'chrome.tabs.discard() para hibernación. Reduce uso de RAM significativamente.'},
+  {cat:'prod', name:'Modo lector desde el launcher', p:3, e:2,
+   desc:'Activar el modo lector de Firefox o una implementación propia para la tab actual con un comando. Elimina distracciones y formatea el artículo para lectura.',
+   cmds:['/read','/reader-mode'],
+   examples:['/read → activa vista limpia del artículo actual'],
+   note:'Firefox tiene Reader Mode API nativa. En Chrome requiere librería como Readability.js.'},
+
+  {cat:'ai', name:'Asistente IA conversacional en el launcher', p:1, e:1,
+   desc:'Integrar un LLM (Claude, GPT-4o) directamente en el panel de Omni. Permite hacer preguntas, recibir respuestas, y continuar conversaciones sin abrir una nueva pestaña. La respuesta se muestra inline en el launcher.',
+   cmds:['/ai ¿Cómo funciona el protocolo TCP?','/ask resume este artículo'],
+   examples:['Pregunta directa sin abrir ChatGPT','Contexto de la página actual disponible automáticamente'],
+   note:'API key configurable en opciones. Streaming de respuesta con Server-Sent Events.'},
+  {cat:'ai', name:'Resumen de página con /tldr', p:1, e:2,
+   desc:'Extraer el texto principal de la página actual (via Readability.js) y enviarlo al LLM para obtener un resumen en 3-5 puntos. El resultado se muestra directamente en el launcher.',
+   cmds:['/tldr','/summarize','/resumen'],
+   examples:['/tldr → resumen del artículo de 4000 palabras en 5 bullets','/tldr en idioma:es → traduce y resume'],
+   note:'Readability.js extraer el texto. Límite de tokens manageable para la mayoría de artículos.'},
+  {cat:'ai', name:'Generación de texto contextual', p:2, e:1,
+   desc:'Tomar el texto seleccionado en la página actual y transformarlo: mejorarlo, resumirlo, traducirlo, cambiarlo de tono. El resultado va al portapapeles o se muestra en el launcher.',
+   cmds:['/mejorar','/traducir al inglés','/formalizar','/simplificar'],
+   examples:['Seleccionar párrafo + /formalizar → versión profesional al portapapeles','Seleccionar código + /explicar → descripción en lenguaje natural'],
+   note:'Requiere acceso al selection API del content script.'},
+  {cat:'ai', name:'Autocompletado de búsqueda inteligente', p:2, e:1,
+   desc:'Mientras el usuario escribe en Omni, sugerir no solo resultados sino también acciones inteligentes inferidas del contexto. "react hooks" sugiere abrir MDN, el repo en GitHub y un artículo reciente del historial.',
+   cmds:[],
+   examples:['"create jira ticket" → abre Jira con formulario pre-rellenado','"schedule meeting" → abre Google Calendar'],
+   note:'Intent classification con modelo pequeño local (clasificador de intenciones entrenado).'},
+  {cat:'ai', name:'Clasificación automática de bookmarks', p:2, e:1,
+   desc:'Analizar los bookmarks del usuario con un LLM liviano y sugerir carpetas y tags automáticamente. Los bookmarks sin clasificar se clasifican con una pasada de procesamiento en background.',
+   cmds:['/organize-bookmarks','/suggest-tags'],
+   examples:['100 bookmarks sin carpeta → clasificados en 8 categorías automáticamente'],
+   note:'Procesamiento batch en background. El usuario aprueba cambios antes de aplicarlos.'},
+  {cat:'ai', name:'Búsqueda de duplicados y limpieza de tabs', p:2, e:2,
+   desc:'Detectar tabs duplicadas (mismo URL), tabs del mismo dominio, y tabs "antiguas" que llevan días abiertas sin visitar. Mostrar un resumen y permitir cerrar grupos de un golpe.',
+   cmds:['/duplicates','/cleanup','/old-tabs'],
+   examples:['12 tabs duplicadas de stackoverflow encontradas','23 tabs sin visitar en +7 días'],
+   note:'Comparación de URLs normalizadas + chrome.tabs.lastAccessed API.'},
+  {cat:'ai', name:'Contexto de página para comandos', p:3, e:1,
+   desc:'Cuando se ejecuta un comando, pasar automáticamente el contexto de la página actual (título, URL, texto seleccionado) al LLM. "¿de qué trata esto?" funciona sin copiar nada.',
+   cmds:['/de-que-trata','/related-articles'],
+   examples:['En página de issue de GitHub: /summary → resume el issue'],
+   note:'Requiere permiso scripting para leer el DOM del tab activo.'},
+
+  {cat:'access', name:'Navegación completa por teclado (mejorada)', p:1, e:2,
+   desc:'La extensión actual ya usa teclado, pero falta: Tab para mover entre secciones, teclas de contexto (Shift+Enter para nueva ventana), atajos de teclado mostrables con ?, y acceso a todas las acciones sin ratón.',
+   cmds:['? → ver todos los atajos','Tab → navegar entre secciones'],
+   examples:['Cerrar tab actual con Alt+W sin usar ratón','Ver cheatsheet de atajos con ?'],
+   note:'Gestión completa de focus con tabIndex y keydown handlers exhaustivos.'},
+  {cat:'access', name:'Compatibilidad con lectores de pantalla', p:1, e:2,
+   desc:'Añadir atributos ARIA completos: role="combobox" en el input, role="listbox" en resultados, aria-selected, aria-activedescendant, aria-live para anunciar cambios. Testar con NVDA, JAWS y VoiceOver.',
+   cmds:[],
+   examples:['VoiceOver anuncia "3 de 12 resultados, GitHub" al navegar','Cambio de resultados anunciado como aria-live="polite"'],
+   note:'Actualmente el Shadow DOM y la falta de roles ARIA hace la extensión prácticamente inutilizable con screen readers.'},
+  {cat:'access', name:'Soporte de alto contraste', p:1, e:3,
+   desc:'Respetar la preferencia del sistema prefers-contrast: more. Ofrecer un tema de alto contraste manual en ajustes. Bordes más gruesos, diferencia máxima entre texto y fondo.',
+   cmds:[],
+   examples:['En modo alto contraste de Windows: bordes bien visibles','Negro sobre blanco puro sin grises intermedios'],
+   note:'@media (prefers-contrast: more) ya está disponible en todos los navegadores modernos.'},
+  {cat:'access', name:'Tamaño de fuente configurable', p:2, e:3,
+   desc:'Respetar el tamaño de fuente base del usuario (font-size del html) y permitir ajuste manual en las opciones de la extensión. Muchos usuarios con dificultades visuales aumentan el font-size del navegador y las extensiones deben respetarlo.',
+   cmds:[],
+   examples:['Usuario con 150% de zoom: el launcher escala correctamente','Ajuste 80%-150% del tamaño base'],
+   note:'Usar unidades rem en lugar de px. Añadir variable CSS --omni-scale en opciones.'},
+  {cat:'access', name:'Reducción de movimiento', p:2, e:3,
+   desc:'Respetar prefers-reduced-motion: reduce. Las animaciones de apertura/cierre del launcher, las transiciones entre resultados, y el destacado del hover deben desactivarse o reducirse para usuarios sensibles al movimiento.',
+   cmds:[],
+   examples:['Sin animaciones en el launcher para usuarios con vestibular disorder','Transiciones al mínimo: solo opacidad, no transforms'],
+   note:'@media (prefers-reduced-motion: reduce) — un CSS override simple.'},
+  {cat:'access', name:'Localización e internacionalización (i18n)', p:2, e:2,
+   desc:'Soporte completo para múltiples idiomas usando la API chrome.i18n. Traducir toda la UI: placeholders, mensajes de estado, nombres de comandos. Comunidad puede contribuir traducciones vía archivo JSON.',
+   cmds:[],
+   examples:['UI en español, francés, alemán, japonés, chino','Comandos en inglés siempre, pero mensajes localizados'],
+   note:'chrome.i18n API + archivos _locales/es/messages.json. Herramienta de contribución comunitaria.'},
+  {cat:'access', name:'Soporte de RTL (árabe, hebreo, persa)', p:3, e:2,
+   desc:'Alineación correcta para idiomas de escritura derecha a izquierda. Los resultados, el campo de búsqueda, y los atajos de teclado deben respetarse con dirección RTL.',
+   cmds:[],
+   examples:['Campo de búsqueda alineado a la derecha en modo árabe','Resultados invertidos correctamente'],
+   note:'dir="rtl" + CSS logical properties (margin-inline-start, etc.)'},
+
+  {cat:'custom', name:'Temas visuales personalizados', p:2, e:2,
+   desc:'Además del modo claro/oscuro automático, ofrecer temas visuales: Catppuccin, Solarized, Nord, Tokyo Night, monochrome. Los temas se almacenan como variables CSS y son intercambiables.',
+   cmds:['/theme nord','/theme catppuccin-mocha'],
+   examples:['Aplicar el mismo tema que usa el editor de código','Tema personalizado con los colores de la empresa'],
+   note:'Un tema = un objeto de variables CSS. Galería de temas comunitarios posible.'},
+  {cat:'custom', name:'Layout configurable del launcher', p:2, e:2,
+   desc:'Permitir al usuario elegir la posición (centro, arriba, esquina), el ancho, la altura máxima de resultados, y la densidad de la UI (compacta, normal, espaciosa).',
+   cmds:[],
+   examples:['Lanzador en la esquina superior derecha tipo Notion quickfind','Versión compacta con menos espacio entre resultados'],
+   note:'Variables CSS + chrome.storage.sync para persistir preferencias.'},
+  {cat:'custom', name:'Sección de favoritos / pinned items', p:2, e:2,
+   desc:'Marcar acciones, URLs o comandos como "favoritos" para que aparezcan siempre al inicio de los resultados sin necesidad de buscarlo. Acceso inmediato a lo que más se usa.',
+   cmds:['/pin github.com','/favorites','/unpin'],
+   examples:['Pinear los 5 proyectos del sprint actual','Pinear el comando /standup'],
+   note:'Array en chrome.storage.sync. Interfaz drag-to-reorder en opciones.'},
+  {cat:'custom', name:'Categorías de resultados configurables', p:3, e:2,
+   desc:'El usuario elige qué tipos de resultados se muestran y en qué orden: tabs, bookmarks, historial, acciones, snippets, comandos personalizados. Posibilidad de ocultar categorías que no usa.',
+   cmds:[],
+   examples:['Desactivar historial para un perfil más privado','Poner acciones de IA al principio'],
+   note:'Orden y visibilidad de secciones guardado en chrome.storage.sync.'},
+  {cat:'custom', name:'Atajos de teclado completamente personalizables', p:2, e:2,
+   desc:'Ir más allá del shortcut de apertura. Permitir mapear teclas a acciones específicas: Alt+W para cerrar tab, Alt+B para bookmark, Alt+M para mute, etc. Sin conflictos con atajos del navegador.',
+   cmds:[],
+   examples:['Alt+D → duplicar tab actual','Alt+P → pinear tab'],
+   note:'chrome.commands API permite hasta 4 atajos adicionales. El resto via keydown en content script.'},
+  {cat:'custom', name:'Perfiles de usuario', p:3, e:1,
+   desc:'Guardar distintas configuraciones como "perfiles" — trabajo, personal, estudio — con diferentes favoritos, temas, comandos y categorías activas. Cambiar entre perfiles con un comando.',
+   cmds:['/profile trabajo','/profile personal'],
+   examples:['Perfil trabajo: sin historial personal, con comandos de Jira','Perfil personal: tema oscuro, con clips de YouTube'],
+   note:'Objeto completo de configuración serializable en chrome.storage.sync.'},
+
+  {cat:'collab', name:'Compartir tabs en tiempo real (URL sharing)', p:2, e:1,
+   desc:'Exportar la lista de tabs abiertas como una URL o JSON que otro usuario puede importar. Útil para pasarle a un colega "las 8 páginas que necesitas ver para el proyecto".',
+   cmds:['/share-tabs','/import-tabs <url>'],
+   examples:['Generar URL con las 8 tabs del proyecto','Colega importa y abre las mismas páginas'],
+   note:'URL encoding de array de URLs. Optionalmente un servicio de paste efímero.'},
+  {cat:'collab', name:'Integración con gestores de proyectos', p:2, e:1,
+   desc:'Autenticación OAuth con Linear, Jira, Asana, GitHub Issues. Buscar y crear tickets directamente desde Omni sin abrir el gestor de proyectos.',
+   cmds:['/linear crear bug en login','/jira MY-123','/gh issues'],
+   examples:['Crear issue de Linear desde cualquier página','Buscar el ticket que tienes asignado'],
+   note:'OAuth flow en options page. Tokens guardados en chrome.storage.local (nunca sync).'},
+  {cat:'collab', name:'Búsqueda en herramientas de equipo', p:2, e:1,
+   desc:'Buscar en Slack, Notion, Confluence, Google Drive directamente desde el launcher con sus APIs. Resultados de múltiples fuentes en una interfaz unificada.',
+   cmds:['/slack mensaje de Luis sobre deploy','/notion sprint planning','/drive Q3 presentation'],
+   examples:['Buscar un mensaje de Slack sin abrir Slack','"/drive budget" encuentra el spreadsheet del Q4'],
+   note:'Cada integración requiere su propia pantalla OAuth en opciones.'},
+  {cat:'collab', name:'Comparte sesiones de tabs con el equipo', p:3, e:1,
+   desc:'Exportar una sesión de tabs a un link que el equipo puede importar colectivamente. Útil para code reviews, onboarding, o investigación colaborativa.',
+   cmds:['/share-session revisión-PR-456'],
+   examples:['Tech lead comparte 6 páginas de documentación para el nuevo dev'],
+   note:'Backend mínimo para almacenar sesiones compartidas con TTL de 48h.'},
+
+  {cat:'sec', name:'Vault de contraseñas básico', p:2, e:1,
+   desc:'Guardar credenciales cifradas localmente con una master password. Autocompletado de usuario/contraseña desde el launcher. Todo el cifrado ocurre en el navegador con Web Crypto API, nada sale del dispositivo.',
+   cmds:['/vault github.com','/vault-add github.com'],
+   examples:['Copiar la contraseña de una cuenta al portapapeles en 2 teclas'],
+   note:'AES-GCM con clave derivada de master password via PBKDF2. Zero knowledge local.'},
+  {cat:'sec', name:'Bloqueo automático por inactividad', p:2, e:3,
+   desc:'Si el vault de contraseñas o los snippets sensibles están habilitados, bloquear el acceso a Omni después de N minutos de inactividad. Requiere PIN o master password para reactivar.',
+   cmds:['/lock','/set-lock-timeout 15min'],
+   examples:['Omni se bloquea automáticamente al alejarse del equipo'],
+   note:'chrome.alarms para inactividad. Estado de lock en memory (no storage).'},
+  {cat:'sec', name:'Modo privado / incógnito integrado', p:2, e:3,
+   desc:'Abrir cualquier resultado directamente en una ventana de incógnito con un atajo. También poder configurar que ciertos dominios siempre abran en incógnito automáticamente.',
+   cmds:['Ctrl+Shift+Enter → abrir en incógnito'],
+   examples:['Abrir resultado de búsqueda en ventana privada sin ratón'],
+   note:'chrome.windows.create({incognito: true}) — requiere permiso "incognito".'},
+  {cat:'sec', name:'Borrado de historial selectivo', p:2, e:2,
+   desc:'Buscar en el historial y borrar entradas específicas, por dominio, o por rango de fechas desde el launcher. Sin necesidad de abrir la página de historial del navegador.',
+   cmds:['/delete-history facebook.com','/clear-history last-week'],
+   examples:['Borrar todo el historial de un dominio específico','Limpiar historial de las últimas 24 horas'],
+   note:'chrome.history.deleteUrl() y chrome.history.deleteRange()'},
+  {cat:'sec', name:'Auditoría de permisos de extensiones', p:3, e:2,
+   desc:'Mostrar un resumen de las extensiones instaladas con sus permisos más invasivos. Alertar sobre extensiones con acceso a "all URLs" o "tabs". Permite revocar permisos desde Omni.',
+   cmds:['/audit-extensions','/ext permissions'],
+   examples:['"3 extensiones tienen acceso a todos tus datos de navegación"'],
+   note:'chrome.management API para listar extensiones + permisos declarados.'},
+
+  {cat:'dev', name:'Consola de JavaScript rápida', p:2, e:2,
+   desc:'Ejecutar snippets de JavaScript en el contexto de la página actual sin abrir DevTools. Para developers que necesitan probar cosas rápidamente.',
+   cmds:['> document.title','> JSON.stringify(window.__data)'],
+   examples:["> location.href → ver URL actual","> copy(document.querySelector('h1').innerText)"],
+   note:'chrome.scripting.executeScript() en MV3. Resultados en el panel del launcher.'},
+  {cat:'dev', name:'Gestión de feature flags (localStorage)', p:2, e:2,
+   desc:'Ver y editar valores de localStorage, sessionStorage y cookies del dominio actual. Activar/desactivar feature flags en apps que los usan vía storage.',
+   cmds:['/flags','/flag enable dark-mode-v2','/storage set key valor'],
+   examples:['Activar feature flag de nuevo onboarding en staging','"Ver todos los feature flags activos"'],
+   note:'Acceso directo a las APIs de storage desde el content script del launcher.'},
+  {cat:'dev', name:'Inspector de respuestas de red', p:3, e:1,
+   desc:'Ver las últimas N llamadas de red de la página actual (URL, método, status code, tiempo) directamente desde el launcher. Para debug rápido sin abrir Network tab de DevTools.',
+   cmds:['/network','/network errors'],
+   examples:['"Ver qué llamada de API está fallando con 500"'],
+   note:'chrome.devtools.network API — solo disponible en devtools pages, requiere enfoque diferente.'},
+  {cat:'dev', name:'Búsqueda en npm, PyPI, MDN, crates.io', p:2, e:3,
+   desc:'Búsqueda rápida en registros de paquetes y documentación de lenguajes directamente desde el launcher. El resultado abre la página del paquete o la doc.',
+   cmds:['!npm lodash','!pypi pandas','!mdn Array.flat','!crates serde'],
+   examples:['!npm react → va a npmjs.com/package/react directamente'],
+   note:'Simple URL redirect con los parámetros de búsqueda de cada servicio.'},
+  {cat:'dev', name:'Git branch/PR en el título del tab', p:3, e:2,
+   desc:'Detectar cuando el usuario está en GitHub/GitLab y mostrar el nombre de la rama, el número de PR o el estado del CI en el launcher junto al título de la tab.',
+   cmds:[],
+   examples:['"PR #456 — feat/auth-refactor — CI: passing"'],
+   note:'Scraping del DOM de GitHub/GitLab desde el content script.'},
+  {cat:'dev', name:'Inspección de cookies y headers', p:3, e:2,
+   desc:'Ver las cookies del dominio actual, su expiración y flags (HttpOnly, Secure, SameSite). Copiar o borrar cookies individuales desde el launcher.',
+   cmds:['/cookies','/cookie session_id','/clear-cookies'],
+   examples:['Ver la cookie de sesión antes de cerrar el navegador'],
+   note:'chrome.cookies API — requiere permiso "cookies" en el manifest.'},
+
+  {cat:'media', name:'Controles de multimedia globales', p:1, e:2,
+   desc:'Controlar reproducción de audio/video en CUALQUIER tab desde el launcher: play/pause, siguiente pista, volumen, silenciar. Sin cambiar de tab. Compatible con YouTube, Spotify Web, SoundCloud, etc.',
+   cmds:['/play','/pause','/next','/mute-all','/vol 50'],
+   examples:['"Pausar YouTube que suena en background"','"Silenciar todas las tabs con audio"'],
+   note:'chrome.tabs.query({audible: true}) + chrome.scripting.executeScript() para enviar MediaSession commands.'},
+  {cat:'media', name:'Descarga rápida de recursos de la página', p:2, e:2,
+   desc:'Ver y descargar imágenes, videos, PDFs y archivos de la página actual desde el launcher. Sin click derecho, sin buscar el elemento en el DOM.',
+   cmds:['/download-images','/download-pdf','/resources'],
+   examples:['Descargar todas las imágenes de una galería sin click derecho en cada una'],
+   note:'Scraping de src/href del DOM + chrome.downloads.download()'},
+  {cat:'media', name:'Lector de RSS y noticias', p:3, e:1,
+   desc:'Detectar si la página actual tiene un feed RSS/Atom y permitir suscribirse. Mostrar los últimos artículos de feeds suscritos directamente en el launcher.',
+   cmds:['/feed','/subscribe','/feeds'],
+   examples:['Detectar feed de blog y mostrar últimos 5 artículos desde Omni'],
+   note:'Link[type="application/rss+xml"] detection + fetch de feeds.'},
+  {cat:'media', name:'Captura de pantalla y anotación', p:2, e:2,
+   desc:'Tomar screenshot de la tab visible, de la página completa, o de una selección desde el launcher. Opción de copiar al portapapeles o descargar.',
+   cmds:['/screenshot','/screenshot full','/screenshot selection'],
+   examples:['/screenshot → captura visible y copia al portapapeles'],
+   note:'chrome.tabs.captureVisibleTab() para la vista visible. Página completa requiere scroll y stitching.'},
+  {cat:'media', name:'Reproducción de video en Picture-in-Picture', p:2, e:3,
+   desc:'Activar Picture-in-Picture en cualquier video de cualquier tab con un comando. Sin buscar el botón de PiP en el reproductor.',
+   cmds:['/pip','/picture-in-picture'],
+   examples:['"Activar PiP en el video de YouTube del background"'],
+   note:'document.querySelector("video").requestPictureInPicture() via content script.'},
+
+  {cat:'wellness', name:'Tiempo de uso por dominio', p:2, e:2,
+   desc:'Trackear cuánto tiempo pasa el usuario en cada dominio de forma local y privada. Ver estadísticas desde el launcher. Útil para ser consciente de los hábitos de navegación.',
+   cmds:['/time-stats','/time-stats twitter.com'],
+   examples:['"Llevas 2h 15min en YouTube hoy"','"Top 5 dominios de esta semana"'],
+   note:'Escuchar chrome.tabs.onActivated + chrome.windows.onFocusChanged para calcular tiempo activo.'},
+  {cat:'wellness', name:'Límites de tiempo por sitio', p:2, e:2,
+   desc:'Configurar límites de tiempo diarios para dominios específicos. Cuando se alcanza el límite, el launcher muestra una advertencia y puede bloquear el acceso.',
+   cmds:['/limit twitter.com 30min','/limits'],
+   examples:['Máximo 1 hora de Reddit por día','Aviso cuando se llevan 45 min en Instagram'],
+   note:'Combinado con el tracker de tiempo. chrome.declarativeNetRequest para el bloqueo opcional.'},
+  {cat:'wellness', name:'Recordatorio de descanso ocular (20-20-20)', p:3, e:3,
+   desc:'Notificación cada 20 minutos para mirar a 20 pies de distancia por 20 segundos. Regla oftalmológica para reducir fatiga ocular.',
+   cmds:['/eye-break on','/eye-break off'],
+   examples:['"Recordatorio: descansa la vista por 20 segundos"'],
+   note:'chrome.alarms.create() con repetición de 20 min. Notificación simple.'},
+  {cat:'wellness', name:'Modo "no me molestes" integrado', p:2, e:2,
+   desc:'Silenciar todas las notificaciones del navegador, bloquear listas de distracciones, y activar un fondo neutro en las nuevas pestañas durante el periodo de focus.',
+   cmds:['/dnd 2h','/dnd off'],
+   examples:['2 horas sin notificaciones ni acceso a sitios de distracción'],
+   note:'chrome.notifications + chrome.declarativeNetRequest.'},
+
+  {cat:'ext', name:'API pública para plugins de terceros', p:2, e:1,
+   desc:'Exponer una API via chrome.runtime.sendMessage para que otras extensiones registren sus propios comandos en Omni. Cualquier extensión podría añadir sus funciones al launcher universal.',
+   cmds:[],
+   examples:['Extension de 1Password registra comando /1p en Omni','Extension de Grammarly registra /check-grammar'],
+   note:'Manifest: "externally_connectable". API estilo Raycast Extensions.'},
+  {cat:'ext', name:'Webhooks y automatizaciones (Zapier/Make)', p:3, e:1,
+   desc:'Conectar Omni a herramientas de automatización. Al ejecutar ciertos comandos, disparar webhooks que activen flujos en Zapier, Make.com o n8n.',
+   cmds:['/webhook deploy-staging','/trigger notify-team'],
+   examples:['Disparar pipeline de CI desde el launcher','"Notificar al equipo en Slack desde Omni"'],
+   note:'fetch() a URL de webhook configurable en opciones.'},
+  {cat:'ext', name:'CLI local via Native Messaging', p:3, e:1,
+   desc:'Conectar Omni a un programa nativo instalado en el sistema para ejecutar comandos de terminal, abrir aplicaciones del escritorio, o acceder a archivos locales.',
+   cmds:['/terminal ls ~/Downloads','/app code','/open proyecto.pdf'],
+   examples:['Abrir VS Code en el repositorio del proyecto actual','Ejecutar script de build local'],
+   note:'chrome.runtime.connectNative() con app nativa. Requiere instalación de companion app.'},
+  {cat:'ext', name:'Sincronización entre navegadores y dispositivos', p:2, e:1,
+   desc:'Sincronizar comandos personalizados, snippets, sesiones y configuración entre Chrome, Firefox, Edge e incluso entre ordenador y móvil via un backend mínimo propio o la cuenta del usuario.',
+   cmds:[],
+   examples:['Snippet creado en Chrome aparece en Firefox automáticamente'],
+   note:'chrome.storage.sync ya sincroniza entre dispositivos del mismo navegador. Cross-browser requiere backend.'},
+];
+
+let activeCats = new Set();
+let expanded = null;
+
+function renderCats() {
+  const btn_container = document.getElementById('cat-buttons');
+  btn_container.innerHTML = '';
+  CATS.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-btn' + (activeCats.has(c.id) ? ' on' : '');
+    if(activeCats.has(c.id)) { btn.style.background = c.bg; btn.style.color = c.color; btn.style.borderColor = c.color; }
+    btn.innerHTML = `<span class="dot" style="background:${c.color}"></span>${c.label}`;
+    btn.onclick = () => {
+      if(activeCats.has(c.id)) activeCats.delete(c.id); else activeCats.add(c.id);
+      renderCats(); renderFeats();
+    };
+    btn_container.appendChild(btn);
+  });
+}
+
+function renderFeats() {
+  const pf = document.getElementById('prio-filter').value;
+  const ef = document.getElementById('effort-filter').value;
+  const filtered = FEATS.filter(f => {
+    if(activeCats.size > 0 && !activeCats.has(f.cat)) return false;
+    if(pf && f.p !== parseInt(pf)) return false;
+    if(ef && f.e !== parseInt(ef)) return false;
+    return true;
+  });
+  document.getElementById('count-badge').textContent = filtered.length + ' funciones';
+  const grid = document.getElementById('feat-grid');
+  grid.innerHTML = '';
+  filtered.forEach((f,i) => {
+    const cat = CATS.find(c => c.id === f.cat);
+    const pLabels = ['','Alta','Media','Baja'];
+    const eLabels = ['','Alto','Medio','Bajo'];
+    const pClasses = ['','p1','p2','p3'];
+    const eClasses = ['','e1','e2','e3'];
+    const card = document.createElement('div');
+    card.className = 'feat' + (expanded === f.name ? ' expanded' : '');
+    card.innerHTML = `
+      <div class="feat-top">
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <div class="cat-color-tab" style="background:${cat.color}"></div>
+          <div>
+            <div class="feat-name">${f.name}</div>
+            <div class="feat-meta">
+              <span class="chip ${pClasses[f.p]}">Prio: ${pLabels[f.p]}</span>
+              <span class="chip ${eClasses[f.e]}">Esfuerzo: ${eLabels[f.e]}</span>
+              <span style="font-size:11px;color:var(--color-text-secondary);padding:2px 0">${cat.label}</span>
+            </div>
+          </div>
+        </div>
+        <span class="chevron">›</span>
+      </div>
+      <div class="feat-desc">${f.desc}</div>
+      <div class="feat-detail">
+        ${f.cmds.length ? `<div style="margin-bottom:8px"><div class="sub-head" style="font-size:11px">Comandos</div>${f.cmds.map(c=>`<span class="cmd" style="margin:2px 2px 2px 0;display:inline-block">${c}</span>`).join('')}</div>` : ''}
+        ${f.examples.length ? `<div style="margin-bottom:8px"><div class="sub-head" style="font-size:11px">Ejemplos de uso</div>${f.examples.map(e=>`<div class="example-row"><span class="ex-label">Ej.</span><span style="color:var(--color-text-primary)">${e}</span></div>`).join('')}</div>` : ''}
+        ${f.note ? `<div style="background:var(--color-background-secondary);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--color-text-secondary)"><strong style="color:var(--color-text-primary);font-weight:500">Implementación: </strong>${f.note}</div>` : ''}
+      </div>`;
+    card.onclick = () => {
+      expanded = (expanded === f.name) ? null : f.name;
+      renderFeats();
+    };
+    grid.appendChild(card);
+  });
+}
+
+function renderStats() {
+  const total = FEATS.length;
+  const high = FEATS.filter(f=>f.p===1).length;
+  const cats = CATS.length;
+  const quick = FEATS.filter(f=>f.e===3).length;
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat"><div class="stat-n">${total}</div><div class="stat-l">funciones propuestas</div></div>
+    <div class="stat"><div class="stat-n">${high}</div><div class="stat-l">alta prioridad</div></div>
+    <div class="stat"><div class="stat-n">${cats}</div><div class="stat-l">áreas exploradas</div></div>
+    <div class="stat"><div class="stat-n">${quick}</div><div class="stat-l">quick wins</div></div>`;
+}
+
+renderStats();
+renderCats();
+renderFeats();
+</script>

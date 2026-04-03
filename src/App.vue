@@ -11,11 +11,12 @@
     <SettingsModal v-if="tabStore.state" />
     <SmartSuggestions v-if="renderSmartSuggestions" />
     <OnboardingModal v-if="showOnboarding" @close="completeOnboarding" />
+      <OmniLauncher />
 
     <Teleport to="body">
       <Transition name="update-toast">
         <aside
-          v-if="updateNotice.visible"
+            v-if="updateNotice.visible"
           class="update-toast"
           role="status"
           aria-live="polite"
@@ -48,6 +49,7 @@
   import UnsService from './services/UnsService.js';
   import SpaceSwitcher from './components/SpaceSwitcher.vue';
   import { useAutoTheme } from './composables/useAutoTheme.js';
+    import OmniLauncher from './omni/components/OmniLauncher.vue';
   import useThemeStore from './stores/useThemeStore.js';
 
   const MIDORI_DOWNLOAD_URL = 'https://astian.org/midori-browser/download';
@@ -80,6 +82,7 @@
       SpaceSwitcher,
       SmartSuggestions: defineAsyncComponent(() => import('./components/SmartSuggestions.vue')),
       OnboardingModal: defineAsyncComponent(() => import('./components/OnboardingModal.vue')),
+        OmniLauncher,
     },
 
     computed: {
