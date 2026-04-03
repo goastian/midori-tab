@@ -1,5 +1,7 @@
 {
   "manifest_version": 2,
+  "host_permissions": null,
+  "action": null,
   "permissions": [
     "storage",
     "identity",
@@ -17,6 +19,7 @@
     "http://marketplace.astian.org/*"
   ],
   "background": {
+    "service_worker": null,
     "scripts": ["background.js"],
     "persistent": false
   },

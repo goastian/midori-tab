@@ -1,5 +1,5 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "midori-tab",
   "description": "A beautiful, customizable new tab with smart search, workspaces and bookmarks.",
   "author": "Im-Jota",
@@ -9,9 +9,12 @@
   "permissions": [
     "storage",
     "identity",
-    "tabs"
-  ],
-  "host_permissions": [
+    "tabs",
+    "activeTab",
+    "bookmarks",
+    "history",
+    "browsingData",
+    "search",
     "https://api.rss2json.com/*",
     "https://api.unsplash.com/*",
     "https://api.github.com/*",
@@ -19,10 +22,50 @@
     "http://127.0.0.1/*",
     "http://marketplace.astian.org/*"
   ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ],
+    "persistent": false
+  },
+  "commands": {
+    "open-omni": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "Command+Shift+K"
+      },
+      "description": "Open command menu"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "run_at": "document_idle",
+      "js": [
+        "omni-content.js"
+      ],
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    "globe.svg",
+    "icons/*",
+    "assets/*"
+  ],
   "icons": {
     "16": "icons/16.png",
     "48": "icons/48.png",
     "128": "icons/128.png"
+  },
+  "browser_action": {
+    "default_icon": {
+      "16": "icons/16.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    },
+    "default_title": "Open Midori command menu"
   },
   "browser_specific_settings": {
     "gecko": {
