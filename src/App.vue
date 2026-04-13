@@ -1,6 +1,15 @@
 <template>
   <div class="viewport" :class="{ 'bg-cl' : tabStore.effectiveTheme !== 'light' }">
-    <img :src="backgroundImage" class="background" v-if="showImageBackground && backgroundImage" />
+    <div class="background-skeleton" v-if="showImageBackground && !imageReady"></div>
+    <Transition name="bg-fade">
+      <img
+        :src="backgroundImage"
+        class="background"
+        v-if="showImageBackground && backgroundImage"
+        v-show="imageReady"
+        @load="imageReady = true"
+      />
+    </Transition>
     <div class="credits" v-if="showCredits">
       📷 Photo by 
       <a :href="imageAuthorLink" target="_blank" rel="noopener noreferrer">{{ imageAuthor }}</a> 
@@ -59,6 +68,7 @@
       return {
         loaded: true,
         backgroundImage: "",
+        imageReady: false,
         tabStore: useTabStore(),
         i18n: useI18nStore(),
         refreshWallpaperListener: null,
@@ -152,6 +162,7 @@
       },
 
       async load() {
+        this.imageReady = false;
         if (this.tabStore.background?.type === 'MarketplaceWallpaper') {
           const background = this.tabStore.background;
           this.backgroundImage = background.imageUrl || '';
@@ -296,6 +307,24 @@
   align-items: center;
 }
 
+.background-skeleton {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -3;
+  pointer-events: none;
+  background: linear-gradient(110deg, #0c1219 30%, #162028 50%, #0c1219 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 .background {
   position: fixed;
   top: 0;
@@ -305,6 +334,13 @@
   z-index: -3;
   object-fit: cover;
   pointer-events: none;
+}
+
+.bg-fade-enter-active {
+  transition: opacity 0.4s ease;
+}
+.bg-fade-enter-from {
+  opacity: 0;
 }
 
 .credits {

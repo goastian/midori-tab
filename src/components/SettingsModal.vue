@@ -141,8 +141,7 @@ import { watch } from 'vue';
 import Switch from './UI/Switch.vue';
 import Dropdown from './UI/Dropdown.vue';
 import Input from './UI/Input.vue';
-import ThemePicker from './ThemePicker.vue';
-import LanguageSelector from './LanguageSelector.vue';
+import { defineAsyncComponent } from 'vue';
 import useTabStore from '../stores/useTabStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import useThemeStore from '../stores/useThemeStore.js';
@@ -157,8 +156,8 @@ export default {
     Switch,
     Input,
     Dropdown,
-    ThemePicker,
-    LanguageSelector,
+    ThemePicker: defineAsyncComponent(() => import('./ThemePicker.vue')),
+    LanguageSelector: defineAsyncComponent(() => import('./LanguageSelector.vue')),
   },
 
   data() {
