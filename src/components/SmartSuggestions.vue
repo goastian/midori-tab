@@ -32,6 +32,8 @@ import useSuggestionsStore from '../stores/useSuggestionsStore.js';
 import useTabStore from '../stores/useTabStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
 
+const faviconCache = new Map();
+
 export default {
   name: 'SmartSuggestions',
 
@@ -54,10 +56,14 @@ export default {
 
   methods: {
     getFavicon(url) {
+      if (faviconCache.has(url)) return faviconCache.get(url);
       try {
         const domain = new URL(url).hostname;
-        return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        const faviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+        faviconCache.set(url, faviconUrl);
+        return faviconUrl;
       } catch {
+        faviconCache.set(url, '');
         return '';
       }
     },
