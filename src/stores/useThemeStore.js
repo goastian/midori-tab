@@ -354,28 +354,27 @@ const useThemeStore = defineStore('themeStore', {
       if (!vars) return;
 
       const root = document.documentElement;
-      Object.entries(vars).forEach(([key, value]) => {
-        root.style.setProperty(key, value);
-      });
 
-      // Also update legacy aliases
-      root.style.setProperty('--bg-color', vars['--color-bg'] || '');
-      root.style.setProperty('--bg-glass', vars['--surface-raised'] || '');
-      root.style.setProperty('--bg-secondary', vars['--color-bg-secondary'] || '');
-      root.style.setProperty('--text-color', vars['--color-text'] || '');
-      root.style.setProperty('--border-color', vars['--color-border'] || '');
+      // Batch all CSS custom properties in a single style write to avoid
+      // triggering a style recalculation for each individual setProperty().
+      const legacyAliases = {
+        '--bg-color': vars['--color-bg'] || '',
+        '--bg-glass': vars['--surface-raised'] || '',
+        '--bg-secondary': vars['--color-bg-secondary'] || '',
+        '--text-color': vars['--color-text'] || '',
+        '--border-color': vars['--color-border'] || '',
+      };
+
+      const allVars = { ...vars, ...legacyAliases };
+      const cssText = Object.entries(allVars)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('; ');
+
+      root.setAttribute('style', cssText);
     },
 
     clearThemeVars() {
-      const root = document.documentElement;
-      const sampleTheme = PREDEFINED_THEMES.midori.dark;
-      Object.keys(sampleTheme).forEach(key => {
-        root.style.removeProperty(key);
-      });
-      // Remove legacy aliases
-      ['--bg-color', '--bg-glass', '--bg-secondary', '--text-color', '--border-color'].forEach(k => {
-        root.style.removeProperty(k);
-      });
+      document.documentElement.removeAttribute('style');
     },
 
     updateCustomTheme(variant, vars) {
