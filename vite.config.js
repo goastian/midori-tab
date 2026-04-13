@@ -33,8 +33,6 @@ export default defineConfig({
           vendor: ['vue', 'pinia', 'pinia-plugin-persistedstate', 'axios'],
         },
       },
-      // Exclude .woff files — only keep .woff2 (universally supported, ~25% smaller)
-      external: (id) => /\.woff$/.test(id) && !id.endsWith('.woff2'),
     },
     outDir: 'dist',
     emptyOutDir: true,
