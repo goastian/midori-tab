@@ -1,4 +1,8 @@
+let _cachedBrowserInfo = null;
+
 export function getBrowserInfo() {
+  if (_cachedBrowserInfo) return _cachedBrowserInfo;
+
   const ua = String(navigator.userAgent || '');
   const platform = String(navigator.platform || '').toLowerCase();
   const isWindows = /win/i.test(platform) || /windows/i.test(ua);
@@ -44,7 +48,7 @@ export function getBrowserInfo() {
   const platformName = isWindows ? 'windows' : isMac ? 'macos' : isLinux ? 'linux' : 'unknown';
   const family = isMidori ? 'midori' : isFirefox ? 'firefox-compatible' : isChromium ? 'chromium' : 'unknown';
 
-  return {
+  _cachedBrowserInfo = {
     id,
     environmentId: isMidori ? 'midori' : id,
     name,
@@ -62,5 +66,6 @@ export function getBrowserInfo() {
     isMac,
     shortcutsHintKey,
   };
+  return _cachedBrowserInfo;
 }
 
