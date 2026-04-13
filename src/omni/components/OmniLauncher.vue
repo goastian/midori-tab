@@ -126,9 +126,11 @@ export default {
     }
 
     // ── Sync store query ───────────────────────────────────────────────────
+    let searchTimer = null;
     watch(query, (val) => {
       omniStore.query = val;
-      search(val);
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => search(val), 120);
     });
 
     // ── Focus & reset on open ──────────────────────────────────────────────
@@ -144,10 +146,13 @@ export default {
     });
 
     // ── Scroll selected item into view ────────────────────────────────────
-    watch(() => omniStore.selectedIndex, async (idx) => {
-      await nextTick();
-      document.getElementById(`omni-option-${idx}`)
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    let scrollRaf = null;
+    watch(() => omniStore.selectedIndex, (idx) => {
+      cancelAnimationFrame(scrollRaf);
+      scrollRaf = requestAnimationFrame(() => {
+        document.getElementById(`omni-option-${idx}`)
+          ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      });
     });
 
     // ── Keyboard handler ──────────────────────────────────────────────────
@@ -262,6 +267,8 @@ export default {
 
     onUnmounted(() => {
       window.removeEventListener('keydown', onGlobalKeydown);
+      clearTimeout(searchTimer);
+      cancelAnimationFrame(scrollRaf);
       try {
         chrome.runtime.onMessage.removeListener(onRuntimeMessage);
       } catch (_) { /* noop */ }
