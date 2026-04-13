@@ -17,27 +17,31 @@ const useSuggestionsStore = defineStore('suggestionsStore', {
       const now = new Date();
       const hour = now.getHours();
       const day = now.getDay();
+      const dismissedSet = new Set(state.dismissed);
 
       // Buscar hábitos que coincidan con la hora actual (+/- 1 hora)
-      const matched = state.habits.filter(h => {
-        const hourMatch = Math.abs(h.hour - hour) <= 1 || 
-                          (h.hour === 23 && hour === 0) || 
-                          (h.hour === 0 && hour === 23);
-        return hourMatch && !state.dismissed.includes(h.url);
-      });
-
-      // Agrupar por URL y sumar conteos
+      // Agrupar por URL y sumar conteos en una sola pasada
       const grouped = {};
-      matched.forEach(h => {
-        if (!grouped[h.url]) {
-          grouped[h.url] = { ...h, totalCount: 0 };
+      for (let i = 0; i < state.habits.length; i++) {
+        const h = state.habits[i];
+        if (dismissedSet.has(h.url)) continue;
+        const hourDiff = Math.abs(h.hour - hour);
+        const hourMatch = hourDiff <= 1 ||
+                          (h.hour === 23 && hour === 0) ||
+                          (h.hour === 0 && hour === 23);
+        if (!hourMatch) continue;
+
+        let entry = grouped[h.url];
+        if (!entry) {
+          entry = { url: h.url, title: h.title, hour: h.hour, dayOfWeek: h.dayOfWeek, count: h.count, totalCount: 0 };
+          grouped[h.url] = entry;
         }
-        grouped[h.url].totalCount += h.count;
+        entry.totalCount += h.count;
         // Bonus si coincide día de semana
         if (h.dayOfWeek === day) {
-          grouped[h.url].totalCount += h.count * 0.5;
+          entry.totalCount += h.count * 0.5;
         }
-      });
+      }
 
       return Object.values(grouped)
         .sort((a, b) => b.totalCount - a.totalCount)
