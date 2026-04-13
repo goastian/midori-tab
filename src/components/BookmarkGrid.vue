@@ -104,6 +104,7 @@ export default {
       activeTab: categories[0] || 'Personal',
       faviconAttempts: {},
       i18n,
+      _saveTimer: null,
     };
   },
 
@@ -251,9 +252,16 @@ export default {
 
   watch: {
     bookmarks: {
-      handler() { this.save(); },
+      handler() {
+        clearTimeout(this._saveTimer);
+        this._saveTimer = setTimeout(() => this.save(), 500);
+      },
       deep: true,
     },
+  },
+
+  beforeUnmount() {
+    clearTimeout(this._saveTimer);
   },
 };
 </script>
