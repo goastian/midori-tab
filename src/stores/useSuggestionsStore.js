@@ -1,6 +1,23 @@
 import { defineStore } from 'pinia';
 import useI18nStore from './useI18nStore.js';
 
+// Debounced localStorage wrapper to avoid heavy JSON.stringify on every mutation
+const debouncedStorage = (() => {
+  let timer = null;
+  let pending = null;
+  return {
+    getItem: (key) => localStorage.getItem(key),
+    setItem: (key, value) => {
+      pending = { key, value };
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (pending) localStorage.setItem(pending.key, pending.value);
+        pending = null;
+      }, 1000);
+    },
+  };
+})();
+
 const useSuggestionsStore = defineStore('suggestionsStore', {
   state: () => ({
     // Historial de navegación por hora: { url, title, hour, dayOfWeek, count }
@@ -118,7 +135,7 @@ const useSuggestionsStore = defineStore('suggestionsStore', {
 
   persist: {
     enable: true,
-    storage: localStorage,
+    storage: debouncedStorage,
     paths: ['habits', 'enabled'],
   },
 });
