@@ -1,6 +1,16 @@
 import { defineStore } from 'pinia';
 import useThemeStore from './useThemeStore.js';
 
+// Cache system-level prefers-color-scheme to avoid calling matchMedia on every getter access
+let _systemDarkMode = (typeof window !== 'undefined' && window.matchMedia)
+  ? window.matchMedia('(prefers-color-scheme: dark)').matches
+  : false;
+
+if (typeof window !== 'undefined' && window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)')
+    .addEventListener('change', (e) => { _systemDarkMode = e.matches; });
+}
+
 const useTabStore = defineStore('tabStore', {
   state: () => ({
     tabName: 'New Tab',
@@ -19,10 +29,7 @@ const useTabStore = defineStore('tabStore', {
   getters: {
     effectiveTheme(state) {
       if (!state.autoTheme) return state.theme;
-      if (typeof window !== 'undefined' && window.matchMedia) {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-      return state.theme;
+      return _systemDarkMode ? 'dark' : 'light';
     },
   },
 
