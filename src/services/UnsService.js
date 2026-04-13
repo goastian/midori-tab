@@ -14,6 +14,7 @@ class UnsplashService {
   #authorLink = '';
   #imageLink = '';
   #total = 5;
+  #previousBlobUrl = null;
 
   getUrl() {
     return this.#url;
@@ -42,6 +43,14 @@ class UnsplashService {
       return null;
     }
     return this.#url;
+  }
+
+  #setBlobUrl(blobUrl) {
+    if (this.#previousBlobUrl) {
+      URL.revokeObjectURL(this.#previousBlobUrl);
+    }
+    this.#url = blobUrl;
+    this.#previousBlobUrl = blobUrl;
   }
 
   async setImagen() {
@@ -73,7 +82,7 @@ class UnsplashService {
       if (singleImage) {
         const blob = await this.#fetchAndCacheImage(singleImage.url);
         if (blob) {
-          this.#url = URL.createObjectURL(blob);
+          this.#setBlobUrl(URL.createObjectURL(blob));
           this.#author = singleImage.author;
           this.#authorLink = singleImage.authorLink;
           this.#imageLink = singleImage.imagePage;
@@ -95,7 +104,7 @@ class UnsplashService {
    */
   async #loadFromCache(response, meta) {
     const blob = await response.blob();
-    this.#url = URL.createObjectURL(blob);
+    this.#setBlobUrl(URL.createObjectURL(blob));
     this.#author = meta.author;
     this.#authorLink = meta.authorLink;
     this.#imageLink = meta.imagePage;
@@ -170,7 +179,10 @@ class UnsplashService {
         });
 
         newUrls.push(imageUrl);
+      }
 
+      // Descargar todas las imágenes en paralelo en vez de secuencialmente
+      await Promise.all(newUrls.map(async (imageUrl) => {
         try {
           const response = await fetch(imageUrl);
           if (response.ok) {
@@ -180,7 +192,7 @@ class UnsplashService {
         } catch (error) {
           console.warn(`Error cacheando imagen: ${imageUrl}`, error);
         }
-      }
+      }));
 
       /**
        * Clear old cache.
