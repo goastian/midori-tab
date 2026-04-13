@@ -42,7 +42,7 @@
     </div>
     <div v-else-if="items.length" class="asset-grid">
       <article
-        v-for="asset in items"
+        v-for="asset in visibleItems"
         :key="asset.slug"
         class="asset-card"
         :class="{ incompatible: !asset.isCompatible }"
@@ -77,6 +77,14 @@
           {{ actionLabel(asset) }}
         </button>
       </article>
+      <button
+        v-if="hasMore"
+        class="marketplace-load-more"
+        type="button"
+        @click="visibleCount += 20"
+      >
+        {{ i18n.$t('marketplace.showMore') || 'Show more' }} ({{ items.length - visibleCount }})
+      </button>
     </div>
     <div v-else class="marketplace-state">
       {{ i18n.$t('marketplace.empty') }}
@@ -119,6 +127,7 @@ export default {
       activeType: this.defaultType,
       search: '',
       searchTimeout: null,
+      visibleCount: 20,
     };
   },
 
@@ -133,6 +142,14 @@ export default {
 
     items() {
       return this.catalogStore.itemsForType(this.activeType);
+    },
+
+    visibleItems() {
+      return this.items.slice(0, this.visibleCount);
+    },
+
+    hasMore() {
+      return this.items.length > this.visibleCount;
     },
 
     status() {
@@ -154,6 +171,7 @@ export default {
     activeType: {
       immediate: true,
       handler() {
+        this.visibleCount = 20;
         this.loadCatalog();
       },
     },
@@ -161,6 +179,7 @@ export default {
     search() {
       window.clearTimeout(this.searchTimeout);
       this.searchTimeout = window.setTimeout(() => {
+        this.visibleCount = 20;
         this.loadCatalog(true);
       }, 250);
     },
@@ -468,5 +487,22 @@ export default {
 .asset-action:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.marketplace-load-more {
+  grid-column: 1 / -1;
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  background: var(--surface-raised, #0f1520);
+  color: var(--color-text-secondary, #7ec4a8);
+  border-radius: 10px;
+  padding: 0.75rem;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.85rem;
+  transition: background var(--transition-fast, 0.1s ease);
+}
+
+.marketplace-load-more:hover {
+  background: var(--surface-overlay, #1e2d3d);
 }
 </style>
