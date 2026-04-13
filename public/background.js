@@ -33,6 +33,7 @@ function safeCallChrome(method, ...args) {
 // ─── Differential Tabs Cache ───────────────────────────────────────────────
 const tabsCache = new Map(); // tabId → normalised tab object
 let tabsCacheReady = false;
+const TABS_CACHE_MAX = 500;
 
 function normaliseTab(tab) {
   return {
@@ -69,6 +70,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   tabsCache.delete(tabId);
 });
 
+chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
+  tabsCache.delete(removedTabId);
+});
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (tabsCache.has(tabId)) {
     const existing = tabsCache.get(tabId);
@@ -88,9 +93,13 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // ─── Bookmarks Cache ────────────────────────────────────────────────────────
 let bookmarksCache = null;
+let bookmarksInvalidateTimer = null;
 
 function invalidateBookmarks() {
-  bookmarksCache = null;
+  clearTimeout(bookmarksInvalidateTimer);
+  bookmarksInvalidateTimer = setTimeout(() => {
+    bookmarksCache = null;
+  }, 1000);
 }
 
 chrome.bookmarks.onCreated.addListener(invalidateBookmarks);
