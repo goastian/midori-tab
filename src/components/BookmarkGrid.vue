@@ -71,16 +71,15 @@ const DEFAULT_BOOKMARKS = {
     { title: 'MiWallet', url: 'https://wallet.astian.org', domain: 'wallet.astian.org' },
     { title: 'Amazon', url: 'https://amzn.to/47IiNIO', domain: 'amazon.com' },
     { title: 'Aliexpress', url: 'https://s.click.aliexpress.com/e/_c2xYL4uP', domain: 'aliexpress.us' },
+    { title: 'Kayak', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fflights', domain: 'kayak.com' },
   ],
   Work: [
     { title: 'GitHub', url: 'https://github.com', domain: 'github.com' },
     { title: 'Notion', url: 'https://notion.so', domain: 'notion.so' },
   ],
   Travel: [
-    { title: 'Trip.com', url: 'https://www.trip.com/?Allianceid=4479273&SID=57814702&trip_sub1=&trip_sub3=D14220523', domain: 'trip.com' },
-    { title: 'Expedia', url: 'https://expedia.com/affiliate/tot01yr', domain: 'expedia.com' },
-    { title: 'Skyscanner', url: 'https://skyscanner.pxf.io/dyOg6M', domain: 'skyscanner.com' },
-    { title: 'GetYourGuide', url: 'getyourguide.com?partner_id=MK2RLVJ&utm_medium=online_publisher', domain: 'getyourguide.com' },
+    { title: 'Kayak Hotels', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fhotels', domain: 'kayak.com' },
+    { title: 'Kayak Cars', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fcars', domain: 'kayak.com' },
   ],
 };
 
