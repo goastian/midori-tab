@@ -70,8 +70,9 @@ const DEFAULT_BOOKMARKS = {
     { title: 'Astian', url: 'https://astian.org/', domain: 'astian.org' },
     { title: 'MiWallet', url: 'https://wallet.astian.org', domain: 'wallet.astian.org' },
     { title: 'Amazon', url: 'https://amzn.to/47IiNIO', domain: 'amazon.com' },
-    { title: 'Aliexpress', url: 'https://s.click.aliexpress.com/e/_c2xYL4uP', domain: 'aliexpress.us' },
     { title: 'Kayak', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fflights', domain: 'kayak.com' },
+    { title: 'Aliexpress', url: 'https://s.click.aliexpress.com/e/_c2xYL4uP', domain: 'aliexpress.us' },
+    { title: 'Ebay', url: 'https://ebay.us/Tg0rAn', domain: 'ebay.us' },
   ],
   Work: [
     { title: 'GitHub', url: 'https://github.com', domain: 'github.com' },
