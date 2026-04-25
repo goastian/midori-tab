@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "midori-tab",
   "description": "A beautiful, customizable new tab with smart search, workspaces and bookmarks.",
-  "author": "Im-Jota",
+  "author": "Astian, Inc",
   "chrome_url_overrides": {
     "newtab": "index.html"
   },
