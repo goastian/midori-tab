@@ -68,7 +68,6 @@ const DEFAULT_CATEGORIES = ['Personal', 'Work', 'Travel'];
 const DEFAULT_BOOKMARKS = {
   Personal: [
     { title: 'Astian', url: 'https://astian.org/', domain: 'astian.org' },
-    { title: 'MiWallet', url: 'https://wallet.astian.org', domain: 'wallet.astian.org' },
     { title: 'Amazon', url: 'https://amzn.to/47IiNIO', domain: 'amazon.com' },
     { title: 'Kayak', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fflights', domain: 'kayak.com' },
     { title: 'Aliexpress', url: 'https://s.click.aliexpress.com/e/_c2xYL4uP', domain: 'aliexpress.us' },
@@ -80,6 +79,10 @@ const DEFAULT_BOOKMARKS = {
   ],
   Travel: [
     { title: 'Kayak Hotels', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fhotels', domain: 'kayak.com' },
+    { title: 'Kayak Cars', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fcars', domain: 'kayak.com' },
+  ],
+  Web3: [
+    { title: 'MiWallet', url: 'https://wallet.astian.org', domain: 'wallet.astian.org' },
     { title: 'Kayak Cars', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fcars', domain: 'kayak.com' },
   ],
 };
