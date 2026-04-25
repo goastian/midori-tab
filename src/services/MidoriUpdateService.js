@@ -4,6 +4,8 @@ import { compareSemver } from '../utils/semver.js'
 
 const STORAGE_KEY = 'midori_update_check_state_v1'
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
+const DEFAULT_NO_UPDATE_WINDOW_MS = 2 * 60 * 60 * 1000
+const DEFAULT_ERROR_WINDOW_MS = 30 * 60 * 1000
 
 function createStorageAdapter() {
   try {
@@ -52,6 +54,24 @@ export default class MidoriUpdateService {
     this.storage = options.storage || createStorageAdapter()
     this.client = options.client || new GitHubReleaseClient({ timeout: options.timeout })
     this.dailyWindowMs = Number(options.dailyWindowMs) > 0 ? Number(options.dailyWindowMs) : ONE_DAY_MS
+    this.noUpdateWindowMs = Number(options.noUpdateWindowMs) > 0
+      ? Number(options.noUpdateWindowMs)
+      : DEFAULT_NO_UPDATE_WINDOW_MS
+    this.errorWindowMs = Number(options.errorWindowMs) > 0
+      ? Number(options.errorWindowMs)
+      : DEFAULT_ERROR_WINDOW_MS
+  }
+
+  #getCheckWindowMs(state, currentVersion) {
+    if (state.lastResult === 'error') {
+      return this.errorWindowMs
+    }
+
+    const hasCachedUpdate = state.latestVersion
+      ? compareSemver(state.latestVersion, currentVersion) > 0
+      : false
+
+    return hasCachedUpdate ? this.dailyWindowMs : this.noUpdateWindowMs
   }
 
   getCachedState() {
@@ -82,12 +102,14 @@ export default class MidoriUpdateService {
       }
     }
 
-    if (!force && isWithinWindow(state.lastCheckedAt, now, this.dailyWindowMs)) {
+    const checkWindowMs = this.#getCheckWindowMs(state, currentVersion)
+
+    if (!force && isWithinWindow(state.lastCheckedAt, now, checkWindowMs)) {
       return {
         state,
         currentVersion,
         source: 'cache',
-        reason: 'daily-window-active',
+        reason: 'check-window-active',
         checkedAt: state.lastCheckedAt,
         ...this.getEligibility({ browserInfo, currentVersion, state, now }),
       }

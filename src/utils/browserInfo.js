@@ -4,6 +4,7 @@ export function getBrowserInfo() {
   if (_cachedBrowserInfo) return _cachedBrowserInfo;
 
   const ua = String(navigator.userAgent || '');
+  const vendor = String(navigator.vendor || '');
   const platform = String(navigator.platform || '').toLowerCase();
   const isWindows = /win/i.test(platform) || /windows/i.test(ua);
   const isMac = /mac/i.test(platform) || /macintosh/i.test(ua);
@@ -16,6 +17,7 @@ export function getBrowserInfo() {
   const isChromium = !isFirefox && (/Chrome\/\d+/i.test(ua) || isEdge || isOpera || isVivaldi);
 
   const hasMidoriInUa = /Midori\/\d+/i.test(ua) || /\bMidori\b/i.test(ua);
+  const hasAstianBranding = /\bastian\b/i.test(ua) || /\bastian\b/i.test(vendor);
   const hasMidoriGlobal = Boolean(
     globalThis?.midori
     || globalThis?.Midori
@@ -34,7 +36,12 @@ export function getBrowserInfo() {
     hasMidoriRuntimeIdentity = false;
   }
 
-  const isMidori = Boolean(hasMidoriInUa || hasMidoriGlobal || hasMidoriRuntimeIdentity);
+  const isMidori = Boolean(
+    hasMidoriInUa
+    || hasAstianBranding
+    || hasMidoriGlobal
+    || hasMidoriRuntimeIdentity
+  );
 
   let id = 'unknown';
   let name = 'Unknown';

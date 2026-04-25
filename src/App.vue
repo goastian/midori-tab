@@ -78,7 +78,7 @@
         autoTheme: null,
         updateService: markRaw(new MidoriUpdateService()),
         updateNotice: {
-          visible: true,
+          visible: false,
           latestVersion: '',
         },
       }

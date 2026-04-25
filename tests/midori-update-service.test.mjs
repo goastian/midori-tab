@@ -75,8 +75,101 @@ test('usa cache diaria y evita segunda llamada de red en la misma ventana', asyn
   assert.equal(first.eligible, true)
   assert.equal(first.latestVersion, '9.0.0')
   assert.equal(second.source, 'cache')
-  assert.equal(second.reason, 'daily-window-active')
+  assert.equal(second.reason, 'check-window-active')
   assert.equal(client.calls.length, 1)
+})
+
+test('reintenta en ventana corta cuando no hay update disponible', async () => {
+  const storage = createMemoryStorage()
+  const client = createClientMock([
+    {
+      release: { version: '1.0.0', name: 'v1.0.0' },
+      etag: 'W/etag-5',
+      status: 200,
+      notModified: false,
+    },
+    {
+      release: { version: '1.1.0', name: 'v1.1.0' },
+      etag: 'W/etag-6',
+      status: 200,
+      notModified: false,
+    },
+  ])
+  const service = new MidoriUpdateService({
+    storage,
+    client,
+    noUpdateWindowMs: 1_000,
+    dailyWindowMs: 60_000,
+  })
+
+  const first = await service.checkForUpdate({
+    browserInfo: { isMidori: true },
+    currentVersion: '1.0.0',
+    now: 10_000,
+  })
+
+  const withinWindow = await service.checkForUpdate({
+    browserInfo: { isMidori: true },
+    currentVersion: '1.0.0',
+    now: 10_500,
+  })
+
+  const afterWindow = await service.checkForUpdate({
+    browserInfo: { isMidori: true },
+    currentVersion: '1.0.0',
+    now: 11_100,
+  })
+
+  assert.equal(first.eligible, false)
+  assert.equal(withinWindow.source, 'cache')
+  assert.equal(withinWindow.reason, 'check-window-active')
+  assert.equal(afterWindow.source, 'network')
+  assert.equal(afterWindow.eligible, true)
+  assert.equal(client.calls.length, 2)
+})
+
+test('reintenta rapido despues de error de red', async () => {
+  const storage = createMemoryStorage()
+  const client = createClientMock([
+    new Error('temporary network issue'),
+    {
+      release: { version: '1.2.0', name: 'v1.2.0' },
+      etag: 'W/etag-7',
+      status: 200,
+      notModified: false,
+    },
+  ])
+  const service = new MidoriUpdateService({
+    storage,
+    client,
+    errorWindowMs: 500,
+    noUpdateWindowMs: 60_000,
+  })
+
+  const first = await service.checkForUpdate({
+    browserInfo: { isMidori: true },
+    currentVersion: '1.0.0',
+    now: 20_000,
+  })
+
+  const cachedError = await service.checkForUpdate({
+    browserInfo: { isMidori: true },
+    currentVersion: '1.0.0',
+    now: 20_100,
+  })
+
+  const retry = await service.checkForUpdate({
+    browserInfo: { isMidori: true },
+    currentVersion: '1.0.0',
+    now: 20_600,
+  })
+
+  assert.equal(first.reason, 'error')
+  assert.equal(cachedError.source, 'cache')
+  assert.equal(cachedError.reason, 'check-window-active')
+  assert.equal(retry.source, 'network')
+  assert.equal(retry.eligible, true)
+  assert.equal(client.calls.length, 2)
 })
 
 test('reutiliza ETag al expirar cache diaria y responde 304', async () => {
