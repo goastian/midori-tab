@@ -1,7 +1,7 @@
 {
   "name": "midori-newtab",
   "private": true,
-  "version": "1.0.16",
+  "version": "1.0.17",
   "type": "module",
   "scripts": {
     "dev:chrome": "npm run build:manifest:chrome && vite build --watch",
