@@ -79,10 +79,34 @@ export default {
 
   computed: {
     placeholder() {
-      return this.i18n.t.search?.placeholder || `Buscar con ${DEFAULT_ENGINE.label}...`;
+      const key = 'search.placeholderWithEngine';
+      const translated = this.i18n.$t(key);
+      if (translated !== key) {
+        return String(translated).replace('{engine}', DEFAULT_ENGINE.label);
+      }
+
+      const fallbackByLocale = {
+        es: 'Buscar con {engine}...',
+        en: 'Search with {engine}...',
+        pt: 'Pesquisar com {engine}...',
+        fr: 'Rechercher avec {engine}...',
+        de: 'Suchen mit {engine}...',
+        ru: 'Искать с помощью {engine}...',
+        zh: '使用 {engine} 搜索...',
+        ja: '{engine} で検索...',
+        it: 'Cerca con {engine}...',
+      };
+
+      const template = fallbackByLocale[this.i18n.locale] || fallbackByLocale.en;
+      return template.replace('{engine}', DEFAULT_ENGINE.label);
     },
     searchLabel() {
-      return this.i18n.t.search?.button || 'Buscar';
+      const key = 'search.button';
+      const translated = this.i18n.$t(key);
+      if (translated !== key) return translated;
+
+      const quickSettingsSearch = this.i18n.$t('dashboard.quickSettings.search');
+      return quickSettingsSearch !== 'dashboard.quickSettings.search' ? quickSettingsSearch : 'Search';
     },
   },
 
