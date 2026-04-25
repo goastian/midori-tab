@@ -264,6 +264,12 @@ export default {
   color: var(--color-text-muted, #5A9A82);
 }
 
+.search-input:focus,
+.search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* Search button */
 .search-btn {
   display: flex;
