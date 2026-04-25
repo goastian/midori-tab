@@ -27,9 +27,7 @@
         <section v-if="activeGridWidgets.length" class="dash-widgets">
             <div v-for="key in activeGridWidgets" :key="key" class="widget-card">
                 <button class="widget-close" @click="widgetsStore.toggle(key)" title="Close widget">✕</button>
-                <LazyMount>
-                    <component :is="widgetComponentMap[key]" />
-                </LazyMount>
+                <component :is="widgetComponentMap[key]" />
             </div>
         </section>
 
@@ -188,15 +186,18 @@ import useWidgetsStore from '../stores/useWidgetsStore';
 import useI18nStore from '../stores/useI18nStore.js';
 
 /** Widget keys for the bottom sheet (everything except search & bookmarks). */
-const GRID_KEYS = ['privacy', 'rss', 'calendar', 'notes', 'todo'];
+const GRID_KEYS = ['weather', 'currency', 'browserBookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
 
 /** Widget metadata for the bottom sheet picker. */
 const WIDGET_META = [
-    { key: 'privacy', icon: '🛡️', label: 'Privacy' },
-    { key: 'calendar', icon: '📅', label: 'Calendar' },
-    { key: 'notes', icon: '📝', label: 'Sticky Note' },
-    { key: 'todo', icon: '✅', label: 'Tasks' },
-    { key: 'rss', icon: '📰', label: 'Feeds' },
+    { key: 'weather', icon: '⛅', labelKey: 'widgets.weather' },
+    { key: 'currency', icon: '💹', labelKey: 'widgets.currency' },
+    { key: 'browserBookmarks', icon: '🔖', labelKey: 'dashboard.quickSettings.bookmarks' },
+    { key: 'privacy', icon: '🛡️', labelKey: 'widgets.privacy' },
+    { key: 'calendar', icon: '📅', labelKey: 'widgets.calendar' },
+    { key: 'notes', icon: '📝', labelKey: 'widgets.notes' },
+    { key: 'todo', icon: '✅', labelKey: 'widgets.todo' },
+    { key: 'rss', icon: '📰', labelKey: 'widgets.rss' },
 ];
 
 export default {
@@ -225,15 +226,20 @@ export default {
     computed: {
         /** Returns the grid widgets that are enabled, in configured order. */
         activeGridWidgets() {
-            return this.widgetsStore.order.filter(
-                k => GRID_KEYS.includes(k) && this.widgetsStore.enabled[k]
-            );
+            // Use fixed grid keys so stale persisted order cannot hide new widgets.
+            return GRID_KEYS.filter(k => this.widgetsStore.enabled[k]);
         },
         availableWidgets() {
-            return WIDGET_META;
+            return WIDGET_META.map(widget => ({
+                ...widget,
+                label: this.i18n.$t(widget.labelKey),
+            }));
         },
         widgetComponentMap() {
             return {
+                weather: 'WeatherWidget',
+                currency: 'CurrencyWidget',
+                browserBookmarks: 'BrowserBookmarksWidget',
                 privacy: 'PrivacyWidget',
                 rss: 'RssWidget',
                 calendar: 'CalendarWidget',
@@ -319,11 +325,13 @@ export default {
         SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
         BookmarkGrid: defineAsyncComponent(() => import('../components/BookmarkGrid.vue')),
         PrivacyWidget: defineAsyncComponent(() => import('../components/PrivacyWidget.vue')),
+        WeatherWidget: defineAsyncComponent(() => import('../components/WeatherWidget.vue')),
+        CurrencyWidget: defineAsyncComponent(() => import('../components/CurrencyWidget.vue')),
+        BrowserBookmarksWidget: defineAsyncComponent(() => import('../components/BrowserBookmarksWidget.vue')),
         RssWidget: defineAsyncComponent(() => import('../components/RssWidget.vue')),
         CalendarWidget: defineAsyncComponent(() => import('../components/CalendarWidget.vue')),
         NotesWidget: defineAsyncComponent(() => import('../components/NotesWidget.vue')),
         TodoWidget: defineAsyncComponent(() => import('../components/TodoWidget.vue')),
-        LazyMount: defineAsyncComponent(() => import('../components/LazyMount.vue')),
         MarketplaceBrowser: defineAsyncComponent(() => import('../components/MarketplaceBrowser.vue')),
     },
 };

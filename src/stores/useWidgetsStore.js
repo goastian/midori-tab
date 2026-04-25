@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { resolveBuiltinWidgetKey } from '../utils/marketplaceAssets.js';
 
 /** Default widget order */
-const DEFAULT_ORDER = ['search', 'bookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
+const DEFAULT_ORDER = ['search', 'bookmarks', 'weather', 'currency', 'browserBookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
 
 /**
  * Store that manages which widgets are enabled and their display order.
@@ -13,6 +13,9 @@ const useWidgetsStore = defineStore('widgetsStore', {
     enabled: {
       search: true,
       bookmarks: true,
+      weather: false,
+      currency: false,
+      browserBookmarks: false,
       privacy: true,
       rss: false,
       calendar: false,
@@ -94,6 +97,9 @@ const useWidgetsStore = defineStore('widgetsStore', {
         store.enabled = {
           search: !!raw.search,
           bookmarks: !!raw.bookmarks,
+          weather: !!raw.weather,
+          currency: !!raw.currency,
+          browserBookmarks: !!raw.browserBookmarks,
           privacy: raw.privacy !== false,
           rss: !!raw.rss,
           calendar: !!raw.calendar,
@@ -102,6 +108,18 @@ const useWidgetsStore = defineStore('widgetsStore', {
         };
         store.order = [...DEFAULT_ORDER];
       }
+
+      // Ensure new widget keys exist in persisted enabled map.
+      if (!Object.prototype.hasOwnProperty.call(store.enabled, 'weather')) {
+        store.enabled.weather = false;
+      }
+      if (!Object.prototype.hasOwnProperty.call(store.enabled, 'currency')) {
+        store.enabled.currency = false;
+      }
+      if (!Object.prototype.hasOwnProperty.call(store.enabled, 'browserBookmarks')) {
+        store.enabled.browserBookmarks = false;
+      }
+
       // Ensure order array contains all widget keys
       for (const key of DEFAULT_ORDER) {
         if (!store.order.includes(key)) {
