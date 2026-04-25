@@ -61,6 +61,7 @@
   import useThemeStore from './stores/useThemeStore.js';
 
   const MIDORI_DOWNLOAD_URL = 'https://astian.org/midori-browser/download';
+  const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
   export default {
     data() {
@@ -76,7 +77,8 @@
         imageAuthorLink: "",
         imageLink: "",
         autoTheme: null,
-        updateService: markRaw(new MidoriUpdateService()),
+        updateCheckIntervalId: null,
+        updateService: markRaw(new MidoriUpdateService({ checkIntervalMs: UPDATE_CHECK_INTERVAL_MS })),
         updateNotice: {
           visible: false,
           latestVersion: '',
@@ -150,6 +152,10 @@
       if (this.autoTheme) {
         this.autoTheme.stop();
       }
+      if (this.updateCheckIntervalId) {
+        clearInterval(this.updateCheckIntervalId);
+        this.updateCheckIntervalId = null;
+      }
     },
 
     methods: {
@@ -192,6 +198,7 @@
         const enable = async () => {
           this.renderSmartSuggestions = true;
           await this.checkMidoriUpdate();
+          this.startMidoriUpdatePolling();
         };
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
           window.requestIdleCallback(enable, { timeout: 1000 });
@@ -210,6 +217,16 @@
         window.addEventListener('midori:refresh-wallpaper', listener);
       },
 
+      startMidoriUpdatePolling() {
+        if (this.updateCheckIntervalId) {
+          clearInterval(this.updateCheckIntervalId);
+        }
+
+        this.updateCheckIntervalId = setInterval(() => {
+          this.checkMidoriUpdate();
+        }, UPDATE_CHECK_INTERVAL_MS);
+      },
+
       async checkMidoriUpdate() {
         try {
           const browserInfo = getBrowserInfo();
@@ -221,6 +238,11 @@
           if (result.eligible) {
             this.updateNotice = {
               visible: true,
+              latestVersion: result.latestVersion || '',
+            };
+          } else if (!result.deferredToday) {
+            this.updateNotice = {
+              visible: false,
               latestVersion: result.latestVersion || '',
             };
           }

@@ -58,7 +58,11 @@ test('usa cache diaria y evita segunda llamada de red en la misma ventana', asyn
       notModified: false,
     },
   ])
-  const service = new MidoriUpdateService({ storage, client })
+  const service = new MidoriUpdateService({
+    storage,
+    client,
+    checkIntervalMs: 60_000,
+  })
 
   const first = await service.checkForUpdate({
     browserInfo: { isMidori: true },
@@ -79,7 +83,7 @@ test('usa cache diaria y evita segunda llamada de red en la misma ventana', asyn
   assert.equal(client.calls.length, 1)
 })
 
-test('reintenta en ventana corta cuando no hay update disponible', async () => {
+test('hace ping de nuevo al expirar la ventana fija de 30 minutos', async () => {
   const storage = createMemoryStorage()
   const client = createClientMock([
     {
@@ -98,8 +102,7 @@ test('reintenta en ventana corta cuando no hay update disponible', async () => {
   const service = new MidoriUpdateService({
     storage,
     client,
-    noUpdateWindowMs: 1_000,
-    dailyWindowMs: 60_000,
+    checkIntervalMs: 1_000,
   })
 
   const first = await service.checkForUpdate({
@@ -128,7 +131,7 @@ test('reintenta en ventana corta cuando no hay update disponible', async () => {
   assert.equal(client.calls.length, 2)
 })
 
-test('reintenta rapido despues de error de red', async () => {
+test('hace ping de nuevo al expirar la ventana fija incluso tras error de red', async () => {
   const storage = createMemoryStorage()
   const client = createClientMock([
     new Error('temporary network issue'),
@@ -142,8 +145,7 @@ test('reintenta rapido despues de error de red', async () => {
   const service = new MidoriUpdateService({
     storage,
     client,
-    errorWindowMs: 500,
-    noUpdateWindowMs: 60_000,
+    checkIntervalMs: 500,
   })
 
   const first = await service.checkForUpdate({
@@ -188,7 +190,11 @@ test('reutiliza ETag al expirar cache diaria y responde 304', async () => {
       notModified: true,
     },
   ])
-  const service = new MidoriUpdateService({ storage, client })
+  const service = new MidoriUpdateService({
+    storage,
+    client,
+    checkIntervalMs: 24 * 60 * 60 * 1000,
+  })
 
   await service.checkForUpdate({
     browserInfo: { isMidori: true },
@@ -217,7 +223,11 @@ test('deferForToday bloquea la alerta hasta el siguiente dia', async () => {
       notModified: false,
     },
   ])
-  const service = new MidoriUpdateService({ storage, client })
+  const service = new MidoriUpdateService({
+    storage,
+    client,
+    deferWindowMs: 24 * 60 * 60 * 1000,
+  })
 
   await service.checkForUpdate({
     browserInfo: { isMidori: true },

@@ -4,8 +4,8 @@ import { compareSemver } from '../utils/semver.js'
 
 const STORAGE_KEY = 'midori_update_check_state_v1'
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
-const DEFAULT_NO_UPDATE_WINDOW_MS = 2 * 60 * 60 * 1000
-const DEFAULT_ERROR_WINDOW_MS = 30 * 60 * 1000
+const DEFAULT_CHECK_INTERVAL_MS = 30 * 60 * 1000
+const DEFAULT_DEFER_WINDOW_MS = ONE_DAY_MS
 
 function createStorageAdapter() {
   try {
@@ -53,25 +53,12 @@ export default class MidoriUpdateService {
     this.storageKey = options.storageKey || STORAGE_KEY
     this.storage = options.storage || createStorageAdapter()
     this.client = options.client || new GitHubReleaseClient({ timeout: options.timeout })
-    this.dailyWindowMs = Number(options.dailyWindowMs) > 0 ? Number(options.dailyWindowMs) : ONE_DAY_MS
-    this.noUpdateWindowMs = Number(options.noUpdateWindowMs) > 0
-      ? Number(options.noUpdateWindowMs)
-      : DEFAULT_NO_UPDATE_WINDOW_MS
-    this.errorWindowMs = Number(options.errorWindowMs) > 0
-      ? Number(options.errorWindowMs)
-      : DEFAULT_ERROR_WINDOW_MS
-  }
-
-  #getCheckWindowMs(state, currentVersion) {
-    if (state.lastResult === 'error') {
-      return this.errorWindowMs
-    }
-
-    const hasCachedUpdate = state.latestVersion
-      ? compareSemver(state.latestVersion, currentVersion) > 0
-      : false
-
-    return hasCachedUpdate ? this.dailyWindowMs : this.noUpdateWindowMs
+    this.checkIntervalMs = Number(options.checkIntervalMs) > 0
+      ? Number(options.checkIntervalMs)
+      : DEFAULT_CHECK_INTERVAL_MS
+    this.deferWindowMs = Number(options.deferWindowMs) > 0
+      ? Number(options.deferWindowMs)
+      : DEFAULT_DEFER_WINDOW_MS
   }
 
   getCachedState() {
@@ -102,9 +89,7 @@ export default class MidoriUpdateService {
       }
     }
 
-    const checkWindowMs = this.#getCheckWindowMs(state, currentVersion)
-
-    if (!force && isWithinWindow(state.lastCheckedAt, now, checkWindowMs)) {
+    if (!force && isWithinWindow(state.lastCheckedAt, now, this.checkIntervalMs)) {
       return {
         state,
         currentVersion,
@@ -180,7 +165,7 @@ export default class MidoriUpdateService {
     const hasNewerVersion = latestVersion
       ? compareSemver(latestVersion, currentVersion) > 0
       : false
-    const deferredToday = isWithinWindow(state.deferredUntil, now, this.dailyWindowMs)
+    const deferredToday = isWithinWindow(state.deferredUntil, now, this.deferWindowMs)
     const eligible = Boolean(browserInfo?.isMidori && hasNewerVersion && !deferredToday)
 
     return {
