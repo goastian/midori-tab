@@ -96,6 +96,16 @@ export default {
     current: 'Current language',
   },
 
+  widgets: {
+    weather: 'Weather',
+    currency: 'Currency',
+    privacy: 'Privacy',
+    calendar: 'Calendar',
+    notes: 'Notes',
+    todo: 'Tasks',
+    rss: 'Feeds',
+  },
+
   common: {
     on: 'On',
     off: 'Off',
@@ -140,6 +150,15 @@ export default {
       title: 'Add a New Widget',
       close: 'Close',
     },
+    widgets: {
+      weather: 'Weather',
+      currency: 'Currency',
+      privacy: 'Privacy',
+      calendar: 'Calendar',
+      notes: 'Notes',
+      todo: 'Tasks',
+      rss: 'Feeds',
+    },
     shortcutsDialog: {
       title: 'Add Bookmark to Speed Dial',
       address: 'Address',
@@ -165,6 +184,65 @@ export default {
       refresh: 'Refresh',
       settings: 'Settings',
       open: 'Open',
+    },
+  },
+
+  bookmarks: {
+    add: 'Add',
+    edit: 'Edit',
+    delete: 'Delete',
+    addCategory: 'Add category',
+    deleteCategory: 'Delete category',
+    newCategory: 'New category name:',
+    bookmarkName: 'Bookmark name:',
+    bookmarkUrl: 'Bookmark URL:',
+    confirmDelete: 'Delete',
+    searchPlaceholder: 'Search bookmarks...',
+    export: 'Export',
+    import: 'Import',
+    importError: 'Could not import the selected file.',
+  },
+
+  weather: {
+    title: 'Weather',
+    loading: 'Loading forecast...',
+    high: 'High',
+    low: 'Low',
+    wind: 'Wind',
+    stale: 'Showing cached data.',
+    useCurrentLocation: 'Use current location',
+    city: 'City',
+    cityPlaceholder: 'Search city',
+    apply: 'Apply',
+    currentLocationLabel: 'Current location',
+    conditions: {
+      clear: 'Clear',
+      cloudy: 'Cloudy',
+      fog: 'Fog',
+      rain: 'Rain',
+      snow: 'Snow',
+      storm: 'Storm',
+      unknown: 'Unknown',
+    },
+    errors: {
+      unavailable: 'Weather service unavailable.',
+      noGeolocation: 'Geolocation is not available.',
+      locationDenied: 'Could not get your location.',
+      cityNotFound: 'City not found.',
+    },
+  },
+
+  currency: {
+    title: 'Currency converter',
+    amount: 'Amount',
+    from: 'From',
+    to: 'To',
+    rate: 'Rate',
+    stale: 'Using cached rates.',
+    loading: 'Updating rates...',
+    rateUnavailable: 'Rate unavailable',
+    errors: {
+      unavailable: 'Currency service unavailable.',
     },
   },
 

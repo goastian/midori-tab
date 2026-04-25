@@ -102,6 +102,16 @@ export default {
     current: 'Idioma actual',
   },
 
+  widgets: {
+    weather: 'Clima',
+    currency: 'Divisas',
+    privacy: 'Privacidad',
+    calendar: 'Calendario',
+    notes: 'Notas',
+    todo: 'Tareas',
+    rss: 'Feeds',
+  },
+
   common: {
     on: 'On',
     off: 'Off',
@@ -146,6 +156,15 @@ export default {
       title: 'Añadir un widget',
       close: 'Cerrar',
     },
+    widgets: {
+      weather: 'Clima',
+      currency: 'Divisas',
+      privacy: 'Privacidad',
+      calendar: 'Calendario',
+      notes: 'Notas',
+      todo: 'Tareas',
+      rss: 'Feeds',
+    },
     shortcutsDialog: {
       title: 'Añadir marcador al Speed Dial',
       address: 'Dirección',
@@ -171,6 +190,65 @@ export default {
       refresh: 'Refrescar',
       settings: 'Configuración',
       open: 'Abrir',
+    },
+  },
+
+  bookmarks: {
+    add: 'Añadir',
+    edit: 'Editar',
+    delete: 'Eliminar',
+    addCategory: 'Añadir categoría',
+    deleteCategory: 'Eliminar categoría',
+    newCategory: 'Nombre de la nueva categoría:',
+    bookmarkName: 'Nombre del marcador:',
+    bookmarkUrl: 'URL del marcador:',
+    confirmDelete: '¿Eliminar',
+    searchPlaceholder: 'Buscar marcadores...',
+    export: 'Exportar',
+    import: 'Importar',
+    importError: 'No se pudo importar el archivo seleccionado.',
+  },
+
+  weather: {
+    title: 'Clima',
+    loading: 'Cargando pronóstico...',
+    high: 'Máx',
+    low: 'Mín',
+    wind: 'Viento',
+    stale: 'Mostrando datos en caché.',
+    useCurrentLocation: 'Usar ubicación actual',
+    city: 'Ciudad',
+    cityPlaceholder: 'Buscar ciudad',
+    apply: 'Aplicar',
+    currentLocationLabel: 'Ubicación actual',
+    conditions: {
+      clear: 'Despejado',
+      cloudy: 'Nublado',
+      fog: 'Niebla',
+      rain: 'Lluvia',
+      snow: 'Nieve',
+      storm: 'Tormenta',
+      unknown: 'Desconocido',
+    },
+    errors: {
+      unavailable: 'Servicio del clima no disponible.',
+      noGeolocation: 'La geolocalización no está disponible.',
+      locationDenied: 'No se pudo obtener tu ubicación.',
+      cityNotFound: 'Ciudad no encontrada.',
+    },
+  },
+
+  currency: {
+    title: 'Conversor de monedas',
+    amount: 'Cantidad',
+    from: 'De',
+    to: 'A',
+    rate: 'Tasa',
+    stale: 'Usando tasas en caché.',
+    loading: 'Actualizando tasas...',
+    rateUnavailable: 'Tasa no disponible',
+    errors: {
+      unavailable: 'Servicio de divisas no disponible.',
     },
   },
 
