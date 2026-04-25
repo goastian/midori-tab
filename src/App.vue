@@ -19,7 +19,6 @@
     <Minimalist />
     <SettingsModal v-if="tabStore.state" />
     <SmartSuggestions v-if="renderSmartSuggestions" />
-    <OnboardingModal v-if="showOnboarding" @close="completeOnboarding" />
       <OmniLauncher />
 
     <Teleport to="body">
@@ -72,7 +71,6 @@
         tabStore: useTabStore(),
         i18n: useI18nStore(),
         refreshWallpaperListener: null,
-        showOnboarding: false,
         renderSmartSuggestions: false,
         imageAuthor: "",
         imageAuthorLink: "",
@@ -91,7 +89,6 @@
       SettingsModal: defineAsyncComponent(() => import('./components/SettingsModal.vue')),
       SpaceSwitcher,
       SmartSuggestions: defineAsyncComponent(() => import('./components/SmartSuggestions.vue')),
-      OnboardingModal: defineAsyncComponent(() => import('./components/OnboardingModal.vue')),
         OmniLauncher,
     },
 
@@ -131,7 +128,6 @@
       this.load();
       this.loadSettings();
       this.setupWallpaperRefresh();
-      this.setupOnboarding();
       this.setupDeferredMounts();
 
       // Apply active theme colors
@@ -212,23 +208,6 @@
         };
         this.refreshWallpaperListener = listener;
         window.addEventListener('midori:refresh-wallpaper', listener);
-      },
-
-      setupOnboarding() {
-        try {
-          const done = localStorage.getItem('midori_onboarding_done') === '1';
-          this.showOnboarding = !done;
-        } catch (e) {
-          this.showOnboarding = false;
-        }
-      },
-
-      completeOnboarding() {
-        this.showOnboarding = false;
-        try {
-          localStorage.setItem('midori_onboarding_done', '1');
-        } catch (e) {
-        }
       },
 
       async checkMidoriUpdate() {

@@ -174,27 +174,6 @@ export default {
     },
   },
 
-  onboarding: {
-    title: 'Bienvenido a Midori Tab',
-    close: 'Cerrar',
-    back: 'Atrás',
-    next: 'Siguiente',
-    done: 'Listo',
-    steps: {
-      widgets: {
-        title: 'Widgets',
-        description: 'Activa widgets desde “Widget” y personaliza tu tablero.',
-      },
-      shortcuts: {
-        title: 'Atajos',
-        description: 'Agrega accesos rápidos a tus sitios favoritos desde “Atajo”.',
-      },
-      themeDensity: {
-        title: 'Tema y densidad',
-        description: 'Cambia tema y densidad desde "Ajustes rápidos".',
-      },
-    },
-  },
   privacy: {
     title: 'Midori Privacy',
     notAvailable: 'Midori Privacy no está instalado o no responde.',
