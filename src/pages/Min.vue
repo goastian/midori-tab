@@ -48,32 +48,14 @@
             </button>
         </div>
 
-        <!-- ═══ Widget bottom sheet ═══ -->
-        <Teleport to="body">
-            <Transition name="sheet-fade">
-                <div v-if="showWidgetSheet" class="sheet-overlay" @click="showWidgetSheet = false"></div>
-            </Transition>
-            <Transition name="sheet-slide">
-                <div v-if="showWidgetSheet" class="widget-sheet">
-                    <div class="sheet-header">
-                        <span class="sheet-title">{{ i18n.$t('dashboard.widgetsSheet.title') }}</span>
-                        <button class="sheet-close" type="button" @click="showWidgetSheet = false" :aria-label="i18n.$t('dashboard.widgetsSheet.close')">✕</button>
-                    </div>
-                    <div class="sheet-grid">
-                        <button
-                            v-for="w in availableWidgets"
-                            :key="w.key"
-                            class="sheet-item"
-                            :class="{ active: widgetsStore.enabled[w.key] }"
-                            @click="toggleWidget(w.key)"
-                        >
-                            <span class="sheet-item-icon">{{ w.icon }}</span>
-                            <span class="sheet-item-label">{{ w.label }}</span>
-                        </button>
-                    </div>
-                </div>
-            </Transition>
-        </Teleport>
+        <WidgetPicker
+            :visible="showWidgetSheet"
+            :widgets="availableWidgets"
+            :enabled="widgetsStore.enabled"
+            :i18n="i18n"
+            @close="showWidgetSheet = false"
+            @toggle="toggleWidget"
+        />
 
         <Teleport to="body">
             <Transition name="sheet-fade">
@@ -187,28 +169,18 @@ import Logo from '../components/Logo.vue';
 import SearchBox from '../components/SearchBox.vue';
 import BookmarkGrid from '../components/BookmarkGrid.vue';
 import PrivacyWidget from '../components/PrivacyWidget.vue';
-
-/** Widget keys for the bottom sheet (everything except search & bookmarks). */
-const GRID_KEYS = ['weather', 'currency', 'browserBookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
-
-/** Widget metadata for the bottom sheet picker. */
-const WIDGET_META = [
-    { key: 'weather', icon: '⛅', labelKey: 'widgets.weather' },
-    { key: 'currency', icon: '💹', labelKey: 'widgets.currency' },
-    { key: 'browserBookmarks', icon: '🔖', labelKey: 'dashboard.quickSettings.bookmarks' },
-    { key: 'privacy', icon: '🛡️', labelKey: 'widgets.privacy' },
-    { key: 'calendar', icon: '📅', labelKey: 'widgets.calendar' },
-    { key: 'notes', icon: '📝', labelKey: 'widgets.notes' },
-    { key: 'todo', icon: '✅', labelKey: 'widgets.todo' },
-    { key: 'rss', icon: '📰', labelKey: 'widgets.rss' },
-];
+import WidgetPicker from '../components/WidgetPicker.vue';
+import { useWidgetManagement } from '../composables/useWidgetManagement.js';
 
 export default {
     data() {
+        const widgetsStore = useWidgetsStore();
+        const i18n = useI18nStore();
         return {
             tab: useTabStore(),
-            widgetsStore: useWidgetsStore(),
-            i18n: useI18nStore(),
+            widgetsStore,
+            i18n,
+            widgetManagement: useWidgetManagement({ widgetsStore, i18n }),
             showWidgetSheet: false,
             showMarketplaceSheet: false,
             activeMarketplaceType: 'wallpaper',
@@ -229,26 +201,13 @@ export default {
     computed: {
         /** Returns the grid widgets that are enabled, in configured order. */
         activeGridWidgets() {
-            // Use fixed grid keys so stale persisted order cannot hide new widgets.
-            return GRID_KEYS.filter(k => this.widgetsStore.enabled[k]);
+            return this.widgetManagement.getActiveGridWidgets();
         },
         availableWidgets() {
-            return WIDGET_META.map(widget => ({
-                ...widget,
-                label: this.i18n.$t(widget.labelKey),
-            }));
+            return this.widgetManagement.getAvailableWidgets();
         },
         widgetComponentMap() {
-            return {
-                weather: 'WeatherWidget',
-                currency: 'CurrencyWidget',
-                browserBookmarks: 'BrowserBookmarksWidget',
-                privacy: 'PrivacyWidget',
-                rss: 'RssWidget',
-                calendar: 'CalendarWidget',
-                notes: 'NotesWidget',
-                todo: 'TodoWidget',
-            };
+            return this.widgetManagement.getWidgetComponentMap();
         },
     },
 
@@ -288,7 +247,7 @@ export default {
 
         /** Toggles a widget on/off from the bottom sheet. */
         toggleWidget(key) {
-            this.widgetsStore.toggle(key);
+            this.widgetManagement.toggleWidget(key);
         },
 
         openMarketplace(type = 'wallpaper') {
@@ -323,6 +282,7 @@ export default {
         SearchBox,
         BookmarkGrid,
         PrivacyWidget,
+        WidgetPicker,
         WeatherWidget: defineAsyncComponent(() => import('../components/WeatherWidget.vue')),
         CurrencyWidget: defineAsyncComponent(() => import('../components/CurrencyWidget.vue')),
         BrowserBookmarksWidget: defineAsyncComponent(() => import('../components/BrowserBookmarksWidget.vue')),

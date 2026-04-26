@@ -73,7 +73,13 @@
 </template>
 
 <script>
-import rssCacheService from '../services/RssCacheService.js';
+import {
+  fetchFeedPayload,
+  getAvailableFeeds,
+  getFeedColor,
+  parseFeedPayload,
+  truncateFeedText,
+} from '../services/RssWidgetService.js';
 
 export default {
   name: 'RssWidget',
@@ -84,36 +90,7 @@ export default {
       feedItems: [],
       loading: false,
       error: null,
-      availableFeeds: [
-        {
-          name: 'BBC News',
-          url: 'https://feeds.bbci.co.uk/news/rss.xml',
-          icon: '🇬🇧',
-          color: '#1e3a8a',
-          description: 'Noticias internacionales'
-        },
-        {
-          name: 'Astian',
-          url: 'https://astian.org/rss',
-          icon: '🚀',
-          color: '#4ecdc4',
-          description: 'Tecnología y desarrollo'
-        },
-        {
-          name: 'Mozilla',
-          url: 'https://blog.mozilla.org/feed/',
-          icon: '🦊',
-          color: '#ff7139',
-          description: 'Web abierta y privacidad'
-        },
-        {
-          name: 'GitHub',
-          url: 'https://github.blog/feed/',
-          icon: '🐙',
-          color: '#24292e',
-          description: 'Desarrollo y código'
-        }
-      ],
+      availableFeeds: getAvailableFeeds(),
       currentFeedIndex: 0,
       showFeedSelector: false,
       autoRefreshInterval: null
@@ -136,7 +113,7 @@ export default {
   
   computed: {
     currentFeedColor() {
-      return this.availableFeeds[this.currentFeedIndex]?.color || '#4ecdc4';
+      return getFeedColor(this.availableFeeds, this.currentFeedIndex);
     }
   },
   
@@ -156,11 +133,11 @@ export default {
       this.feedUrl = currentFeed.url;
       
       try {
-        // Usar servicio de caché optimizado
-        const feedData = await rssCacheService.getFeed(this.feedUrl, forceRefresh);
-        
-        this.feedTitle = feedData.feed.title;
-        this.feedItems = feedData.items;
+        const feedData = await fetchFeedPayload(this.feedUrl, forceRefresh);
+        const parsedData = parseFeedPayload(feedData);
+
+        this.feedTitle = parsedData.feedTitle;
+        this.feedItems = parsedData.feedItems;
         
         // Log si viene de caché (solo en desarrollo)
         if (feedData.fromCache) {
@@ -231,9 +208,7 @@ export default {
     },
     
     truncateText(text, maxLength) {
-      if (!text) return '';
-      if (text.length <= maxLength) return text;
-      return text.substring(0, maxLength) + '...';
+      return truncateFeedText(text, maxLength);
     }
   }
 }
