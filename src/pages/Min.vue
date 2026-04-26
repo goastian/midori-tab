@@ -2,10 +2,10 @@
     <div class="dashboard">
         <!-- ═══ Settings button: fixed top-right ═══ -->
         <button class="settings-btn" type="button" @click="openSettings" :title="i18n.t.settings.title" :aria-label="i18n.t.settings.title">
-            <Settings :size="20" :stroke-width="1.5" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
         <button class="quick-btn" type="button" @click="showQuickSettings = !showQuickSettings" :title="i18n.$t('dashboard.quickSettings.title')" :aria-label="i18n.$t('dashboard.quickSettings.title')">
-            <SlidersHorizontal :size="20" :stroke-width="1.5" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>
         </button>
 
         <!-- ═══ Logo centered ═══ -->
@@ -34,16 +34,16 @@
         <!-- ═══ Bottom action bar ═══ -->
         <div class="bottom-actions">
             <button class="action-btn" type="button" @click="showShortcutDialog = true" :aria-label="i18n.$t('dashboard.actions.shortcut')">
-                <Plus :size="14" :stroke-width="2" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                 <span>{{ i18n.$t('dashboard.actions.shortcut') }}</span>
             </button>
             <button class="action-btn" type="button" @click="showWidgetSheet = !showWidgetSheet" :aria-label="i18n.$t('dashboard.actions.widget')">
-                <Minus v-if="showWidgetSheet" :size="14" :stroke-width="2" />
-                <Plus v-else :size="14" :stroke-width="2" />
+                <svg v-if="showWidgetSheet" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                 <span>{{ i18n.$t('dashboard.actions.widget') }}</span>
             </button>
             <button class="action-btn" type="button" @click="openMarketplace()" :aria-label="i18n.$t('dashboard.actions.marketplace')">
-                <Store :size="14" :stroke-width="2" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2 2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></svg>
                 <span>{{ i18n.$t('dashboard.actions.marketplace') }}</span>
             </button>
         </div>
@@ -180,10 +180,13 @@
 
 <script>
 import { defineAsyncComponent, nextTick } from 'vue';
-import { Settings, SlidersHorizontal, Plus, Minus, Store } from 'lucide-vue-next';
 import useTabStore from '../stores/useTabStore';
 import useWidgetsStore from '../stores/useWidgetsStore';
 import useI18nStore from '../stores/useI18nStore.js';
+import Logo from '../components/Logo.vue';
+import SearchBox from '../components/SearchBox.vue';
+import BookmarkGrid from '../components/BookmarkGrid.vue';
+import PrivacyWidget from '../components/PrivacyWidget.vue';
 
 /** Widget keys for the bottom sheet (everything except search & bookmarks). */
 const GRID_KEYS = ['weather', 'currency', 'browserBookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
@@ -316,15 +319,10 @@ export default {
     },
 
     components: {
-        Settings,
-        SlidersHorizontal,
-        Plus,
-        Minus,
-        Store,
-        Logo: defineAsyncComponent(() => import('../components/Logo.vue')),
-        SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
-        BookmarkGrid: defineAsyncComponent(() => import('../components/BookmarkGrid.vue')),
-        PrivacyWidget: defineAsyncComponent(() => import('../components/PrivacyWidget.vue')),
+        Logo,
+        SearchBox,
+        BookmarkGrid,
+        PrivacyWidget,
         WeatherWidget: defineAsyncComponent(() => import('../components/WeatherWidget.vue')),
         CurrencyWidget: defineAsyncComponent(() => import('../components/CurrencyWidget.vue')),
         BrowserBookmarksWidget: defineAsyncComponent(() => import('../components/BrowserBookmarksWidget.vue')),

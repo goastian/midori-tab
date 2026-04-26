@@ -1,5 +1,3 @@
-import axios from 'axios';
-
 const CACHE_NAME = 'unsplash-image-cache-v1';
 const CACHE_KEY_LIST = 'unsplash_cache_images';
 const CACHE_EXPIRY = 'unsplash_cache_expiry';
@@ -112,13 +110,14 @@ class UnsplashService {
 
   async #fetchSingleImage() {
     try {
-      const { data } = await axios.get('https://api.unsplash.com/photos/random', {
-        params: {
-          client_id: import.meta.env.VITE_UNSPLASH_API,
-          orientation: 'landscape',
-          query: 'landscape',
-        }
+      const params = new URLSearchParams({
+        client_id: import.meta.env.VITE_UNSPLASH_API,
+        orientation: 'landscape',
+        query: 'landscape',
       });
+      const res = await fetch(`https://api.unsplash.com/photos/random?${params}`);
+      if (!res.ok) return null;
+      const data = await res.json();
 
       // Optimizado: webp, calidad 75, ancho limitado
       const imageUrl = `${data.urls.regular}?w=${screenWidth}&fit=crop&fm=webp&q=75`;
@@ -152,15 +151,16 @@ class UnsplashService {
 
   async #precacheImages() {
     try {
-      const { data } = await axios.get('https://api.unsplash.com/photos', {
-        params: {
-          client_id: import.meta.env.VITE_UNSPLASH_API,
-          per_page: this.#total,
-          page: 1,
-          orientation: 'landscape',
-          query: 'landscape',
-        }
+      const params = new URLSearchParams({
+        client_id: import.meta.env.VITE_UNSPLASH_API,
+        per_page: this.#total,
+        page: 1,
+        orientation: 'landscape',
+        query: 'landscape',
       });
+      const res = await fetch(`https://api.unsplash.com/photos?${params}`);
+      if (!res.ok) return;
+      const data = await res.json();
 
       const now = Date.now();
       const newList = [];

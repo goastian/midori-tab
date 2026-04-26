@@ -1,4 +1,3 @@
-import axios from 'axios';
 import Token from '../utils/token';
 
 class User {
@@ -25,15 +24,15 @@ class User {
         const isValidated = await validated.verificate();
         try {
             if (isValidated) {
-                const res = await axios.get(`${import.meta.env.VITE_PASSPORT_SERVER}/api/gateway/user`, {
+                const res = await fetch(`${import.meta.env.VITE_PASSPORT_SERVER}/api/gateway/user`, {
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                         Accept: 'application/json',
                         Authorization: `Bearer ${token}`
                     },
                 });
-                if (res.status == 200) {
-                    this.__user = { ...res.data };
+                if (res.ok) {
+                    this.__user = { ...await res.json() };
                     this.__lastFetch = now;
                     return this.__user;
                 }

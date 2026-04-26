@@ -1,5 +1,5 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "midori-tab",
   "description": "A beautiful, customizable new tab with smart search, workspaces and bookmarks.",
   "author": "Astian, Inc",
@@ -14,10 +14,7 @@
     "bookmarks",
     "history",
     "browsingData",
-    "scripting",
-    "search"
-  ],
-  "host_permissions": [
+    "search",
     "https://api.rss2json.com/*",
     "https://api.unsplash.com/*",
     "https://api.github.com/*",
@@ -27,7 +24,10 @@
     "http://marketplace.astian.org/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "scripts": [
+      "background.js"
+    ],
+    "persistent": false
   },
   "commands": {
     "open-omni": {
@@ -37,14 +37,6 @@
       },
       "description": "Open command menu"
     }
-  },
-  "action": {
-    "default_icon": {
-      "16": "icons/16.png",
-      "48": "icons/48.png",
-      "128": "icons/128.png"
-    },
-    "default_title": "Open Midori command menu"
   },
   "content_scripts": [
     {
@@ -59,21 +51,28 @@
     }
   ],
   "web_accessible_resources": [
-    {
-      "resources": [
-        "globe.svg",
-        "icons/*",
-        "assets/*"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    }
+    "globe.svg",
+    "icons/*",
+    "assets/*"
   ],
   "icons": {
     "16": "icons/16.png",
     "48": "icons/48.png",
     "128": "icons/128.png"
   },
-  "version": "1.0.17"
+  "browser_action": {
+    "default_icon": {
+      "16": "icons/16.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    },
+    "default_title": "Open Midori command menu"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "midoritabs@astian.org",
+      "strict_min_version": "109.0"
+    }
+  },
+  "version": "1.0.18"
 }

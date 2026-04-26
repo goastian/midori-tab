@@ -22,7 +22,14 @@ export default defineConfig({
     __MIDORI_APP_VERSION__: JSON.stringify(APP_VERSION),
   },
   build: {
-    minify: 'esbuild',
+    target: 'es2022',
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_debugger: true,
+        passes: 2,
+      },
+    },
     rollupOptions: {
       input: {
         index: resolve(__dirname, 'index.html'),
@@ -30,12 +37,11 @@ export default defineConfig({
       output: {
         entryFileNames: '[name].js',
         manualChunks: {
-          vendor: ['vue', 'pinia', 'pinia-plugin-persistedstate', 'axios'],
+          vendor: ['vue', 'pinia', 'pinia-plugin-persistedstate'],
         },
       },
     },
     outDir: 'dist',
     emptyOutDir: true,
-    target: 'esnext'
   }
 });

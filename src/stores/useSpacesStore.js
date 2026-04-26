@@ -112,6 +112,29 @@ const useSpacesStore = defineStore('spacesStore', {
   persist: {
     enable: true,
     storage: localStorage,
+    paths: ['spaces', 'activeSpaceId', 'enabled'],
+    serializer: {
+      serialize(state) {
+        const cleaned = {
+          ...state,
+          spaces: Array.isArray(state.spaces)
+            ? state.spaces.map(space => {
+                if (!space?.background) return space;
+                const bg = { ...space.background };
+                // Strip ephemeral blob: URLs — they become invalid between sessions
+                for (const key of Object.keys(bg)) {
+                  if (typeof bg[key] === 'string' && bg[key].startsWith('blob:')) {
+                    delete bg[key];
+                  }
+                }
+                return { ...space, background: bg };
+              })
+            : state.spaces,
+        };
+        return JSON.stringify(cleaned);
+      },
+      deserialize: JSON.parse,
+    },
   },
 });
 

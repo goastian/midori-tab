@@ -3,6 +3,18 @@ import { resolveBuiltinWidgetKey } from '../utils/marketplaceAssets.js';
 
 /** Default widget order */
 const DEFAULT_ORDER = ['search', 'bookmarks', 'weather', 'currency', 'browserBookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
+const DEFAULT_ENABLED = {
+  search: true,
+  bookmarks: true,
+  weather: false,
+  currency: false,
+  browserBookmarks: false,
+  privacy: true,
+  rss: false,
+  calendar: false,
+  notes: false,
+  todo: false,
+};
 
 /**
  * Store that manages which widgets are enabled and their display order.
@@ -10,18 +22,7 @@ const DEFAULT_ORDER = ['search', 'bookmarks', 'weather', 'currency', 'browserBoo
  */
 const useWidgetsStore = defineStore('widgetsStore', {
   state: () => ({
-    enabled: {
-      search: true,
-      bookmarks: true,
-      weather: false,
-      currency: false,
-      browserBookmarks: false,
-      privacy: true,
-      rss: false,
-      calendar: false,
-      notes: false,
-      todo: false,
-    },
+    enabled: { ...DEFAULT_ENABLED },
     /** Ordered list of widget keys — determines render order on the page */
     order: [...DEFAULT_ORDER],
     installedMarketplaceWidgets: {},
@@ -109,15 +110,15 @@ const useWidgetsStore = defineStore('widgetsStore', {
         store.order = [...DEFAULT_ORDER];
       }
 
-      // Ensure new widget keys exist in persisted enabled map.
-      if (!Object.prototype.hasOwnProperty.call(store.enabled, 'weather')) {
-        store.enabled.weather = false;
+      if (!store.enabled || typeof store.enabled !== 'object') {
+        store.enabled = { ...DEFAULT_ENABLED };
       }
-      if (!Object.prototype.hasOwnProperty.call(store.enabled, 'currency')) {
-        store.enabled.currency = false;
-      }
-      if (!Object.prototype.hasOwnProperty.call(store.enabled, 'browserBookmarks')) {
-        store.enabled.browserBookmarks = false;
+
+      // Ensure all widget keys exist in persisted enabled map.
+      for (const [key, defaultValue] of Object.entries(DEFAULT_ENABLED)) {
+        if (!Object.prototype.hasOwnProperty.call(store.enabled, key)) {
+          store.enabled[key] = defaultValue;
+        }
       }
 
       // Ensure order array contains all widget keys

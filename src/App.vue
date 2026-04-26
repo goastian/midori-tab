@@ -55,6 +55,7 @@
   import useI18nStore from './stores/useI18nStore.js';
   import useTabStore from './stores/useTabStore.js';
   import UnsService from './services/UnsService.js';
+  import Minimalist from './pages/Min.vue';
   import SpaceSwitcher from './components/SpaceSwitcher.vue';
   import { useAutoTheme } from './composables/useAutoTheme.js';
     import OmniLauncher from './omni/components/OmniLauncher.vue';
@@ -87,7 +88,7 @@
     },
 
     components: {
-      Minimalist: defineAsyncComponent(() => import('./pages/Min.vue')),
+      Minimalist,
       SettingsModal: defineAsyncComponent(() => import('./components/SettingsModal.vue')),
       SpaceSwitcher,
       SmartSuggestions: defineAsyncComponent(() => import('./components/SmartSuggestions.vue')),
