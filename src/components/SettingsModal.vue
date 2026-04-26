@@ -6,8 +6,11 @@
           <div v-if="settings.state" class="panel" @click.stop>
           <!-- Header -->
           <div class="panel-header">
-            <h2 class="panel-title">{{ i18n.t.settings.title }}</h2>
-            <button @click="closeSettings" class="panel-close">
+            <div class="panel-heading">
+              <h2 class="panel-title">{{ i18n.t.settings.title }}</h2>
+              <p class="panel-subtitle">{{ navs[tab]?.description }}</p>
+            </div>
+            <button @click="closeSettings" class="panel-close" aria-label="Close settings">
               <span>✕</span>
             </button>
           </div>
@@ -21,7 +24,10 @@
               :class="['panel-tab', { active: index === tab }]"
             >
               <span class="tab-icon">{{ item.emoji }}</span>
-              <span class="tab-label">{{ item.title }}</span>
+              <span class="tab-copy">
+                <span class="tab-label">{{ item.title }}</span>
+                <span class="tab-desc">{{ item.description }}</span>
+              </span>
             </button>
           </nav>
 
@@ -65,7 +71,6 @@
 </template>
 
 <script>
-import { watch } from 'vue';
 import useTabStore from '../stores/useTabStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import useThemeStore from '../stores/useThemeStore.js';
@@ -207,12 +212,12 @@ export default {
 
 /* ── Panel container ── */
 .panel {
-  width: 380px;
-  max-width: 92vw;
+  width: 420px;
+  max-width: 94vw;
   height: 100vh;
   background: var(--surface-base, #080D14);
   border-left: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  box-shadow: -4px 0 24px rgba(0,0,0,0.25);
+  box-shadow: -14px 0 50px rgba(0, 0, 0, 0.42);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -221,19 +226,37 @@ export default {
 /* ── Header ── */
 .panel-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
+  padding: 1rem 1.1rem 0.9rem;
   border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  background: var(--surface-raised, #0F1520);
+  background:
+    linear-gradient(180deg, rgba(8, 20, 32, 0.96), rgba(8, 16, 28, 0.94)),
+    radial-gradient(circle at 12% -20%, rgba(4, 164, 105, 0.16), transparent 42%);
   flex-shrink: 0;
 }
 
+.panel-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  min-width: 0;
+}
+
 .panel-title {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--color-text, white);
   margin: 0;
+  line-height: 1.2;
+}
+
+.panel-subtitle {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--color-text-muted, #5A9A82);
+  line-height: 1.25;
+  letter-spacing: 0.01em;
 }
 
 .panel-close {
@@ -258,29 +281,30 @@ export default {
 
 /* ── Horizontal tab bar ── */
 .panel-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 0.5rem 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  padding: 0.65rem 0.8rem;
   border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
   background: var(--surface-sunken, #060A10);
   flex-shrink: 0;
-  overflow-x: auto;
 }
 
 .panel-tab {
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.45rem 0.7rem;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.5rem 0.58rem;
   border: none;
   background: transparent;
   border-radius: var(--radius-sm, 6px);
   cursor: pointer;
   color: var(--color-text-muted, #5A9A82);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 500;
-  white-space: nowrap;
   transition: all 0.12s ease;
+  min-width: 0;
+  text-align: left;
 }
 
 .panel-tab:hover {
@@ -294,107 +318,132 @@ export default {
 }
 
 .tab-icon {
-  font-size: 0.9rem;
+  font-size: 0.86rem;
+  line-height: 1;
+  margin-top: 0.08rem;
+}
+
+.tab-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.08rem;
 }
 
 .tab-label {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1.15;
+}
+
+.tab-desc {
+  font-size: 0.67rem;
+  line-height: 1.15;
+  color: color-mix(in srgb, var(--color-text-muted, #5A9A82) 90%, white 10%);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ── Scrollable content area ── */
 .panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem 1.25rem;
+  padding: 1rem 1rem 1.15rem;
 }
 
 /* ── Sections ── */
-.settings-section {
+:deep(.settings-section) {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.8rem;
 }
 
-.section-header {
+:deep(.section-header) {
   margin-bottom: 0.25rem;
 }
 
-.section-title-main {
+:deep(.section-title-main) {
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text, white);
   margin: 0 0 0.2rem 0;
+  line-height: 1.2;
 }
 
-.section-subtitle {
+:deep(.section-subtitle) {
   font-size: 0.78rem;
   color: var(--color-text-muted, #5A9A82);
   margin: 0;
+  line-height: 1.3;
 }
 
 /* ── Setting item rows ── */
-.setting-item {
+:deep(.setting-item) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 0.85rem;
+  padding: 0.85rem 0.92rem;
   background: var(--surface-raised, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-md, 10px);
   gap: 0.75rem;
   transition: all 0.1s ease;
 }
 
-.setting-item:hover {
+:deep(.setting-item:hover) {
   background: var(--surface-overlay, #1E2D3D);
   border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 /* Stacked variant: label on top, control below (for dropdowns/inputs in narrow panel) */
-.setting-item--stacked {
+:deep(.setting-item--stacked) {
   flex-direction: column;
   align-items: stretch;
 }
 
-.setting-info {
+:deep(.setting-info) {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.2rem;
   flex: 1;
   min-width: 0;
 }
 
-.setting-label {
+:deep(.setting-label) {
   font-weight: 500;
   color: var(--color-text, white);
-  font-size: 0.85rem;
+  font-size: 0.84rem;
+  line-height: 1.25;
+  display: block;
 }
 
-.setting-description {
+:deep(.setting-description) {
   font-size: 0.72rem;
   color: var(--color-text-muted, #5A9A82);
   line-height: 1.3;
+  display: block;
 }
 
-.separator {
+:deep(.separator) {
   height: 1px;
   background: var(--color-border, rgba(126,196,168,0.1));
-  margin: 0.35rem 0;
+  margin: 0.5rem 0;
 }
 
-.marketplace-shortcut {
+:deep(.marketplace-shortcut) {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.85rem;
   padding: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
   border-radius: var(--radius-md, 10px);
   background: linear-gradient(135deg, rgba(4, 164, 105, 0.12), rgba(15, 21, 32, 0.88));
   border: 1px solid rgba(4, 164, 105, 0.18);
 }
 
-.marketplace-shortcut-btn {
+:deep(.marketplace-shortcut-btn) {
   border: none;
   background: var(--color-primary, #04A469);
   color: #fff;
@@ -406,7 +455,7 @@ export default {
 }
 
 /* ── Gradients ── */
-.gradients-section {
+:deep(.gradients-section) {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -416,19 +465,19 @@ export default {
   border-radius: var(--radius-sm, 6px);
 }
 
-.section-label {
+:deep(.section-label) {
   font-weight: 500;
   color: var(--color-text, white);
   font-size: 0.85rem;
 }
 
-.gradients-grid {
+:deep(.gradients-grid) {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.5rem;
 }
 
-.gradient-card {
+:deep(.gradient-card) {
   height: 56px;
   border-radius: var(--radius-sm, 6px);
   cursor: pointer;
@@ -439,16 +488,16 @@ export default {
   justify-content: center;
 }
 
-.gradient-card:hover {
+:deep(.gradient-card:hover) {
   transform: scale(1.03);
   border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
-.gradient-card.active {
+:deep(.gradient-card.active) {
   border-color: var(--color-primary, #04A469);
 }
 
-.check-icon {
+:deep(.check-icon) {
   font-size: 1.2rem;
   color: white;
 }
@@ -533,16 +582,22 @@ export default {
   }
 
   .panel-tabs {
-    padding: 0.4rem 0.5rem;
+    grid-template-columns: 1fr;
+    gap: 0.32rem;
+    padding: 0.45rem 0.55rem;
   }
 
-  .gradients-grid {
+  :deep(.gradients-grid) {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .marketplace-shortcut {
+  :deep(.marketplace-shortcut) {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .panel-content {
+    padding: 0.8rem 0.75rem 0.95rem;
   }
 }
 </style>
