@@ -96,10 +96,6 @@ import OmniResultItem from './OmniResultItem.vue';
 
 const MAX_VISIBLE = 100;
 
-function addHttp(url) {
-  return /^(?:f|ht)tps?\:\/\//.test(url) ? url : 'http://' + url;
-}
-
 export default {
   name: 'OmniLauncher',
   components: { OmniResultItem },
@@ -187,53 +183,35 @@ export default {
 
       omniStore.close();
 
-      if (isRemoveMode) {
-        chrome.runtime.sendMessage({ request: 'remove', type: item.type, action: item });
-        return;
-      }
+      chrome.runtime.sendMessage(
+        {
+          request: 'execute-omni-item',
+          item,
+          query: q,
+          newTab,
+          removeMode: isRemoveMode,
+        },
+        (response) => {
+          if (chrome.runtime.lastError) return;
 
-      switch (item.action) {
-        case 'switch-tab':
-          chrome.runtime.sendMessage({ request: 'switch-tab', tab: item });
-          break;
-        case 'bookmark':
-        case 'history':
-          window.open(item.url, newTab ? '_blank' : '_self');
-          break;
-        case 'goto':
-          window.open(addHttp(q), newTab ? '_blank' : '_self');
-          break;
-        case 'search':
-          chrome.runtime.sendMessage({ request: 'search', query: q });
-          break;
-        case 'url':
-          window.open(item.url, newTab ? '_blank' : '_self');
-          break;
-        case 'new-tab':
-          window.open('', '_blank');
-          break;
-        case 'email':
-          window.open('mailto:');
-          break;
-        case 'print':
-          window.print();
-          break;
-        case 'fullscreen':
-          document.documentElement.requestFullscreen?.();
-          break;
-        case 'scroll-top':
-          window.scrollTo(0, 0);
-          break;
-        case 'scroll-bottom':
-          window.scrollTo(0, document.body.scrollHeight);
-          break;
-        default:
-          if (item.url) {
-            window.open(item.url, newTab ? '_blank' : '_self');
-          } else {
-            chrome.runtime.sendMessage({ request: item.action, tab: item, query: q });
+          switch (response?.localAction) {
+            case 'print':
+              window.print();
+              break;
+            case 'fullscreen':
+              document.documentElement.requestFullscreen?.();
+              break;
+            case 'scroll-top':
+              window.scrollTo(0, 0);
+              break;
+            case 'scroll-bottom':
+              window.scrollTo(0, document.body.scrollHeight);
+              break;
+            default:
+              break;
           }
-      }
+        }
+      );
     }
 
     // ── Global keyboard shortcut for new-tab context ───────────────────────

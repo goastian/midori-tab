@@ -415,6 +415,23 @@ async function switchTab(tab) {
   await safeCallChrome(chrome.windows.update.bind(chrome.windows), tab.windowId, { focused: true });
 }
 
+async function openUrlFromCurrentTab(url, newTab = false) {
+  if (!url) return;
+
+  if (newTab) {
+    chrome.tabs.create({ url });
+    return;
+  }
+
+  const currentTab = await getCurrentTab();
+  if (currentTab?.id) {
+    chrome.tabs.update(currentTab.id, { url });
+    return;
+  }
+
+  chrome.tabs.create({ url });
+}
+
 async function executeAction(message) {
   switch (message.request) {
     case 'switch-tab':
@@ -526,6 +543,58 @@ async function executeAction(message) {
   }
 }
 
+async function executeOmniItem(message) {
+  const item = message.item || {};
+  const query = message.query || '';
+  const removeMode = Boolean(message.removeMode);
+  const newTab = Boolean(message.newTab);
+
+  if (removeMode) {
+    await executeAction({ request: 'remove', type: item.type, action: item });
+    return { handled: true };
+  }
+
+  switch (item.action) {
+    case 'switch-tab':
+      await executeAction({ request: 'switch-tab', tab: item });
+      return { handled: true };
+    case 'bookmark':
+    case 'history':
+    case 'url':
+      if (item.url) {
+        await openUrlFromCurrentTab(item.url, newTab);
+      }
+      return { handled: true };
+    case 'goto':
+      await openUrlFromCurrentTab(addHttp(query), newTab);
+      return { handled: true };
+    case 'search':
+      await executeAction({ request: 'search', query });
+      return { handled: true };
+    case 'new-tab':
+      await executeAction({ request: 'new-tab' });
+      return { handled: true };
+    case 'email':
+      await openUrlFromCurrentTab('mailto:', newTab);
+      return { handled: true };
+    case 'print':
+    case 'fullscreen':
+    case 'scroll-top':
+    case 'scroll-bottom':
+      return { handled: false, localAction: item.action };
+    default:
+      if (item.url) {
+        await openUrlFromCurrentTab(item.url, newTab);
+        return { handled: true };
+      }
+      if (item.action) {
+        await executeAction({ request: item.action, tab: item, query });
+        return { handled: true };
+      }
+      return { handled: false };
+  }
+}
+
 // ─── Message Handler ─────────────────────────────────────────────────────────
 async function handleMessage(message) {
   switch (message.request) {
@@ -536,6 +605,10 @@ async function handleMessage(message) {
     case 'query-omni': {
       const results = await queryOmni(message.query ?? '');
       return { results };
+    }
+
+    case 'execute-omni-item': {
+      return executeOmniItem(message);
     }
 
     case 'search-history': {
