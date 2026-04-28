@@ -46,14 +46,6 @@
     },
     "default_title": "Open Midori command menu"
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "run_at": "document_idle",
-      "js": ["omni-content.js"],
-      "all_frames": false
-    }
-  ],
   "web_accessible_resources": [
     {
       "resources": ["globe.svg", "icons/*", "assets/*"],

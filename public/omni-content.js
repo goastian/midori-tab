@@ -17,7 +17,12 @@
   }, { capture: true });
 
   // ── Message listener ────────────────────────────────────────────────────
-  chrome.runtime.onMessage.addListener((message) => {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.request === 'omni-handshake') {
+      sendResponse({ ok: true });
+      return;
+    }
+
     if (message.request === 'open-omni') {
       if (isOpen) {
         closeOverlay();
@@ -25,6 +30,8 @@
         openOverlay();
       }
     }
+
+    return undefined;
   });
 
   // ── Build overlay ────────────────────────────────────────────────────────
@@ -40,11 +47,7 @@
       const input = overlay.querySelector('.omni-cs-input');
       input && input.focus();
     });
-    // Populate data
-    chrome.runtime.sendMessage({ request: 'get-data' }, (data) => {
-      if (!data) return;
-      renderResults(data.tabs, data.bookmarks, data.actions, '');
-    });
+    executeSearch('');
   }
 
   function closeOverlay() {
@@ -97,11 +100,9 @@
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
-  let allItems = [];
   let visibleItems = [];
   let selectedIdx = 0;
   let debounceTimer = null;
-  const memoCache = new Map();
 
   function onInput(e) {
     clearTimeout(debounceTimer);
@@ -143,94 +144,18 @@
 
   // ── Search ────────────────────────────────────────────────────────────────
   function executeSearch(rawQuery) {
-    const query = expandShorthand(rawQuery).toLowerCase().trim();
-
-    const cached = memoCache.get(query);
-    if (cached) {
-      renderResults(null, null, null, rawQuery, cached);
-      return;
-    }
-
-    if (query.startsWith('/history')) {
-      const q = query.replace('/history', '').trim();
-      chrome.runtime.sendMessage({ request: 'search-history', query: q }, (r) => {
-        const results = r?.history ?? [];
-        memoCache.set(query, results);
-        renderResults(null, null, null, rawQuery, results);
-      });
-      return;
-    }
-    if (query.startsWith('/bookmarks')) {
-      const q = query.replace('/bookmarks', '').trim();
-      if (q) {
-        chrome.runtime.sendMessage({ request: 'search-bookmarks', query: q }, (r) => {
-          const results = r?.bookmarks ?? [];
-          memoCache.set(query, results);
-          renderResults(null, null, null, rawQuery, results);
-        });
-      } else {
-        const results = allItems.filter((i) => i.type === 'bookmark');
-        memoCache.set(query, results);
-        renderResults(null, null, null, rawQuery, results);
+    chrome.runtime.sendMessage({ request: 'query-omni', query: rawQuery }, (response) => {
+      if (chrome.runtime.lastError) {
+        renderResults([]);
+        return;
       }
-      return;
-    }
-
-    let results = filterItems(query, rawQuery);
-    memoCache.set(query, results);
-    renderResults(null, null, null, rawQuery, results);
-  }
-
-  function expandShorthand(q) {
-    if (q === '/t') return '/tabs ';
-    if (q === '/b') return '/bookmarks ';
-    if (q === '/h') return '/history ';
-    if (q === '/r') return '/remove ';
-    if (q === '/a') return '/actions ';
-    return q;
-  }
-
-  function filterItems(lower, rawQuery) {
-    const match = (i) =>
-      (i.title || '').toLowerCase().includes(lower) ||
-      (i.url || '').toLowerCase().includes(lower);
-
-    if (lower === '') return allItems;
-    if (lower.startsWith('/tabs')) {
-      const q = lower.replace('/tabs', '').trim();
-      return allItems.filter((i) => i.type === 'tab' && (q === '' || match(i)));
-    }
-    if (lower.startsWith('/actions')) {
-      const q = lower.replace('/actions', '').trim();
-      return allItems.filter((i) => i.type === 'action' && (q === '' || match(i)));
-    }
-    if (lower.startsWith('/remove')) {
-      const q = lower.replace('/remove', '').trim();
-      return allItems.filter((i) => (i.type === 'tab' || i.type === 'bookmark') && (q === '' || match(i)));
-    }
-
-    const base = allItems.filter(match);
-    if (isValidUrl(lower)) {
-      return [{ type: 'special', action: 'goto', title: rawQuery, desc: 'Go to URL', emoji: true, emojiChar: '🔗', keycheck: false }, ...base];
-    }
-    if (lower) {
-      return [{ type: 'special', action: 'search', title: `"${rawQuery}"`, desc: 'Search the web', emoji: true, emojiChar: '🔍', keycheck: false }, ...base];
-    }
-    return base;
-  }
-
-  function isValidUrl(str) {
-    return /^(https?:\/\/)?((([a-z\d]([a-z\d-]*[a-z\d])*)\.)+[a-z]{2,}|((\d{1,3}\.){3}\d{1,3}))(\:\d+)?(\/[-a-z\d%_.~+]*)*(\?[;&a-z\d%_.~+=-]*)?(\#[-a-z\d_]*)?$/i.test(str);
+      renderResults(response?.results ?? []);
+    });
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  function renderResults(tabs, bookmarks, actions, rawQuery, overrideItems) {
-    if (tabs !== null) {
-      allItems = [...(tabs || []), ...(bookmarks || []), ...(actions || [])];
-      memoCache.clear();
-    }
-
-    visibleItems = overrideItems !== undefined ? overrideItems : filterItems(rawQuery.toLowerCase().trim(), rawQuery);
+  function renderResults(items) {
+    visibleItems = items;
     visibleItems = visibleItems.slice(0, 100);
     selectedIdx = 0;
 

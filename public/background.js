@@ -4,6 +4,10 @@
 
 'use strict';
 
+const OMNI_CONTENT_SCRIPT_FILES = ['omni-content.js'];
+const OMNI_QUERY_TTL = 5_000;
+const omniQueryCache = new Map();
+
 function callChrome(method, ...args) {
   return new Promise((resolve, reject) => {
     try {
@@ -28,6 +32,57 @@ function callChrome(method, ...args) {
 
 function safeCallChrome(method, ...args) {
   return callChrome(method, ...args).catch(() => undefined);
+}
+
+function clearOmniQueryCache() {
+  omniQueryCache.clear();
+}
+
+function isRestrictedOmniUrl(url) {
+  return (
+    !url ||
+    url.startsWith('chrome://') ||
+    url.startsWith('about:') ||
+    url.startsWith('chrome-extension://') ||
+    url.includes('chrome.google.com')
+  );
+}
+
+async function ensureOmniContentScript(tabId) {
+  const ready = await safeCallChrome(
+    chrome.tabs.sendMessage.bind(chrome.tabs),
+    tabId,
+    { request: 'omni-handshake' }
+  );
+
+  if (ready?.ok) {
+    return true;
+  }
+
+  if (chrome.scripting?.executeScript) {
+    await callChrome(
+      chrome.scripting.executeScript.bind(chrome.scripting),
+      {
+        target: { tabId },
+        files: OMNI_CONTENT_SCRIPT_FILES,
+      }
+    );
+    return true;
+  }
+
+  if (chrome.tabs?.executeScript) {
+    await callChrome(
+      chrome.tabs.executeScript.bind(chrome.tabs),
+      tabId,
+      {
+        file: OMNI_CONTENT_SCRIPT_FILES[0],
+        runAt: 'document_idle',
+      }
+    );
+    return true;
+  }
+
+  return false;
 }
 
 // ─── Differential Tabs Cache ───────────────────────────────────────────────
@@ -64,14 +119,17 @@ async function ensureTabsCache() {
 
 chrome.tabs.onCreated.addListener((tab) => {
   tabsCache.set(tab.id, normaliseTab(tab));
+  clearOmniQueryCache();
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabsCache.delete(tabId);
+  clearOmniQueryCache();
 });
 
 chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
   tabsCache.delete(removedTabId);
+  clearOmniQueryCache();
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -89,6 +147,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     // Tab appeared without onCreated (e.g. restored session)
     tabsCache.set(tabId, normaliseTab(tab));
   }
+  clearOmniQueryCache();
+});
+
+chrome.tabs.onActivated.addListener(() => {
+  clearOmniQueryCache();
+});
+
+chrome.windows.onFocusChanged.addListener(() => {
+  clearOmniQueryCache();
 });
 
 // ─── Bookmarks Cache ────────────────────────────────────────────────────────
@@ -99,6 +166,7 @@ function invalidateBookmarks() {
   clearTimeout(bookmarksInvalidateTimer);
   bookmarksInvalidateTimer = setTimeout(() => {
     bookmarksCache = null;
+    clearOmniQueryCache();
   }, 1000);
 }
 
@@ -192,6 +260,31 @@ async function ensureStaticActions() {
   staticActions = buildStaticActions(os === 'mac');
 }
 
+function isValidOmniUrl(str) {
+  return /^(https?:\/\/)?((([a-z\d]([a-z\d-]*[a-z\d])*)\.)+[a-z]{2,}|((\d{1,3}\.){3}\d{1,3}))(\:\d+)?(\/[-a-z\d%_.~+]*)*(\?[;&a-z\d%_.~+=-]*)?(\#[-a-z\d_]*)?$/i.test(str);
+}
+
+function addHttp(url) {
+  return /^(?:f|ht)tps?\:\/\//.test(url) ? url : 'http://' + url;
+}
+
+function expandOmniShorthand(query) {
+  if (query === '/t') return '/tabs ';
+  if (query === '/b') return '/bookmarks ';
+  if (query === '/h') return '/history ';
+  if (query === '/r') return '/remove ';
+  if (query === '/a') return '/actions ';
+  return query;
+}
+
+function matchOmniItem(item, lower) {
+  return (
+    (item.title || '').toLowerCase().includes(lower) ||
+    (item.url || '').toLowerCase().includes(lower) ||
+    (item.desc || '').toLowerCase().includes(lower)
+  );
+}
+
 // ─── Dynamic actions based on current tab ──────────────────────────────────
 async function getDynamicActions() {
   const tabs = await callChrome(chrome.tabs.query.bind(chrome.tabs), { active: true, currentWindow: true });
@@ -209,6 +302,105 @@ async function getDynamicActions() {
     : { title: 'Pin tab', desc: 'Pin the current tab', type: 'action', action: 'pin', emoji: true, emojiChar: '📌', keycheck: true, keys: [alt, '⇧', 'P'] };
 
   return [muteAction, pinAction];
+}
+
+async function collectOmniData() {
+  await ensureStaticActions();
+  await ensureTabsCache();
+
+  const [bookmarks, dynamicActions] = await Promise.all([
+    getBookmarks(),
+    getDynamicActions(),
+  ]);
+
+  return {
+    tabs: Array.from(tabsCache.values()),
+    bookmarks,
+    actions: [...dynamicActions, ...staticActions],
+  };
+}
+
+async function queryOmni(rawQuery) {
+  const expanded = expandOmniShorthand(rawQuery || '');
+  const lower = expanded.toLowerCase().trim();
+  const cached = omniQueryCache.get(lower);
+
+  if (cached && Date.now() - cached.ts < OMNI_QUERY_TTL) {
+    return cached.results;
+  }
+
+  const data = await collectOmniData();
+  const { tabs, bookmarks, actions } = data;
+  let results = [];
+
+  if (lower === '') {
+    results = [...actions];
+  } else if (lower.startsWith('/history')) {
+    const historyQuery = lower.replace('/history', '').trim();
+    const historyResults = await callChrome(chrome.history.search.bind(chrome.history), {
+      text: historyQuery,
+      maxResults: 50,
+      startTime: 0,
+    });
+    results = (historyResults || []).map((entry) => ({
+      id: entry.id,
+      title: entry.title || entry.url,
+      desc: entry.url,
+      url: entry.url,
+      type: 'history',
+      action: 'history',
+      emoji: true,
+      emojiChar: '🏛',
+      keycheck: false,
+    }));
+  } else if (lower.startsWith('/bookmarks')) {
+    const bookmarkQuery = lower.replace('/bookmarks', '').trim();
+    if (bookmarkQuery) {
+      const bookmarkResults = await callChrome(chrome.bookmarks.search.bind(chrome.bookmarks), { query: bookmarkQuery });
+      results = (bookmarkResults || [])
+        .filter((bookmark) => Boolean(bookmark.url))
+        .map((bookmark) => ({
+          id: bookmark.id,
+          title: bookmark.title || bookmark.url,
+          desc: bookmark.url,
+          url: bookmark.url,
+          type: 'bookmark',
+          action: 'bookmark',
+          emoji: true,
+          emojiChar: '⭐️',
+          keycheck: false,
+        }));
+    } else {
+      results = bookmarks;
+    }
+  } else if (lower.startsWith('/tabs')) {
+    const tabQuery = lower.replace('/tabs', '').trim();
+    results = tabQuery ? tabs.filter((tab) => matchOmniItem(tab, tabQuery)) : tabs;
+  } else if (lower.startsWith('/actions')) {
+    const actionQuery = lower.replace('/actions', '').trim();
+    results = actionQuery ? actions.filter((action) => matchOmniItem(action, actionQuery)) : actions;
+  } else if (lower.startsWith('/remove')) {
+    const removeQuery = lower.replace('/remove', '').trim();
+    const removables = [...tabs, ...bookmarks];
+    results = removeQuery ? removables.filter((item) => matchOmniItem(item, removeQuery)) : removables;
+  } else {
+    const matched = [...tabs, ...bookmarks, ...actions].filter((item) => matchOmniItem(item, lower));
+
+    if (isValidOmniUrl(lower)) {
+      results = [
+        { type: 'special', action: 'goto', title: rawQuery, desc: addHttp(rawQuery), emoji: true, emojiChar: '🔗', keycheck: false },
+        ...matched,
+      ];
+    } else {
+      results = [
+        { type: 'special', action: 'search', title: `"${rawQuery}"`, desc: 'Search the web', emoji: true, emojiChar: '🔍', keycheck: false },
+        ...matched,
+      ];
+    }
+  }
+
+  omniQueryCache.set(lower, { results, ts: Date.now() });
+  return results;
 }
 
 // ─── Action Handlers ────────────────────────────────────────────────────────
@@ -336,18 +528,14 @@ async function executeAction(message) {
 
 // ─── Message Handler ─────────────────────────────────────────────────────────
 async function handleMessage(message) {
-  await ensureStaticActions();
-  await ensureTabsCache();
-
   switch (message.request) {
     case 'get-data': {
-      const [bookmarks, dynamicActions] = await Promise.all([
-        getBookmarks(),
-        getDynamicActions(),
-      ]);
-      const tabs = Array.from(tabsCache.values());
-      const actions = [...dynamicActions, ...staticActions];
-      return { tabs, bookmarks, actions };
+      return collectOmniData();
+    }
+
+    case 'query-omni': {
+      const results = await queryOmni(message.query ?? '');
+      return { results };
     }
 
     case 'search-history': {
@@ -436,24 +624,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 // ─── Keyboard shortcut & toolbar click ──────────────────────────────────────
-function openOmniInTab(tab) {
+async function openOmniInTab(tab) {
   if (!tab) return;
   const url = tab.url || '';
   // Can't send to privileged system pages
-  if (url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('chrome-extension://')) {
+  if (isRestrictedOmniUrl(url)) {
     // Fallback: open a new tab (the new tab IS the omni launcher)
     chrome.tabs.create({});
     return;
   }
 
   try {
-    const maybePromise = chrome.tabs.sendMessage(tab.id, { request: 'open-omni' });
-    if (maybePromise && typeof maybePromise.catch === 'function') {
-      maybePromise.catch(() => {
-        // Content script not ready (e.g. file:// or pdf) — open new tab
-        chrome.tabs.create({});
-      });
-    }
+    await ensureOmniContentScript(tab.id);
+    await callChrome(chrome.tabs.sendMessage.bind(chrome.tabs), tab.id, { request: 'open-omni' });
   } catch (_) {
     chrome.tabs.create({});
   }
@@ -462,52 +645,23 @@ function openOmniInTab(tab) {
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === 'open-omni') {
     const tab = await getCurrentTab();
-    openOmniInTab(tab);
+    await openOmniInTab(tab);
   }
 });
 
 const toolbarActionApi = chrome.action || chrome.browserAction;
 
 if (toolbarActionApi?.onClicked) {
-  toolbarActionApi.onClicked.addListener((tab) => {
-    openOmniInTab(tab);
+  toolbarActionApi.onClicked.addListener(async (tab) => {
+    await openOmniInTab(tab);
   });
 }
 
-// ─── Install: inject content script into existing tabs ──────────────────────
+// ─── Install lifecycle ──────────────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install' || details.reason === 'update') {
-    const manifest = chrome.runtime.getManifest();
-    const contentScriptEntry = manifest.content_scripts?.[0];
-    if (!contentScriptEntry) return;
-
-    const windows = await callChrome(chrome.windows.getAll.bind(chrome.windows), { populate: true });
-    for (const win of (windows || [])) {
-      for (const tab of (win.tabs || [])) {
-        const url = tab.url || '';
-        if (
-          url.startsWith('chrome://') ||
-          url.startsWith('chrome-extension://') ||
-          url.startsWith('about:') ||
-          url.includes('chrome.google.com')
-        ) continue;
-
-        // Use scripting API (MV3)
-        if (chrome.scripting) {
-          try {
-            for (const file of (contentScriptEntry.js || [])) {
-              await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [file] });
-            }
-            if (contentScriptEntry.css?.length) {
-              await chrome.scripting.insertCSS({
-                target: { tabId: tab.id },
-                files: contentScriptEntry.css,
-              });
-            }
-          } catch (_) { /* tab may have been closed */ }
-        }
-      }
-    }
+    await ensureTabsCache().catch(() => undefined);
+    await ensureStaticActions().catch(() => undefined);
   }
 });
 

@@ -107,7 +107,7 @@ export default {
   setup() {
     const omniStore = useOmniStore();
     const i18n = useI18nStore();
-    const { search, invalidateMemo } = useOmniSearch();
+    const { search } = useOmniSearch();
 
     const inputRef = ref(null);
     const dialogRef = ref(null);
@@ -126,11 +126,9 @@ export default {
     }
 
     // ── Sync store query ───────────────────────────────────────────────────
-    let searchTimer = null;
     watch(query, (val) => {
       omniStore.query = val;
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => search(val), 120);
+      search(val);
     });
 
     // ── Focus & reset on open ──────────────────────────────────────────────
@@ -138,9 +136,7 @@ export default {
       if (!open) return;
       query.value = '';
       omniStore.setResults([]);
-      invalidateMemo();
-      // Pre-warm data cache
-      omniStore.fetchData();
+      search('', { immediate: true });
       await nextTick();
       inputRef.value?.focus();
     });
@@ -267,7 +263,6 @@ export default {
 
     onUnmounted(() => {
       window.removeEventListener('keydown', onGlobalKeydown);
-      clearTimeout(searchTimer);
       cancelAnimationFrame(scrollRaf);
       try {
         chrome.runtime.onMessage.removeListener(onRuntimeMessage);
