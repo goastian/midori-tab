@@ -10,9 +10,10 @@
         <div
           ref="dialogRef"
           class="omni-dialog"
+          :style="dialogStyleVars"
           role="dialog"
           aria-modal="true"
-          :aria-label="i18n.$t('omni.label')"
+          :aria-label="dialogLabelText"
         >
           <!-- ── Search row ── -->
           <div class="omni-search-row">
@@ -22,7 +23,7 @@
               v-model="query"
               class="omni-input"
               type="text"
-              :placeholder="i18n.$t('omni.placeholder')"
+              :placeholder="placeholderText"
               autocomplete="off"
               autocorrect="off"
               spellcheck="false"
@@ -41,7 +42,7 @@
             ref="listRef"
             class="omni-list"
             role="listbox"
-            :aria-label="i18n.$t('omni.resultsLabel')"
+            :aria-label="resultsLabelText"
           >
             <OmniResultItem
               v-for="(item, idx) in visibleResults"
@@ -59,7 +60,7 @@
               role="status"
               aria-live="polite"
             >
-              {{ i18n.$t('omni.noResults') }}
+              {{ noResultsText }}
             </li>
           </ul>
 
@@ -72,13 +73,13 @@
               aria-atomic="true"
               class="omni-count"
             >
-              {{ visibleResults.length }} {{ i18n.$t('omni.results') }}
+              {{ visibleResults.length }} {{ resultsWordText }}
             </span>
             <span class="omni-hint">
-              <kbd>↑</kbd><kbd>↓</kbd> {{ i18n.$t('omni.navigate') }}
-              · <kbd>↵</kbd> {{ i18n.$t('omni.select') }}
-              · <kbd>{{ openInNewTabHint }}</kbd> {{ i18n.$t('omni.openInNewTab') }}
-              · <kbd>Esc</kbd> {{ i18n.$t('omni.dismiss') }}
+              <kbd>{{ navigateHint }}</kbd> {{ hintNavigateText }}
+              · <kbd>{{ selectHint }}</kbd> {{ hintSelectText }}
+              · <kbd>{{ openInNewTabHint }}</kbd> {{ hintOpenInNewTabText }}
+              · <kbd>{{ dismissHint }}</kbd> {{ hintDismissText }}
             </span>
           </div>
         </div>
@@ -108,7 +109,40 @@ export default {
     const listRef = ref(null);
     const query = ref('');
     const maxVisible = ref(100);
+
+    const dialogLabelText = ref('Midori Omni');
+    const placeholderText = ref('Type a command or search…');
+    const resultsLabelText = ref('Results');
+    const noResultsText = ref('No results');
+    const resultsWordText = ref('results');
+
+    const navigateHint = ref('↑↓');
+    const selectHint = ref('↵');
     const openInNewTabHint = ref('Ctrl+↵');
+    const dismissHint = ref('Esc');
+
+    const hintNavigateText = ref('navigate');
+    const hintSelectText = ref('select');
+    const hintOpenInNewTabText = ref('open in new tab');
+    const hintDismissText = ref('dismiss');
+
+    const density = ref({
+      dialogMaxHeight: 560,
+      listMaxHeight: 420,
+      searchRowHeight: 52,
+      searchRowPaddingX: 16,
+      footerPaddingX: 16,
+      footerPaddingY: 8,
+    });
+
+    const dialogStyleVars = computed(() => ({
+      '--omni-dialog-max-height': `${density.value.dialogMaxHeight}px`,
+      '--omni-list-max-height': `${density.value.listMaxHeight}px`,
+      '--omni-search-row-height': `${density.value.searchRowHeight}px`,
+      '--omni-search-row-padding-x': `${density.value.searchRowPaddingX}px`,
+      '--omni-footer-padding-x': `${density.value.footerPaddingX}px`,
+      '--omni-footer-padding-y': `${density.value.footerPaddingY}px`,
+    }));
 
     // ── Derived ────────────────────────────────────────────────────────────
     const visibleResults = computed(() => omniStore.results.slice(0, maxVisible.value));
@@ -238,11 +272,36 @@ export default {
       try {
         chrome.runtime.sendMessage({ request: 'get-omni-config' }, (config) => {
           if (chrome.runtime.lastError || !config) return;
+
           if (Number.isFinite(config.maxResults) && config.maxResults > 0) {
             maxVisible.value = config.maxResults;
           }
-          if (config.hints?.openInNewTab) {
-            openInNewTabHint.value = config.hints.openInNewTab;
+
+          if (config.copy) {
+            dialogLabelText.value = config.copy.dialogLabel || dialogLabelText.value;
+            placeholderText.value = config.copy.placeholder || placeholderText.value;
+            resultsLabelText.value = config.copy.resultsLabel || resultsLabelText.value;
+            noResultsText.value = config.copy.noResults || noResultsText.value;
+            resultsWordText.value = config.copy.resultsLabel || resultsWordText.value;
+
+            hintNavigateText.value = config.copy.hintNavigateLabel || hintNavigateText.value;
+            hintSelectText.value = config.copy.hintSelectLabel || hintSelectText.value;
+            hintOpenInNewTabText.value = config.copy.hintOpenInNewTabLabel || hintOpenInNewTabText.value;
+            hintDismissText.value = config.copy.hintDismissLabel || hintDismissText.value;
+          }
+
+          if (config.hints) {
+            navigateHint.value = config.hints.navigate || navigateHint.value;
+            selectHint.value = config.hints.select || selectHint.value;
+            openInNewTabHint.value = config.hints.openInNewTab || openInNewTabHint.value;
+            dismissHint.value = config.hints.dismiss || dismissHint.value;
+          }
+
+          if (config.density && typeof config.density === 'object') {
+            density.value = {
+              ...density.value,
+              ...config.density,
+            };
           }
         });
       } catch (_) { /* noop */ }
@@ -273,7 +332,23 @@ export default {
       itemKey,
       onKeydown,
       executeItem,
+      dialogStyleVars,
+
+      dialogLabelText,
+      placeholderText,
+      resultsLabelText,
+      noResultsText,
+      resultsWordText,
+
+      navigateHint,
+      selectHint,
       openInNewTabHint,
+      dismissHint,
+
+      hintNavigateText,
+      hintSelectText,
+      hintOpenInNewTabText,
+      hintDismissText,
     };
   },
 };
@@ -295,7 +370,7 @@ export default {
 /* ── Dialog ───────────────────────────────────────────────────────────────── */
 .omni-dialog {
   width: min(700px, 96vw);
-  max-height: 560px;
+  max-height: var(--omni-dialog-max-height, 560px);
   background: var(--color-bg-elevated, #1e2128);
   border: 1px solid var(--color-border, #35373e);
   border-radius: 10px;
@@ -311,7 +386,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0 1rem;
+  padding: 0 var(--omni-search-row-padding-x, 16px);
   border-bottom: 1px solid var(--color-border, #35373e);
   flex-shrink: 0;
 }
@@ -326,7 +401,7 @@ export default {
   background: transparent;
   border: none;
   outline: none;
-  height: 3.25rem;
+  height: var(--omni-search-row-height, 52px);
   font-size: 1.1rem;
   font-weight: 400;
   color: var(--color-text, #f1f1f1);
@@ -349,7 +424,7 @@ export default {
   overflow-y: auto;
   padding: 0.25rem 0;
   margin: 0;
-  max-height: 420px;
+  max-height: var(--omni-list-max-height, 420px);
   scrollbar-width: thin;
   scrollbar-color: rgba(127, 127, 127, 0.4) transparent;
 }
@@ -376,7 +451,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.45rem 1rem;
+  padding: var(--omni-footer-padding-y, 8px) var(--omni-footer-padding-x, 16px);
   border-top: 1px solid var(--color-border, #35373e);
   flex-shrink: 0;
 }

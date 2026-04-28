@@ -10,11 +10,31 @@
   let isOpen = false;
   let omniConfig = {
     maxResults: 100,
+    copy: {
+      dialogLabel: 'Midori Omni',
+      placeholder: 'Type a command or search…',
+      noResults: 'No results',
+      resultsLabel: 'results',
+      hintNavigateLabel: 'navigate',
+      hintSelectLabel: 'select',
+      hintOpenInNewTabLabel: 'open in new tab',
+      hintDismissLabel: 'dismiss',
+    },
     hints: {
       navigate: '↑↓',
       select: '↵',
       openInNewTab: 'Ctrl+↵',
       dismiss: 'Esc',
+    },
+    density: {
+      dialogMaxHeight: 560,
+      listMaxHeight: 420,
+      searchRowHeight: 52,
+      searchRowPaddingX: 16,
+      itemPaddingX: 16,
+      itemPaddingY: 9,
+      footerPaddingX: 16,
+      footerPaddingY: 8,
     },
   };
 
@@ -114,12 +134,63 @@
     const hintEl = overlay.querySelector('.omni-cs-hint');
     if (!hintEl) return;
 
+    const copy = omniConfig.copy || {};
     const hints = omniConfig.hints || {};
     const navigate = hints.navigate || '↑↓';
     const select = hints.select || '↵';
     const openInNewTab = hints.openInNewTab || 'Ctrl+↵';
     const dismiss = hints.dismiss || 'Esc';
-    hintEl.textContent = `${navigate} navigate · ${select} select · ${openInNewTab} open in new tab · ${dismiss} dismiss`;
+    const navigateLabel = copy.hintNavigateLabel || 'navigate';
+    const selectLabel = copy.hintSelectLabel || 'select';
+    const openInNewTabLabel = copy.hintOpenInNewTabLabel || 'open in new tab';
+    const dismissLabel = copy.hintDismissLabel || 'dismiss';
+
+    hintEl.textContent = `${navigate} ${navigateLabel} · ${select} ${selectLabel} · ${openInNewTab} ${openInNewTabLabel} · ${dismiss} ${dismissLabel}`;
+  }
+
+  function applyOmniCopy() {
+    if (!overlay) return;
+    const copy = omniConfig.copy || {};
+
+    const dialog = overlay.querySelector('.omni-cs-dialog');
+    if (dialog) {
+      dialog.setAttribute('aria-label', copy.dialogLabel || 'Midori Omni');
+    }
+
+    const input = overlay.querySelector('.omni-cs-input');
+    if (input) {
+      input.setAttribute('placeholder', copy.placeholder || 'Type a command or search…');
+    }
+  }
+
+  function applyOmniDensity() {
+    if (!overlay) return;
+    const density = omniConfig.density || {};
+
+    if (Number.isFinite(density.dialogMaxHeight)) {
+      overlay.style.setProperty('--omni-dialog-max-height', `${density.dialogMaxHeight}px`);
+    }
+    if (Number.isFinite(density.listMaxHeight)) {
+      overlay.style.setProperty('--omni-list-max-height', `${density.listMaxHeight}px`);
+    }
+    if (Number.isFinite(density.searchRowHeight)) {
+      overlay.style.setProperty('--omni-search-row-height', `${density.searchRowHeight}px`);
+    }
+    if (Number.isFinite(density.searchRowPaddingX)) {
+      overlay.style.setProperty('--omni-search-row-padding-x', `${density.searchRowPaddingX}px`);
+    }
+    if (Number.isFinite(density.itemPaddingX)) {
+      overlay.style.setProperty('--omni-item-padding-x', `${density.itemPaddingX}px`);
+    }
+    if (Number.isFinite(density.itemPaddingY)) {
+      overlay.style.setProperty('--omni-item-padding-y', `${density.itemPaddingY}px`);
+    }
+    if (Number.isFinite(density.footerPaddingX)) {
+      overlay.style.setProperty('--omni-footer-padding-x', `${density.footerPaddingX}px`);
+    }
+    if (Number.isFinite(density.footerPaddingY)) {
+      overlay.style.setProperty('--omni-footer-padding-y', `${density.footerPaddingY}px`);
+    }
   }
 
   function loadOmniConfig() {
@@ -129,10 +200,18 @@
       if (Number.isFinite(config.maxResults) && config.maxResults > 0) {
         omniConfig.maxResults = config.maxResults;
       }
+      if (config.copy && typeof config.copy === 'object') {
+        omniConfig.copy = { ...omniConfig.copy, ...config.copy };
+      }
       if (config.hints && typeof config.hints === 'object') {
         omniConfig.hints = { ...omniConfig.hints, ...config.hints };
       }
+      if (config.density && typeof config.density === 'object') {
+        omniConfig.density = { ...omniConfig.density, ...config.density };
+      }
 
+      applyOmniCopy();
+      applyOmniDensity();
       updateHintsText();
     });
   }
@@ -202,6 +281,15 @@
     if (!list) return;
 
     list.innerHTML = '';
+    if (!visibleItems.length) {
+      const empty = document.createElement('li');
+      empty.className = 'omni-cs-empty';
+      empty.setAttribute('role', 'status');
+      empty.setAttribute('aria-live', 'polite');
+      empty.textContent = omniConfig.copy?.noResults || 'No results';
+      list.appendChild(empty);
+    }
+
     visibleItems.forEach((item, idx) => {
       const li = document.createElement('li');
       li.className = 'omni-cs-item' + (idx === 0 ? ' omni-cs-item--selected' : '');
@@ -223,7 +311,10 @@
       list.appendChild(li);
     });
 
-    if (count) count.textContent = `${visibleItems.length} results`;
+    if (count) {
+      const resultsLabel = omniConfig.copy?.resultsLabel || 'results';
+      count.textContent = `${visibleItems.length} ${resultsLabel}`;
+    }
   }
 
   function escapeHtml(str) {
@@ -302,7 +393,7 @@
       .omni-cs-dialog {
         position: fixed; inset: 0; margin: auto;
         width: min(700px, 96vw); height: fit-content;
-        max-height: 560px;
+        max-height: var(--omni-dialog-max-height, 560px);
         background: var(--omni-bg);
         border: 1px solid var(--omni-border);
         border-radius: 10px;
@@ -317,14 +408,14 @@
 
       .omni-cs-search-row {
         display: flex; align-items: center;
-        padding: 0 16px;
+        padding: 0 var(--omni-search-row-padding-x, 16px);
         border-bottom: 1px solid var(--omni-border);
         flex-shrink: 0;
       }
       .omni-cs-search-icon { font-size: 18px; margin-right: 8px; }
       .omni-cs-input {
         all: unset; flex: 1;
-        height: 52px; font-size: 18px; font-weight: 400;
+        height: var(--omni-search-row-height, 52px); font-size: 18px; font-weight: 400;
         color: var(--omni-text);
         caret-color: var(--omni-accent);
       }
@@ -333,14 +424,14 @@
       .omni-cs-list {
         list-style: none; margin: 0; padding: .25rem 0;
         overflow-y: auto; flex: 1;
-        max-height: 400px;
+        max-height: var(--omni-list-max-height, 420px);
       }
       .omni-cs-list::-webkit-scrollbar { width: 6px; }
       .omni-cs-list::-webkit-scrollbar-thumb { background: rgba(127,127,127,.4); border-radius: 3px; }
 
       .omni-cs-item {
         display: flex; align-items: center; gap: 12px;
-        padding: 9px 16px; cursor: pointer;
+        padding: var(--omni-item-padding-y, 9px) var(--omni-item-padding-x, 16px); cursor: pointer;
         transition: background .1s;
       }
       .omni-cs-item:hover, .omni-cs-item--selected {
@@ -375,12 +466,13 @@
 
       .omni-cs-footer {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 8px 16px;
+        padding: var(--omni-footer-padding-y, 8px) var(--omni-footer-padding-x, 16px);
         border-top: 1px solid var(--omni-border);
         flex-shrink: 0;
       }
       .omni-cs-count { font-size: 12px; color: var(--omni-text3); }
       .omni-cs-hint { font-size: 11px; color: var(--omni-text3); }
+      .omni-cs-empty { padding: 12px 16px; list-style: none; color: var(--omni-text3); text-align: center; font-size: 13px; }
 
       @media (prefers-reduced-motion: reduce) {
         .omni-cs-dialog, .omni-cs-backdrop { transition: none !important; }

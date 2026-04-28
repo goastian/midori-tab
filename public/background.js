@@ -213,11 +213,31 @@ async function getOmniUiConfig() {
 
   return {
     maxResults: OMNI_MAX_RESULTS,
+    copy: {
+      dialogLabel: 'Midori Omni',
+      placeholder: 'Type a command or search…',
+      noResults: 'No results',
+      resultsLabel: 'results',
+      hintNavigateLabel: 'navigate',
+      hintSelectLabel: 'select',
+      hintOpenInNewTabLabel: 'open in new tab',
+      hintDismissLabel: 'dismiss',
+    },
     hints: {
       navigate: '↑↓',
       select: '↵',
       openInNewTab,
       dismiss: 'Esc',
+    },
+    density: {
+      dialogMaxHeight: 560,
+      listMaxHeight: 420,
+      searchRowHeight: 52,
+      searchRowPaddingX: 16,
+      itemPaddingX: 16,
+      itemPaddingY: 9,
+      footerPaddingX: 16,
+      footerPaddingY: 8,
     },
   };
 }
