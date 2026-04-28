@@ -6,6 +6,7 @@
 
 const OMNI_CONTENT_SCRIPT_FILES = ['omni-content.js'];
 const OMNI_QUERY_TTL = 5_000;
+const OMNI_MAX_RESULTS = 100;
 const omniQueryCache = new Map();
 
 function callChrome(method, ...args) {
@@ -206,6 +207,21 @@ async function getPlatformOs() {
   return platformOs;
 }
 
+async function getOmniUiConfig() {
+  const os = await getPlatformOs();
+  const openInNewTab = os === 'mac' ? '⌘+↵' : 'Ctrl+↵';
+
+  return {
+    maxResults: OMNI_MAX_RESULTS,
+    hints: {
+      navigate: '↑↓',
+      select: '↵',
+      openInNewTab,
+      dismiss: 'Esc',
+    },
+  };
+}
+
 function buildStaticActions(isMac) {
   const mod = isMac ? '⌘' : 'Ctrl';
   const alt = isMac ? '⌥' : 'Alt';
@@ -399,8 +415,9 @@ async function queryOmni(rawQuery) {
     }
   }
 
-  omniQueryCache.set(lower, { results, ts: Date.now() });
-  return results;
+  const boundedResults = results.slice(0, OMNI_MAX_RESULTS);
+  omniQueryCache.set(lower, { results: boundedResults, ts: Date.now() });
+  return boundedResults;
 }
 
 // ─── Action Handlers ────────────────────────────────────────────────────────
@@ -605,6 +622,10 @@ async function handleMessage(message) {
     case 'query-omni': {
       const results = await queryOmni(message.query ?? '');
       return { results };
+    }
+
+    case 'get-omni-config': {
+      return getOmniUiConfig();
     }
 
     case 'execute-omni-item': {

@@ -77,7 +77,7 @@
             <span class="omni-hint">
               <kbd>↑</kbd><kbd>↓</kbd> {{ i18n.$t('omni.navigate') }}
               · <kbd>↵</kbd> {{ i18n.$t('omni.select') }}
-              · <kbd>Ctrl+↵</kbd> {{ i18n.$t('omni.openInNewTab') }}
+              · <kbd>{{ openInNewTabHint }}</kbd> {{ i18n.$t('omni.openInNewTab') }}
               · <kbd>Esc</kbd> {{ i18n.$t('omni.dismiss') }}
             </span>
           </div>
@@ -94,8 +94,6 @@ import useI18nStore from '../../stores/useI18nStore.js';
 import { useOmniSearch } from '../composables/useOmniSearch.js';
 import OmniResultItem from './OmniResultItem.vue';
 
-const MAX_VISIBLE = 100;
-
 export default {
   name: 'OmniLauncher',
   components: { OmniResultItem },
@@ -109,9 +107,11 @@ export default {
     const dialogRef = ref(null);
     const listRef = ref(null);
     const query = ref('');
+    const maxVisible = ref(100);
+    const openInNewTabHint = ref('Ctrl+↵');
 
     // ── Derived ────────────────────────────────────────────────────────────
-    const visibleResults = computed(() => omniStore.results.slice(0, MAX_VISIBLE));
+    const visibleResults = computed(() => omniStore.results.slice(0, maxVisible.value));
     const showEmpty = computed(() => !visibleResults.value.length && query.value.trim().length > 0);
     const activeDescendantId = computed(() =>
       omniStore.results.length ? `omni-option-${omniStore.selectedIndex}` : undefined
@@ -234,6 +234,19 @@ export default {
 
     onMounted(() => {
       window.addEventListener('keydown', onGlobalKeydown);
+
+      try {
+        chrome.runtime.sendMessage({ request: 'get-omni-config' }, (config) => {
+          if (chrome.runtime.lastError || !config) return;
+          if (Number.isFinite(config.maxResults) && config.maxResults > 0) {
+            maxVisible.value = config.maxResults;
+          }
+          if (config.hints?.openInNewTab) {
+            openInNewTabHint.value = config.hints.openInNewTab;
+          }
+        });
+      } catch (_) { /* noop */ }
+
       try {
         chrome.runtime.onMessage.addListener(onRuntimeMessage);
       } catch (_) { /* not in extension context */ }
@@ -260,6 +273,7 @@ export default {
       itemKey,
       onKeydown,
       executeItem,
+      openInNewTabHint,
     };
   },
 };

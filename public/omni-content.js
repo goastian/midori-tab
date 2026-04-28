@@ -8,6 +8,15 @@
 
   let overlay = null;
   let isOpen = false;
+  let omniConfig = {
+    maxResults: 100,
+    hints: {
+      navigate: '↑↓',
+      select: '↵',
+      openInNewTab: 'Ctrl+↵',
+      dismiss: 'Esc',
+    },
+  };
 
   // ── Escape listener for pages with aggressive Esc capture ──────────────
   document.addEventListener('keyup', (e) => {
@@ -40,6 +49,7 @@
       overlay = buildOverlay();
       document.body.appendChild(overlay);
     }
+    loadOmniConfig();
     isOpen = true;
     overlay.style.display = '';
     overlay.classList.remove('omni-cs-closing');
@@ -99,6 +109,34 @@
     return host;
   }
 
+  function updateHintsText() {
+    if (!overlay) return;
+    const hintEl = overlay.querySelector('.omni-cs-hint');
+    if (!hintEl) return;
+
+    const hints = omniConfig.hints || {};
+    const navigate = hints.navigate || '↑↓';
+    const select = hints.select || '↵';
+    const openInNewTab = hints.openInNewTab || 'Ctrl+↵';
+    const dismiss = hints.dismiss || 'Esc';
+    hintEl.textContent = `${navigate} navigate · ${select} select · ${openInNewTab} open in new tab · ${dismiss} dismiss`;
+  }
+
+  function loadOmniConfig() {
+    chrome.runtime.sendMessage({ request: 'get-omni-config' }, (config) => {
+      if (chrome.runtime.lastError || !config) return;
+
+      if (Number.isFinite(config.maxResults) && config.maxResults > 0) {
+        omniConfig.maxResults = config.maxResults;
+      }
+      if (config.hints && typeof config.hints === 'object') {
+        omniConfig.hints = { ...omniConfig.hints, ...config.hints };
+      }
+
+      updateHintsText();
+    });
+  }
+
   // ── State ─────────────────────────────────────────────────────────────────
   let visibleItems = [];
   let selectedIdx = 0;
@@ -156,7 +194,7 @@
   // ── Render ─────────────────────────────────────────────────────────────────
   function renderResults(items) {
     visibleItems = items;
-    visibleItems = visibleItems.slice(0, 100);
+    visibleItems = visibleItems.slice(0, omniConfig.maxResults);
     selectedIdx = 0;
 
     const list = overlay.querySelector('#omni-cs-list');
