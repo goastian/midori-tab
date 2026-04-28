@@ -237,11 +237,11 @@ export default {
     }
 
     // ── Global keyboard shortcut for new-tab context ───────────────────────
-    // (Ctrl+Shift+K on the new tab page, before the background sends a message)
+    // (Ctrl+K on the new tab page, before the background sends a message)
     function onGlobalKeydown(e) {
       const isMac = navigator.platform.toUpperCase().includes('MAC');
       const mod = isMac ? e.metaKey : e.ctrlKey;
-      if (mod && e.shiftKey && e.key === 'K') {
+      if (mod && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         omniStore.toggle();
       }
