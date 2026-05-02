@@ -6,6 +6,31 @@
   if (window.__midoriOmniLoaded) return;
   window.__midoriOmniLoaded = true;
 
+  const OMNI_SHARED_CONFIG_FILE = 'omni-ui.shared.json';
+  const OMNI_FALLBACK_COPY = {
+    label: 'Command Menu',
+    placeholder: 'Type a command or search…',
+    resultsLabel: 'Search results',
+    results: 'results',
+    navigate: 'navigate',
+    select: 'select',
+    openInNewTab: 'new tab',
+    dismiss: 'dismiss',
+    noResults: 'No results found',
+  };
+  const OMNI_FALLBACK_DENSITY = {
+    dialogMaxHeight: 560,
+    listMaxHeight: 420,
+    searchRowHeight: 52,
+    searchRowPaddingX: 16,
+    itemPaddingX: 16,
+    itemPaddingY: 9,
+    footerPaddingX: 16,
+    footerPaddingY: 8,
+  };
+
+  let sharedOmniDefaultsPromise = null;
+
   let overlay = null;
   let isOpen = false;
   let omniConfig = {
@@ -39,6 +64,69 @@
     },
   };
 
+  function normalizeLocale(code) {
+    if (!code) return '';
+    return String(code).trim().toLowerCase().split('-')[0];
+  }
+
+  function resolveDensityVariant() {
+    return window.innerHeight < 760 || window.innerWidth < 1024 ? 'compact' : 'cozy';
+  }
+
+  function extractSharedDefaults(payload) {
+    const locale = normalizeLocale(navigator.language) || 'en';
+    const copyByLocale = payload?.copyByLocale || {};
+    const densityPresets = payload?.densityPresets || {};
+    const densityVariant = resolveDensityVariant();
+
+    return {
+      copy: copyByLocale[locale] || copyByLocale.en || OMNI_FALLBACK_COPY,
+      density: densityPresets[densityVariant] || densityPresets.cozy || OMNI_FALLBACK_DENSITY,
+    };
+  }
+
+  async function loadSharedOmniDefaults() {
+    if (!sharedOmniDefaultsPromise) {
+      sharedOmniDefaultsPromise = (async () => {
+        try {
+          const url = chrome.runtime.getURL(OMNI_SHARED_CONFIG_FILE);
+          const response = await fetch(url, { cache: 'no-cache' });
+          if (!response.ok) throw new Error('Unable to fetch shared Omni config');
+          const payload = await response.json();
+          return extractSharedDefaults(payload);
+        } catch (_e) {
+          return {
+            copy: OMNI_FALLBACK_COPY,
+            density: OMNI_FALLBACK_DENSITY,
+          };
+        }
+      })();
+    }
+
+    const defaults = await sharedOmniDefaultsPromise;
+    if (defaults?.copy) {
+      omniConfig.copy = {
+        ...omniConfig.copy,
+        dialogLabel: defaults.copy.label || omniConfig.copy.dialogLabel,
+        placeholder: defaults.copy.placeholder || omniConfig.copy.placeholder,
+        noResults: defaults.copy.noResults || omniConfig.copy.noResults,
+        resultsLabel: defaults.copy.resultsLabel || omniConfig.copy.resultsLabel,
+        resultsWord: defaults.copy.results || omniConfig.copy.resultsWord,
+        hintNavigateLabel: defaults.copy.navigate || omniConfig.copy.hintNavigateLabel,
+        hintSelectLabel: defaults.copy.select || omniConfig.copy.hintSelectLabel,
+        hintOpenInNewTabLabel: defaults.copy.openInNewTab || omniConfig.copy.hintOpenInNewTabLabel,
+        hintDismissLabel: defaults.copy.dismiss || omniConfig.copy.hintDismissLabel,
+      };
+    }
+
+    if (defaults?.density) {
+      omniConfig.density = {
+        ...omniConfig.density,
+        ...defaults.density,
+      };
+    }
+  }
+
   // ── Escape listener for pages with aggressive Esc capture ──────────────
   document.addEventListener('keyup', (e) => {
     if (e.key === 'Escape' && isOpen) {
@@ -57,7 +145,7 @@
       if (isOpen) {
         closeOverlay();
       } else {
-        openOverlay();
+        void openOverlay();
       }
     }
 
@@ -65,11 +153,18 @@
   });
 
   // ── Build overlay ────────────────────────────────────────────────────────
-  function openOverlay() {
+  async function openOverlay() {
+    await loadSharedOmniDefaults();
+
     if (!overlay) {
       overlay = buildOverlay();
       document.body.appendChild(overlay);
     }
+
+    applyOmniCopy();
+    applyOmniDensity();
+    updateHintsText();
+
     loadOmniConfig();
     isOpen = true;
     overlay.style.display = '';
@@ -202,7 +297,7 @@
         width: window.innerWidth,
         height: window.innerHeight,
       },
-      densityVariant: window.innerHeight < 760 || window.innerWidth < 1024 ? 'compact' : 'cozy',
+      densityVariant: resolveDensityVariant(),
     }, (config) => {
       if (chrome.runtime.lastError || !config) return;
 
