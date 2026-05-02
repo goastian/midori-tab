@@ -14,7 +14,8 @@
       dialogLabel: 'Midori Omni',
       placeholder: 'Type a command or search…',
       noResults: 'No results',
-      resultsLabel: 'results',
+      resultsLabel: 'Search results',
+      resultsWord: 'results',
       hintNavigateLabel: 'navigate',
       hintSelectLabel: 'select',
       hintOpenInNewTabLabel: 'open in new tab',
@@ -194,7 +195,15 @@
   }
 
   function loadOmniConfig() {
-    chrome.runtime.sendMessage({ request: 'get-omni-config' }, (config) => {
+    chrome.runtime.sendMessage({
+      request: 'get-omni-config',
+      locale: navigator.language,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      densityVariant: window.innerHeight < 760 || window.innerWidth < 1024 ? 'compact' : 'cozy',
+    }, (config) => {
       if (chrome.runtime.lastError || !config) return;
 
       if (Number.isFinite(config.maxResults) && config.maxResults > 0) {
@@ -312,8 +321,8 @@
     });
 
     if (count) {
-      const resultsLabel = omniConfig.copy?.resultsLabel || 'results';
-      count.textContent = `${visibleItems.length} ${resultsLabel}`;
+      const resultsWord = omniConfig.copy?.resultsWord || 'results';
+      count.textContent = `${visibleItems.length} ${resultsWord}`;
     }
   }
 

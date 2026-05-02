@@ -18,6 +18,15 @@ function getBrowserLocale() {
   }
 }
 
+function syncLocaleToExtensionStorage(locale) {
+  try {
+    if (typeof chrome === 'undefined') return;
+    if (!chrome.storage?.local?.set) return;
+    chrome.storage.local.set({ 'midori-locale': locale });
+  } catch (e) {
+  }
+}
+
 const useI18nStore = defineStore('i18nStore', {
   state: () => ({
     locale: locales[getBrowserLocale()] ? getBrowserLocale() : 'en',
@@ -45,6 +54,7 @@ const useI18nStore = defineStore('i18nStore', {
         document.documentElement.lang = this.locale;
       } catch (e) {
       }
+      syncLocaleToExtensionStorage(this.locale);
     },
 
     ensureLocale() {
@@ -54,6 +64,7 @@ const useI18nStore = defineStore('i18nStore', {
         document.documentElement.lang = this.locale;
       } catch (e) {
       }
+      syncLocaleToExtensionStorage(this.locale);
     },
 
     /**

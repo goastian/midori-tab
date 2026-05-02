@@ -110,21 +110,21 @@ export default {
     const query = ref('');
     const maxVisible = ref(100);
 
-    const dialogLabelText = ref('Midori Omni');
-    const placeholderText = ref('Type a command or search…');
-    const resultsLabelText = ref('Results');
-    const noResultsText = ref('No results');
-    const resultsWordText = ref('results');
+    const dialogLabelText = ref(i18n.$t('omni.label'));
+    const placeholderText = ref(i18n.$t('omni.placeholder'));
+    const resultsLabelText = ref(i18n.$t('omni.resultsLabel'));
+    const noResultsText = ref(i18n.$t('omni.noResults'));
+    const resultsWordText = ref(i18n.$t('omni.results'));
 
     const navigateHint = ref('↑↓');
     const selectHint = ref('↵');
     const openInNewTabHint = ref('Ctrl+↵');
     const dismissHint = ref('Esc');
 
-    const hintNavigateText = ref('navigate');
-    const hintSelectText = ref('select');
-    const hintOpenInNewTabText = ref('open in new tab');
-    const hintDismissText = ref('dismiss');
+    const hintNavigateText = ref(i18n.$t('omni.navigate'));
+    const hintSelectText = ref(i18n.$t('omni.select'));
+    const hintOpenInNewTabText = ref(i18n.$t('omni.openInNewTab'));
+    const hintDismissText = ref(i18n.$t('omni.dismiss'));
 
     const density = ref({
       dialogMaxHeight: 560,
@@ -166,9 +166,16 @@ export default {
       if (!open) return;
       query.value = '';
       omniStore.setResults([]);
+      loadOmniConfig();
       search('', { immediate: true });
       await nextTick();
       inputRef.value?.focus();
+    });
+
+    watch(() => i18n.locale, () => {
+      try {
+        loadOmniConfig();
+      } catch (_) { /* noop */ }
     });
 
     // ── Scroll selected item into view ────────────────────────────────────
@@ -266,11 +273,22 @@ export default {
       }
     }
 
-    onMounted(() => {
-      window.addEventListener('keydown', onGlobalKeydown);
+    function resolveDensityVariant() {
+      return window.innerHeight < 760 || window.innerWidth < 1024 ? 'compact' : 'cozy';
+    }
 
-      try {
-        chrome.runtime.sendMessage({ request: 'get-omni-config' }, (config) => {
+    function loadOmniConfig() {
+      chrome.runtime.sendMessage(
+        {
+          request: 'get-omni-config',
+          locale: i18n.locale,
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+          densityVariant: resolveDensityVariant(),
+        },
+        (config) => {
           if (chrome.runtime.lastError || !config) return;
 
           if (Number.isFinite(config.maxResults) && config.maxResults > 0) {
@@ -282,7 +300,7 @@ export default {
             placeholderText.value = config.copy.placeholder || placeholderText.value;
             resultsLabelText.value = config.copy.resultsLabel || resultsLabelText.value;
             noResultsText.value = config.copy.noResults || noResultsText.value;
-            resultsWordText.value = config.copy.resultsLabel || resultsWordText.value;
+            resultsWordText.value = config.copy.resultsWord || resultsWordText.value;
 
             hintNavigateText.value = config.copy.hintNavigateLabel || hintNavigateText.value;
             hintSelectText.value = config.copy.hintSelectLabel || hintSelectText.value;
@@ -303,7 +321,28 @@ export default {
               ...config.density,
             };
           }
-        });
+        }
+      );
+    }
+
+    let configResizeRaf = null;
+
+    function onResize() {
+      if (!omniStore.isOpen) return;
+      cancelAnimationFrame(configResizeRaf);
+      configResizeRaf = requestAnimationFrame(() => {
+        try {
+          loadOmniConfig();
+        } catch (_) { /* noop */ }
+      });
+    }
+
+    onMounted(() => {
+      window.addEventListener('keydown', onGlobalKeydown);
+      window.addEventListener('resize', onResize);
+
+      try {
+        loadOmniConfig();
       } catch (_) { /* noop */ }
 
       try {
@@ -313,7 +352,9 @@ export default {
 
     onUnmounted(() => {
       window.removeEventListener('keydown', onGlobalKeydown);
+      window.removeEventListener('resize', onResize);
       cancelAnimationFrame(scrollRaf);
+      cancelAnimationFrame(configResizeRaf);
       try {
         chrome.runtime.onMessage.removeListener(onRuntimeMessage);
       } catch (_) { /* noop */ }
