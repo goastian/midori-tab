@@ -7,6 +7,7 @@
         class="background"
         v-if="showImageBackground && backgroundImage"
         v-show="imageReady"
+        decoding="async"
         @load="imageReady = true"
       />
     </Transition>
