@@ -13,6 +13,10 @@ export default defineConfig({
         {
           src: 'manifest/manifest.json',
           dest: '.'
+        },
+        {
+          src: 'shared/omni-ui.shared.json',
+          dest: '.'
         }
       ]
     })

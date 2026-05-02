@@ -94,6 +94,42 @@ import { useOmniStore } from '../../stores/useOmniStore.js';
 import useI18nStore from '../../stores/useI18nStore.js';
 import { useOmniSearch } from '../composables/useOmniSearch.js';
 import OmniResultItem from './OmniResultItem.vue';
+import omniSharedUi from '../../../shared/omni-ui.shared.json';
+
+function normalizeLocale(code) {
+  if (!code) return '';
+  return String(code).trim().toLowerCase().split('-')[0];
+}
+
+function getSharedLocaleCopy(localeCode) {
+  const code = normalizeLocale(localeCode);
+  const copyByLocale = omniSharedUi?.copyByLocale || {};
+  return copyByLocale[code] || copyByLocale.en || {
+    label: 'Command Menu',
+    placeholder: 'Type a command or search…',
+    resultsLabel: 'Search results',
+    results: 'results',
+    navigate: 'navigate',
+    select: 'select',
+    openInNewTab: 'new tab',
+    dismiss: 'dismiss',
+    noResults: 'No results found',
+  };
+}
+
+function getSharedDensityPreset(name) {
+  const presets = omniSharedUi?.densityPresets || {};
+  return presets[name] || presets.cozy || {
+    dialogMaxHeight: 560,
+    listMaxHeight: 420,
+    searchRowHeight: 52,
+    searchRowPaddingX: 16,
+    itemPaddingX: 16,
+    itemPaddingY: 9,
+    footerPaddingX: 16,
+    footerPaddingY: 8,
+  };
+}
 
 export default {
   name: 'OmniLauncher',
@@ -110,30 +146,25 @@ export default {
     const query = ref('');
     const maxVisible = ref(100);
 
-    const dialogLabelText = ref(i18n.$t('omni.label'));
-    const placeholderText = ref(i18n.$t('omni.placeholder'));
-    const resultsLabelText = ref(i18n.$t('omni.resultsLabel'));
-    const noResultsText = ref(i18n.$t('omni.noResults'));
-    const resultsWordText = ref(i18n.$t('omni.results'));
+    const sharedCopy = getSharedLocaleCopy(i18n.locale);
+
+    const dialogLabelText = ref(sharedCopy.label);
+    const placeholderText = ref(sharedCopy.placeholder);
+    const resultsLabelText = ref(sharedCopy.resultsLabel);
+    const noResultsText = ref(sharedCopy.noResults);
+    const resultsWordText = ref(sharedCopy.results);
 
     const navigateHint = ref('↑↓');
     const selectHint = ref('↵');
     const openInNewTabHint = ref('Ctrl+↵');
     const dismissHint = ref('Esc');
 
-    const hintNavigateText = ref(i18n.$t('omni.navigate'));
-    const hintSelectText = ref(i18n.$t('omni.select'));
-    const hintOpenInNewTabText = ref(i18n.$t('omni.openInNewTab'));
-    const hintDismissText = ref(i18n.$t('omni.dismiss'));
+    const hintNavigateText = ref(sharedCopy.navigate);
+    const hintSelectText = ref(sharedCopy.select);
+    const hintOpenInNewTabText = ref(sharedCopy.openInNewTab);
+    const hintDismissText = ref(sharedCopy.dismiss);
 
-    const density = ref({
-      dialogMaxHeight: 560,
-      listMaxHeight: 420,
-      searchRowHeight: 52,
-      searchRowPaddingX: 16,
-      footerPaddingX: 16,
-      footerPaddingY: 8,
-    });
+    const density = ref(getSharedDensityPreset('cozy'));
 
     const dialogStyleVars = computed(() => ({
       '--omni-dialog-max-height': `${density.value.dialogMaxHeight}px`,

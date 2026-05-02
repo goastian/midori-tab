@@ -10,130 +10,47 @@ const OMNI_MAX_RESULTS = 100;
 const OMNI_LOCALE_STORAGE_KEY = 'midori-locale';
 const omniQueryCache = new Map();
 
-const OMNI_I18N_COPY = {
-  en: {
-    label: 'Command Menu',
-    placeholder: 'Type a command or search…',
-    resultsLabel: 'Search results',
-    results: 'results',
-    navigate: 'navigate',
-    select: 'select',
-    openInNewTab: 'new tab',
-    dismiss: 'dismiss',
-    noResults: 'No results found',
+const OMNI_SHARED_CONFIG_FILE = 'omni-ui.shared.json';
+
+const OMNI_SHARED_FALLBACK = {
+  copyByLocale: {
+    en: {
+      label: 'Command Menu',
+      placeholder: 'Type a command or search…',
+      resultsLabel: 'Search results',
+      results: 'results',
+      navigate: 'navigate',
+      select: 'select',
+      openInNewTab: 'new tab',
+      dismiss: 'dismiss',
+      noResults: 'No results found',
+    },
   },
-  es: {
-    label: 'Menú de comandos',
-    placeholder: 'Escribe un comando o busca…',
-    resultsLabel: 'Search results',
-    results: 'resultados',
-    navigate: 'navegar',
-    select: 'seleccionar',
-    openInNewTab: 'nueva pestaña',
-    dismiss: 'cerrar',
-    noResults: 'Sin resultados',
-  },
-  pt: {
-    label: 'Menu de comandos',
-    placeholder: 'Digite um comando ou pesquise…',
-    resultsLabel: 'Search results',
-    results: 'resultados',
-    navigate: 'navegar',
-    select: 'selecionar',
-    openInNewTab: 'nova aba',
-    dismiss: 'fechar',
-    noResults: 'Sem resultados',
-  },
-  fr: {
-    label: 'Menu de commandes',
-    placeholder: 'Tapez une commande ou recherchez…',
-    resultsLabel: 'Search results',
-    results: 'résultats',
-    navigate: 'naviguer',
-    select: 'sélectionner',
-    openInNewTab: 'nouvel onglet',
-    dismiss: 'fermer',
-    noResults: 'Aucun résultat',
-  },
-  de: {
-    label: 'Befehlsmenü',
-    placeholder: 'Befehl oder Suche eingeben…',
-    resultsLabel: 'Search results',
-    results: 'Ergebnisse',
-    navigate: 'navigieren',
-    select: 'auswählen',
-    openInNewTab: 'neuer Tab',
-    dismiss: 'schließen',
-    noResults: 'Keine Ergebnisse',
-  },
-  ru: {
-    label: 'Меню команд',
-    placeholder: 'Введите команду или поиск…',
-    resultsLabel: 'Search results',
-    results: 'результатов',
-    navigate: 'навигация',
-    select: 'выбрать',
-    openInNewTab: 'новая вкладка',
-    dismiss: 'закрыть',
-    noResults: 'Нет результатов',
-  },
-  zh: {
-    label: '命令菜单',
-    placeholder: '输入命令或搜索…',
-    resultsLabel: 'Search results',
-    results: '结果',
-    navigate: '导航',
-    select: '选择',
-    openInNewTab: '新标签页',
-    dismiss: '关闭',
-    noResults: '无结果',
-  },
-  ja: {
-    label: 'コマンドメニュー',
-    placeholder: 'コマンドまたは検索を入力…',
-    resultsLabel: 'Search results',
-    results: '件',
-    navigate: '移動',
-    select: '選択',
-    openInNewTab: '新しいタブ',
-    dismiss: '閉じる',
-    noResults: '結果なし',
-  },
-  it: {
-    label: 'Menu comandi',
-    placeholder: 'Digita un comando o cerca…',
-    resultsLabel: 'Search results',
-    results: 'risultati',
-    navigate: 'naviga',
-    select: 'seleziona',
-    openInNewTab: 'nuova scheda',
-    dismiss: 'chiudi',
-    noResults: 'Nessun risultato',
+  densityPresets: {
+    cozy: {
+      dialogMaxHeight: 560,
+      listMaxHeight: 420,
+      searchRowHeight: 52,
+      searchRowPaddingX: 16,
+      itemPaddingX: 16,
+      itemPaddingY: 9,
+      footerPaddingX: 16,
+      footerPaddingY: 8,
+    },
+    compact: {
+      dialogMaxHeight: 470,
+      listMaxHeight: 340,
+      searchRowHeight: 44,
+      searchRowPaddingX: 12,
+      itemPaddingX: 12,
+      itemPaddingY: 7,
+      footerPaddingX: 12,
+      footerPaddingY: 6,
+    },
   },
 };
 
-const OMNI_DENSITY_PRESETS = {
-  cozy: {
-    dialogMaxHeight: 560,
-    listMaxHeight: 420,
-    searchRowHeight: 52,
-    searchRowPaddingX: 16,
-    itemPaddingX: 16,
-    itemPaddingY: 9,
-    footerPaddingX: 16,
-    footerPaddingY: 8,
-  },
-  compact: {
-    dialogMaxHeight: 470,
-    listMaxHeight: 340,
-    searchRowHeight: 44,
-    searchRowPaddingX: 12,
-    itemPaddingX: 12,
-    itemPaddingY: 7,
-    footerPaddingX: 12,
-    footerPaddingY: 6,
-  },
-};
+let omniSharedConfigPromise = null;
 
 function callChrome(method, ...args) {
   return new Promise((resolve, reject) => {
@@ -164,6 +81,31 @@ function safeCallChrome(method, ...args) {
 function normalizeLocale(code) {
   if (!code) return '';
   return String(code).trim().toLowerCase().split('-')[0];
+}
+
+async function getOmniSharedConfig() {
+  if (!omniSharedConfigPromise) {
+    omniSharedConfigPromise = (async () => {
+      try {
+        const url = chrome.runtime.getURL(OMNI_SHARED_CONFIG_FILE);
+        const response = await fetch(url, { cache: 'no-cache' });
+        if (!response.ok) throw new Error(`Unable to fetch ${OMNI_SHARED_CONFIG_FILE}`);
+        const payload = await response.json();
+        if (!payload || typeof payload !== 'object') {
+          return OMNI_SHARED_FALLBACK;
+        }
+
+        return {
+          copyByLocale: payload.copyByLocale || OMNI_SHARED_FALLBACK.copyByLocale,
+          densityPresets: payload.densityPresets || OMNI_SHARED_FALLBACK.densityPresets,
+        };
+      } catch (_e) {
+        return OMNI_SHARED_FALLBACK;
+      }
+    })();
+  }
+
+  return omniSharedConfigPromise;
 }
 
 async function getStoredLocale() {
@@ -365,8 +307,8 @@ function resolveDensityVariant(message) {
   return 'cozy';
 }
 
-function buildLocalizedCopy(locale) {
-  const copy = OMNI_I18N_COPY[locale] || OMNI_I18N_COPY.en;
+function buildLocalizedCopy(locale, copyByLocale) {
+  const copy = copyByLocale[locale] || copyByLocale.en || OMNI_SHARED_FALLBACK.copyByLocale.en;
   return {
     dialogLabel: copy.label,
     placeholder: copy.placeholder,
@@ -383,18 +325,20 @@ function buildLocalizedCopy(locale) {
 async function getOmniUiConfig(message = {}) {
   const os = await getPlatformOs();
   const openInNewTab = os === 'mac' ? '⌘+↵' : 'Ctrl+↵';
+  const sharedConfig = await getOmniSharedConfig();
   const requestedLocale = normalizeLocale(message.locale);
   const storedLocale = await getStoredLocale();
   const uiLocale = normalizeLocale(chrome.i18n?.getUILanguage?.() || '');
   const locale = requestedLocale || storedLocale || uiLocale || 'en';
   const densityVariant = resolveDensityVariant(message);
-  const density = OMNI_DENSITY_PRESETS[densityVariant] || OMNI_DENSITY_PRESETS.cozy;
+  const densityPresets = sharedConfig.densityPresets || OMNI_SHARED_FALLBACK.densityPresets;
+  const density = densityPresets[densityVariant] || densityPresets.cozy || OMNI_SHARED_FALLBACK.densityPresets.cozy;
 
   return {
     maxResults: OMNI_MAX_RESULTS,
     locale,
     densityVariant,
-    copy: buildLocalizedCopy(locale),
+    copy: buildLocalizedCopy(locale, sharedConfig.copyByLocale || OMNI_SHARED_FALLBACK.copyByLocale),
     hints: {
       navigate: '↑↓',
       select: '↵',
