@@ -32,6 +32,15 @@ export default {
     tabNameDesc: 'Customize the tab title',
     selfTab: 'Current tab',
     newTab: 'New tab',
+    showAds: 'Show ads',
+    showAdsDesc: 'Display sponsored content on the New Tab page',
+  },
+
+  ads: {
+    badge: 'Ad',
+    label: 'Sponsored content',
+    dismiss: 'Dismiss ad',
+    cta: 'Learn more',
   },
 
   visual: {

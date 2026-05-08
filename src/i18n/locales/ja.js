@@ -26,6 +26,15 @@ export default {
     tabNameDesc: 'タブのタイトルをカスタマイズ',
     selfTab: '現在のタブ',
     newTab: '新しいタブ',
+    showAds: '広告を表示',
+    showAdsDesc: '新しいタブページにスポンサーコンテンツを表示',
+  },
+
+  ads: {
+    badge: '広告',
+    label: 'スポンサーコンテンツ',
+    dismiss: '広告を閉じる',
+    cta: '詳細を見る',
   },
 
   visual: {

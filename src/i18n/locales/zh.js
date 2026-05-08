@@ -26,6 +26,15 @@ export default {
     tabNameDesc: '自定义标签页标题',
     selfTab: '当前标签页',
     newTab: '新标签页',
+    showAds: '显示广告',
+    showAdsDesc: '在新标签页上显示赞助内容',
+  },
+
+  ads: {
+    badge: '广告',
+    label: '赞助内容',
+    dismiss: '关闭广告',
+    cta: '了解更多',
   },
 
   visual: {

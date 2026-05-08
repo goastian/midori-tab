@@ -33,6 +33,15 @@ export default {
     tabNameDesc: 'Personaliza el título de la pestaña',
     selfTab: 'Pestaña actual',
     newTab: 'Nueva pestaña',
+    showAds: 'Mostrar anuncios',
+    showAdsDesc: 'Mostrar contenido patrocinado en la página de Nueva Pestaña',
+  },
+
+  ads: {
+    badge: 'Anuncio',
+    label: 'Contenido patrocinado',
+    dismiss: 'Descartar anuncio',
+    cta: 'Saber más',
   },
 
   // Visual Tab

@@ -35,6 +35,15 @@ export default {
     tabNameDesc: 'Personnalisez le titre de l\'onglet',
     selfTab: 'Onglet actuel',
     newTab: 'Nouvel onglet',
+    showAds: 'Afficher les annonces',
+    showAdsDesc: 'Afficher du contenu sponsorisé sur la page Nouvel onglet',
+  },
+
+  ads: {
+    badge: 'Annonce',
+    label: 'Contenu sponsorisé',
+    dismiss: 'Fermer l\'annonce',
+    cta: 'En savoir plus',
   },
 
   visual: {

@@ -35,6 +35,15 @@ export default {
     tabNameDesc: 'Tab-Titel anpassen',
     selfTab: 'Aktueller Tab',
     newTab: 'Neuer Tab',
+    showAds: 'Anzeigen anzeigen',
+    showAdsDesc: 'Gesponserte Inhalte auf der Neuer-Tab-Seite anzeigen',
+  },
+
+  ads: {
+    badge: 'Anzeige',
+    label: 'Gesponserter Inhalt',
+    dismiss: 'Anzeige schließen',
+    cta: 'Mehr erfahren',
   },
 
   visual: {

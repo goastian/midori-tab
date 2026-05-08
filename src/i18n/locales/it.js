@@ -35,6 +35,15 @@ export default {
     tabNameDesc: 'Personalizza il titolo della scheda',
     selfTab: 'Scheda corrente',
     newTab: 'Nuova scheda',
+    showAds: 'Mostra annunci',
+    showAdsDesc: 'Mostra contenuti sponsorizzati nella pagina Nuova scheda',
+  },
+
+  ads: {
+    badge: 'Annuncio',
+    label: 'Contenuto sponsorizzato',
+    dismiss: 'Chiudi annuncio',
+    cta: 'Scopri di più',
   },
 
   visual: {

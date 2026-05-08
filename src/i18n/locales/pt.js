@@ -26,6 +26,15 @@ export default {
     tabNameDesc: 'Personalize o título da aba',
     selfTab: 'Aba atual',
     newTab: 'Nova aba',
+    showAds: 'Mostrar anúncios',
+    showAdsDesc: 'Exibir conteúdo patrocinado na página Nova aba',
+  },
+
+  ads: {
+    badge: 'Anúncio',
+    label: 'Conteúdo patrocinado',
+    dismiss: 'Fechar anúncio',
+    cta: 'Saiba mais',
   },
 
   visual: {
