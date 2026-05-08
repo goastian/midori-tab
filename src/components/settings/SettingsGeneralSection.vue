@@ -34,6 +34,14 @@
       </div>
       <Switch :state="spacesStore.enabled" @click="$emit('toggle-spaces')" />
     </div>
+
+    <div class="setting-item">
+      <div class="setting-info">
+        <span class="setting-label">{{ i18n.t.general?.showAds || 'Show ads' }}</span>
+        <span class="setting-description">{{ i18n.t.general?.showAdsDesc || 'Display sponsored content on the New Tab page' }}</span>
+      </div>
+      <Switch :state="settings.showAds" @click="$emit('toggle-ads')" />
+    </div>
   </div>
 </template>
 
@@ -49,7 +57,7 @@ export default {
     Dropdown,
     Input,
   },
-  emits: ['update:title', 'toggle-spaces'],
+  emits: ['update:title', 'toggle-spaces', 'toggle-ads'],
   props: {
     i18n: {
       type: Object,

@@ -41,6 +41,7 @@
               :open-links="openLinks"
               :title="title"
               @toggle-spaces="toggleSpaces"
+              @toggle-ads="toggleAds"
               @update:title="title = $event"
             />
 
@@ -171,6 +172,10 @@ export default {
 
     toggleSpaces() {
       this.spacesStore.enabled = !this.spacesStore.enabled;
+    },
+
+    toggleAds() {
+      this.settings.showAds = !this.settings.showAds;
     },
 
     toggleAutoTheme() {
