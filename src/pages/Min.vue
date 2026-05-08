@@ -23,6 +23,11 @@
             <BookmarkGrid ref="bookmarkGrid" :openTarget="tab.openLink" />
         </section>
 
+        <!-- ═══ Sponsored New Tab ad (1 per session, dismissable) ═══ -->
+        <section v-if="tab.showAds" class="dash-ad-slot">
+            <VAdSlot />
+        </section>
+
         <!-- ═══ Active widgets area (rendered when toggled from bottom sheet) ═══ -->
         <section v-if="activeGridWidgets.length" class="dash-widgets">
             <div v-for="key in activeGridWidgets" :key="key" class="widget-card">
@@ -291,6 +296,7 @@ export default {
         NotesWidget: defineAsyncComponent(() => import('../components/NotesWidget.vue')),
         TodoWidget: defineAsyncComponent(() => import('../components/TodoWidget.vue')),
         MarketplaceBrowser: defineAsyncComponent(() => import('../components/MarketplaceBrowser.vue')),
+        VAdSlot: defineAsyncComponent(() => import('../components/VAdSlot.vue')),
     },
 };
 </script>
