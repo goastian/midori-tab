@@ -24,6 +24,7 @@ const useTabStore = defineStore('tabStore', {
     state: false,
     openLink: 'Self Tab',
     autoTheme: true,
+    showAds: true,
   }),
 
   getters: {
@@ -115,7 +116,7 @@ const useTabStore = defineStore('tabStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['tabName', 'theme', 'density', 'background', 'openLink', 'autoTheme'],
+    paths: ['tabName', 'theme', 'density', 'background', 'openLink', 'autoTheme', 'showAds'],
   }
 })
 
