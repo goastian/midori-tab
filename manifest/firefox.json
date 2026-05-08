@@ -17,7 +17,8 @@
     "https://duckduckgo.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
-    "http://marketplace.astian.org/*"
+    "http://marketplace.astian.org/*",
+    "https://ads.astian.org/*"
   ],
   "background": {
     "service_worker": null,
