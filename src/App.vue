@@ -63,7 +63,9 @@
   import useThemeStore from './stores/useThemeStore.js';
 
   const MIDORI_DOWNLOAD_URL = 'https://astian.org/midori-browser/download';
-  const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+  const UPDATE_CHECK_INTERVAL_MS = 10 * 60 * 1000;
+  const UPDATE_ERROR_RETRY_INTERVAL_MS = 2 * 60 * 1000;
+  const UPDATE_FOREGROUND_DEBOUNCE_MS = 15 * 1000;
 
   export default {
     data() {
@@ -80,7 +82,12 @@
         imageLink: "",
         autoTheme: null,
         updateCheckIntervalId: null,
-        updateService: markRaw(new MidoriUpdateService({ checkIntervalMs: UPDATE_CHECK_INTERVAL_MS })),
+        updateForegroundListener: null,
+        lastForegroundUpdateCheckAt: 0,
+        updateService: markRaw(new MidoriUpdateService({
+          checkIntervalMs: UPDATE_CHECK_INTERVAL_MS,
+          errorRetryIntervalMs: UPDATE_ERROR_RETRY_INTERVAL_MS,
+        })),
         updateNotice: {
           visible: false,
           latestVersion: '',
@@ -133,6 +140,7 @@
       this.loadSettings();
       this.setupWallpaperRefresh();
       this.setupDeferredMounts();
+      this.setupUpdateForegroundChecks();
 
       // Apply active theme colors
       const themeStore = useThemeStore();
@@ -157,6 +165,11 @@
       if (this.updateCheckIntervalId) {
         clearInterval(this.updateCheckIntervalId);
         this.updateCheckIntervalId = null;
+      }
+      if (this.updateForegroundListener) {
+        window.removeEventListener('focus', this.updateForegroundListener);
+        document.removeEventListener('visibilitychange', this.updateForegroundListener);
+        this.updateForegroundListener = null;
       }
     },
 
@@ -217,6 +230,26 @@
         };
         this.refreshWallpaperListener = listener;
         window.addEventListener('midori:refresh-wallpaper', listener);
+      },
+
+      setupUpdateForegroundChecks() {
+        const listener = () => {
+          if (document.visibilityState === 'hidden') {
+            return;
+          }
+
+          const now = Date.now();
+          if (now - this.lastForegroundUpdateCheckAt < UPDATE_FOREGROUND_DEBOUNCE_MS) {
+            return;
+          }
+
+          this.lastForegroundUpdateCheckAt = now;
+          this.checkMidoriUpdate();
+        };
+
+        this.updateForegroundListener = listener;
+        window.addEventListener('focus', listener);
+        document.addEventListener('visibilitychange', listener);
       },
 
       startMidoriUpdatePolling() {

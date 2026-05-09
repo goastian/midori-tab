@@ -56,6 +56,9 @@ export default class MidoriUpdateService {
     this.checkIntervalMs = Number(options.checkIntervalMs) > 0
       ? Number(options.checkIntervalMs)
       : DEFAULT_CHECK_INTERVAL_MS
+    this.errorRetryIntervalMs = Number(options.errorRetryIntervalMs) > 0
+      ? Number(options.errorRetryIntervalMs)
+      : this.checkIntervalMs
     this.deferWindowMs = Number(options.deferWindowMs) > 0
       ? Number(options.deferWindowMs)
       : DEFAULT_DEFER_WINDOW_MS
@@ -89,7 +92,11 @@ export default class MidoriUpdateService {
       }
     }
 
-    if (!force && isWithinWindow(state.lastCheckedAt, now, this.checkIntervalMs)) {
+    const activeCheckWindowMs = state.lastResult === 'error'
+      ? this.errorRetryIntervalMs
+      : this.checkIntervalMs
+
+    if (!force && isWithinWindow(state.lastCheckedAt, now, activeCheckWindowMs)) {
       return {
         state,
         currentVersion,
