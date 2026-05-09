@@ -1,5 +1,5 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "midori-tab",
   "description": "A beautiful, customizable new tab with smart search, workspaces and bookmarks.",
   "author": "Astian, Inc",
@@ -14,20 +14,21 @@
     "bookmarks",
     "history",
     "browsingData",
-    "scripting",
-    "search"
-  ],
-  "host_permissions": [
+    "search",
     "https://api.rss2json.com/*",
     "https://api.unsplash.com/*",
     "https://api.github.com/*",
     "https://duckduckgo.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
-    "http://marketplace.astian.org/*"
+    "http://marketplace.astian.org/*",
+    "https://ads.astian.org/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "scripts": [
+      "background.js"
+    ],
+    "persistent": false
   },
   "commands": {
     "open-omni": {
@@ -38,7 +39,17 @@
       "description": "Open command menu"
     }
   },
-  "action": {
+  "web_accessible_resources": [
+    "globe.svg",
+    "icons/*",
+    "assets/*"
+  ],
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "browser_action": {
     "default_icon": {
       "16": "icons/16.png",
       "48": "icons/48.png",
@@ -46,22 +57,11 @@
     },
     "default_title": "Open Midori command menu"
   },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "globe.svg",
-        "icons/*",
-        "assets/*"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "midoritabs@astian.org",
+      "strict_min_version": "109.0"
     }
-  ],
-  "icons": {
-    "16": "icons/16.png",
-    "48": "icons/48.png",
-    "128": "icons/128.png"
   },
-  "version": "1.0.20"
+  "version": "1.0.21"
 }
