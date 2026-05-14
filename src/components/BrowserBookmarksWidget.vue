@@ -19,8 +19,8 @@
     <p v-else-if="loading" class="widget-empty">{{ copy.loading }}</p>
     <p v-else-if="!items.length" class="widget-empty">{{ copy.empty }}</p>
 
-    <ul v-else class="bookmarks-list">
-      <li v-for="item in items" :key="item.id" class="bookmark-item">
+    <ul v-else class="bookmarks-list" :class="{ 'bookmarks-list--virtual': items.length > virtualThreshold }">
+      <li v-for="item in renderedItems" :key="item.id" class="bookmark-item">
         <button class="bookmark-link" type="button" @click="openBookmark(item.url)">
           <span class="bookmark-icon">{{ faviconChar(item.title) }}</span>
           <span class="bookmark-meta">
@@ -37,6 +37,9 @@
 import useI18nStore from '../stores/useI18nStore.js';
 
 const DEFAULT_LIMIT = 12;
+const SEARCH_LIMIT = 250;
+const VIRTUAL_THRESHOLD = 100;
+const VIRTUAL_RENDER_LIMIT = 80;
 
 function extensionApi() {
   if (typeof browser !== 'undefined') return browser;
@@ -101,6 +104,7 @@ export default {
       query: '',
       items: [],
       _searchTimer: null,
+      _searchToken: 0,
     };
   },
 
@@ -115,6 +119,13 @@ export default {
         unavailable: section.unavailable || 'Bookmarks API unavailable.',
       };
     },
+    renderedItems() {
+      if (this.items.length <= VIRTUAL_THRESHOLD) return this.items;
+      return this.items.slice(0, VIRTUAL_RENDER_LIMIT);
+    },
+    virtualThreshold() {
+      return VIRTUAL_THRESHOLD;
+    },
   },
 
   mounted() {
@@ -123,6 +134,7 @@ export default {
 
   beforeUnmount() {
     clearTimeout(this._searchTimer);
+    this._searchToken += 1;
   },
 
   methods: {
@@ -139,6 +151,7 @@ export default {
     },
 
     async loadBookmarks() {
+      const token = ++this._searchToken;
       const api = bookmarksApi();
       if (!api) {
         this.error = this.copy.unavailable;
@@ -152,16 +165,19 @@ export default {
       try {
         if (this.query) {
           const found = await callBookmarkMethod(api.search.bind(api), this.query);
-          this.items = onlyUrlNodes(found).slice(0, DEFAULT_LIMIT);
+          if (token !== this._searchToken) return;
+          this.items = onlyUrlNodes(found).slice(0, SEARCH_LIMIT);
         } else {
-          const recent = await callBookmarkMethod(api.getRecent.bind(api), DEFAULT_LIMIT);
+          const recent = await callBookmarkMethod(api.getRecent.bind(api), SEARCH_LIMIT);
+          if (token !== this._searchToken) return;
           this.items = onlyUrlNodes(recent);
         }
       } catch (error) {
+        if (token !== this._searchToken) return;
         this.error = error?.message || this.copy.unavailable;
         this.items = [];
       } finally {
-        this.loading = false;
+        if (token === this._searchToken) this.loading = false;
       }
     },
 
@@ -275,6 +291,10 @@ export default {
   gap: 0.25rem;
   max-height: 270px;
   overflow-y: auto;
+}
+
+.bookmarks-list--virtual {
+  contain: content;
 }
 
 .bookmark-link {
