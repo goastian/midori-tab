@@ -1,3 +1,5 @@
+import { getJson, quotaSafeSet, remove } from './StorageService.js';
+
 const CACHE_KEY_LIST = 'unsplash_cache_images';
 const CACHE_EXPIRY = 'unsplash_cache_expiry';
 const CACHE_INDEX = 'unsplash_cache_index';
@@ -77,7 +79,7 @@ class UnsplashService {
       const now = Date.now();
       const expiry = Number(localStorage.getItem(CACHE_EXPIRY)) || 0;
       const index = Number(localStorage.getItem(CACHE_INDEX)) || 0;
-      const cachedList = JSON.parse(localStorage.getItem(CACHE_KEY_LIST) || '[]');
+      const cachedList = await getJson(CACHE_KEY_LIST, []);
 
       /**
        * Check if cache is still valid
@@ -139,7 +141,7 @@ class UnsplashService {
 
   async #refreshMetadataIfNeeded(force) {
     const now = Date.now();
-    const expiry = Number(localStorage.getItem(CACHE_EXPIRY)) || 0;
+      const expiry = Number(localStorage.getItem(CACHE_EXPIRY)) || 0;
 
     if (!force && now < expiry - 6 * 60 * 60 * 1000) {
       return;
@@ -192,7 +194,7 @@ class UnsplashService {
       const now = Date.now();
       const newList = [];
 
-      for (const photo of data) {
+      for (const photo of data.slice(0, this.#total)) {
         // Solo metadata/URLs: no descargamos blobs masivos en background.
         const baseUrl = photo.urls.raw || photo.urls.full || photo.urls.regular;
         const imageUrl = buildOptimizedImageUrl(baseUrl);
@@ -205,10 +207,7 @@ class UnsplashService {
         });
       }
 
-      /**
-       * save info in localStorage
-       */
-      localStorage.setItem(CACHE_KEY_LIST, JSON.stringify(newList));
+      await quotaSafeSet(CACHE_KEY_LIST, newList.slice(0, this.#total), { maxBytes: 75_000 });
       localStorage.setItem(CACHE_INDEX, '1');
       localStorage.setItem(CACHE_EXPIRY, String(now + 24 * 60 * 60 * 1000)); // 24h
     } catch (error) {
@@ -220,7 +219,7 @@ class UnsplashService {
    * Clear cache manually.
    */
   async clearCache() {
-    localStorage.removeItem(CACHE_KEY_LIST);
+    await remove(CACHE_KEY_LIST);
     localStorage.removeItem(CACHE_INDEX);
     localStorage.removeItem(CACHE_EXPIRY);
     localStorage.removeItem(CACHE_FETCH_LOCK);
