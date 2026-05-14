@@ -430,6 +430,8 @@
     const input = overlay ? overlay.querySelector('.omni-cs-input') : null;
     const query = input ? input.value : '';
     const isRemoveMode = query.toLowerCase().startsWith('/remove');
+    const confirmed = confirmDestructiveAction(item, isRemoveMode);
+    if (confirmed === false) return;
 
     closeOverlay();
 
@@ -440,9 +442,11 @@
         query,
         newTab,
         removeMode: isRemoveMode,
+        confirmed,
       },
       (response) => {
         if (chrome.runtime.lastError) return;
+        if (response?.requiresConfirmation) return;
 
         switch (response?.localAction) {
           case 'print':
@@ -462,6 +466,26 @@
         }
       }
     );
+  }
+
+  function confirmDestructiveAction(item, removeMode) {
+    const destructiveActions = new Set([
+      'close-tab',
+      'close-window',
+      'remove-all',
+      'remove-history',
+      'remove-cookies',
+      'remove-cache',
+      'remove-local-storage',
+      'remove-passwords',
+    ]);
+
+    if (!removeMode && !destructiveActions.has(item?.action)) {
+      return undefined;
+    }
+
+    const label = item?.title || item?.desc || item?.action || 'this action';
+    return window.confirm(`Confirm ${label}?`);
   }
 
   // ── Styles ─────────────────────────────────────────────────────────────────
