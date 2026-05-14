@@ -20,15 +20,20 @@ function getAdaptiveWidth() {
 
 const screenWidth = getAdaptiveWidth();
 
-function buildOptimizedImageUrl(rawUrl) {
+function getImageQuality() {
+  const deviceMemory = Number(navigator.deviceMemory || 4);
+  return deviceMemory <= 2 ? 50 : 60;
+}
+
+function buildOptimizedImageUrl(rawUrl, width = screenWidth) {
   if (!rawUrl) return '';
 
   try {
     const url = new URL(rawUrl);
-    url.searchParams.set('w', String(screenWidth));
+    url.searchParams.set('w', String(width));
     url.searchParams.set('fit', 'max');
     url.searchParams.set('fm', 'webp');
-    url.searchParams.set('q', '60');
+    url.searchParams.set('q', String(getImageQuality()));
     url.searchParams.set('dpr', '1');
     return url.toString();
   } catch {
@@ -36,11 +41,20 @@ function buildOptimizedImageUrl(rawUrl) {
   }
 }
 
+function buildSrcSet(rawUrl) {
+  const widths = [960, 1280, 1440, 1600]
+    .filter(width => width <= Math.max(screenWidth, 1280));
+  return widths
+    .map(width => `${buildOptimizedImageUrl(rawUrl, width)} ${width}w`)
+    .join(', ');
+}
+
 class UnsplashService {
   #url = '';
   #author = '';
   #authorLink = '';
   #imageLink = '';
+  #srcSet = '';
   #total = 5;
 
   getUrl() {
@@ -59,6 +73,10 @@ class UnsplashService {
     return this.#imageLink;
   }
 
+  getSrcSet() {
+    return this.#srcSet;
+  }
+
   /**
    * Obtener URL de thumbnail pequeño para cálculo de luminosidad
    * Devuelve la URL actual ya optimizada por tamaño y calidad.
@@ -69,6 +87,7 @@ class UnsplashService {
 
   #setImage(meta) {
     this.#url = meta.url;
+    this.#srcSet = meta.srcSet || '';
     this.#author = meta.author;
     this.#authorLink = meta.authorLink;
     this.#imageLink = meta.imagePage;
@@ -129,6 +148,7 @@ class UnsplashService {
 
       return {
         url: imageUrl,
+        srcSet: buildSrcSet(baseUrl),
         author: data.user.name,
         authorLink: data.user.links.html,
         imagePage: data.links.html,
@@ -201,6 +221,7 @@ class UnsplashService {
 
         newList.push({
           url: imageUrl,
+          srcSet: buildSrcSet(baseUrl),
           author: photo.user.name,
           authorLink: photo.user.links.html,
           imagePage: photo.links.html,
