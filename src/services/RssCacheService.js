@@ -9,6 +9,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 const CACHE_STORAGE_KEY = 'rss_feeds_cache';
 const CACHE_MAX_ENTRIES = 12;
 const CACHE_MAX_BYTES = 300_000;
+const FETCH_TIMEOUT_MS = 8000;
 
 class RssCacheService {
   constructor() {
@@ -71,7 +72,7 @@ class RssCacheService {
    * @param {boolean} forceRefresh - Forzar actualización ignorando caché
    * @returns {Promise<Object>} - Datos del feed
    */
-  async getFeed(feedUrl, forceRefresh = false) {
+  async getFeed(feedUrl, forceRefresh = false, options = {}) {
     await this.ready;
     this.pruneCache();
     const cacheKey = this.getCacheKey(feedUrl);
@@ -96,8 +97,22 @@ class RssCacheService {
 
     // No está en caché o expiró - hacer fetch
     console.log(`🌐 RSS Cache MISS: ${feedUrl} - Fetching...`);
+    let timeoutId = null;
     try {
-      const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`);
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      timeoutId = controller
+        ? globalThis.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+        : null;
+
+      if (options.signal && controller) {
+        if (options.signal.aborted) controller.abort();
+        else options.signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
+
+      const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`, {
+        signal: controller?.signal,
+        cache: forceRefresh ? 'reload' : 'default',
+      });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -135,6 +150,8 @@ class RssCacheService {
       }
 
       throw error;
+    } finally {
+      if (timeoutId) globalThis.clearTimeout(timeoutId);
     }
   }
 

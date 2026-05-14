@@ -39,14 +39,14 @@ export function getFeedColor(feeds, index) {
   return feeds[index]?.color || '#4ecdc4';
 }
 
-export async function fetchFeedPayload(feedUrl, forceRefresh = false) {
-  return rssCacheService.getFeed(feedUrl, forceRefresh);
+export async function fetchFeedPayload(feedUrl, forceRefresh = false, options = {}) {
+  return rssCacheService.getFeed(feedUrl, forceRefresh, options);
 }
 
 export function parseFeedPayload(feedPayload) {
   return {
     feedTitle: feedPayload?.feed?.title || 'RSS',
-    feedItems: Array.isArray(feedPayload?.items) ? feedPayload.items : [],
+    feedItems: Array.isArray(feedPayload?.items) ? feedPayload.items.slice(0, 12) : [],
   };
 }
 
