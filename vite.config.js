@@ -165,6 +165,10 @@ export default defineConfig({
         {
           src: 'shared/omni-ui.shared.json',
           dest: '.'
+        },
+        {
+          src: 'shared/omni-protocol.shared.json',
+          dest: '.'
         }
       ]
     }),
