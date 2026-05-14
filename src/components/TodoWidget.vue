@@ -29,19 +29,16 @@
 </template>
 
 <script>
+import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
+
 const STORAGE_KEY = 'midori_todos';
 
-/**
- * Simple to-do list widget with persistent storage.
- * Supports add, toggle complete, and delete operations.
- */
 export default {
   name: 'TodoWidget',
 
   data() {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     return {
-      items: saved || [],
+      items: [],
       newTask: '',
     };
   },
@@ -53,9 +50,17 @@ export default {
   },
 
   methods: {
-    /** Persists the todo list to localStorage. */
-    save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.items));
+    async load() {
+      const saved = await getJson(STORAGE_KEY, []);
+      this.items = Array.isArray(saved) ? saved : [];
+    },
+
+    saveDebounced() {
+      setJsonDebounced(STORAGE_KEY, this.items, { delayMs: 700, maxBytes: 160_000 });
+    },
+
+    flush() {
+      return flushDebounced(STORAGE_KEY, this.items, { maxBytes: 160_000 }).catch(() => undefined);
     },
 
     addTask() {
@@ -63,18 +68,26 @@ export default {
       if (!text) return;
       this.items.push({ text, done: false });
       this.newTask = '';
-      this.save();
+      this.saveDebounced();
     },
 
     toggleItem(idx) {
       this.items[idx].done = !this.items[idx].done;
-      this.save();
+      this.saveDebounced();
     },
 
     removeItem(idx) {
       this.items.splice(idx, 1);
-      this.save();
+      this.saveDebounced();
     },
+  },
+
+  mounted() {
+    this.load();
+  },
+
+  beforeUnmount() {
+    this.flush();
   },
 };
 </script>
