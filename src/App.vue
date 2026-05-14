@@ -78,6 +78,7 @@
         tabStore: useTabStore(),
         i18n: useI18nStore(),
         refreshWallpaperListener: null,
+        backgroundChangedListener: null,
         renderSmartSuggestions: false,
         renderOmniLauncher: false,
         omniKeydownListener: null,
@@ -131,15 +132,6 @@
       },
     },
 
-    watch: {
-      'tabStore.background': {
-        handler() {
-          this.load();
-        },
-        deep: true,
-      },
-    },
-
     mounted() {
       this.load();
       this.loadSettings();
@@ -163,6 +155,9 @@
       // Limpiar event listeners
       if (this.refreshWallpaperListener) {
         window.removeEventListener('midori:refresh-wallpaper', this.refreshWallpaperListener);
+      }
+      if (this.backgroundChangedListener) {
+        window.removeEventListener('midori:background-changed', this.backgroundChangedListener);
       }
       // Detener auto theme
       if (this.autoTheme) {
@@ -246,6 +241,9 @@
         };
         this.refreshWallpaperListener = listener;
         window.addEventListener('midori:refresh-wallpaper', listener);
+
+        this.backgroundChangedListener = () => this.load();
+        window.addEventListener('midori:background-changed', this.backgroundChangedListener);
       },
 
       setupOmniLazyTriggers() {
