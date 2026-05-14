@@ -17,7 +17,7 @@
       />
 
       <button class="search-btn" @click="search" :aria-label="searchLabel">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <DashboardIcon name="search" :size="18" aria-hidden="true" />
       </button>
     </div>
 
@@ -32,7 +32,7 @@
           @mousedown.prevent="selectSuggestion(s)"
           @mouseenter="activeIndex = i"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="suggestion-icon" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <DashboardIcon name="search" class="suggestion-icon" :size="14" :stroke-width="1.5" aria-hidden="true" />
           <span class="suggestion-text" v-html="highlightMatch(s)"></span>
           <span class="suggestion-arrow">↗</span>
         </li>
@@ -44,6 +44,7 @@
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
 import { fetchSuggestions } from '../services/DuckDuckGoSuggestService.js';
+import DashboardIcon from './icons/DashboardIcon.vue';
 
 const DEFAULT_ENGINE = {
   id: 'astiango',
@@ -54,6 +55,9 @@ const DEFAULT_ENGINE = {
 
 export default {
   name: 'SearchBox',
+  components: {
+    DashboardIcon,
+  },
 
   props: {
     /** How to open search results: 'Self Tab' | 'New Tab' */

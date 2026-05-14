@@ -20,7 +20,10 @@
     <Minimalist />
     <SettingsModal v-if="tabStore.state" />
     <SmartSuggestions v-if="renderSmartSuggestions" />
-      <OmniLauncher />
+    <OmniLauncher
+      v-if="renderOmniLauncher"
+      :enable-global-triggers="false"
+    />
 
     <Teleport to="body">
       <Transition name="update-toast">
@@ -49,7 +52,7 @@
 </template>
 
 <script>
-  import { defineAsyncComponent, markRaw } from 'vue';
+  import { defineAsyncComponent, markRaw, nextTick } from 'vue';
   import { APP_VERSION } from './utils/appVersion.js';
   import { getBrowserInfo } from './utils/browserInfo.js';
   import MidoriUpdateService from './services/MidoriUpdateService.js';
@@ -59,7 +62,6 @@
   import Minimalist from './pages/Min.vue';
   import SpaceSwitcher from './components/SpaceSwitcher.vue';
   import { useAutoTheme } from './composables/useAutoTheme.js';
-    import OmniLauncher from './omni/components/OmniLauncher.vue';
   import useThemeStore from './stores/useThemeStore.js';
 
   const MIDORI_DOWNLOAD_URL = 'https://astian.org/midori-browser/download';
@@ -77,6 +79,9 @@
         i18n: useI18nStore(),
         refreshWallpaperListener: null,
         renderSmartSuggestions: false,
+        renderOmniLauncher: false,
+        omniKeydownListener: null,
+        omniRuntimeMessageListener: null,
         imageAuthor: "",
         imageAuthorLink: "",
         imageLink: "",
@@ -100,7 +105,7 @@
       SettingsModal: defineAsyncComponent(() => import('./components/SettingsModal.vue')),
       SpaceSwitcher,
       SmartSuggestions: defineAsyncComponent(() => import('./components/SmartSuggestions.vue')),
-        OmniLauncher,
+      OmniLauncher: defineAsyncComponent(() => import('./omni/components/OmniLauncher.vue')),
     },
 
     computed: {
@@ -140,6 +145,7 @@
       this.loadSettings();
       this.setupWallpaperRefresh();
       this.setupDeferredMounts();
+      this.setupOmniLazyTriggers();
       this.setupUpdateForegroundChecks();
 
       // Apply active theme colors
@@ -170,6 +176,16 @@
         window.removeEventListener('focus', this.updateForegroundListener);
         document.removeEventListener('visibilitychange', this.updateForegroundListener);
         this.updateForegroundListener = null;
+      }
+      if (this.omniKeydownListener) {
+        window.removeEventListener('keydown', this.omniKeydownListener);
+        this.omniKeydownListener = null;
+      }
+      if (this.omniRuntimeMessageListener) {
+        try {
+          chrome.runtime.onMessage.removeListener(this.omniRuntimeMessageListener);
+        } catch (_) { /* noop */ }
+        this.omniRuntimeMessageListener = null;
       }
     },
 
@@ -230,6 +246,44 @@
         };
         this.refreshWallpaperListener = listener;
         window.addEventListener('midori:refresh-wallpaper', listener);
+      },
+
+      setupOmniLazyTriggers() {
+        const openOmni = async ({ toggle = false } = {}) => {
+          this.renderOmniLauncher = true;
+          const [{ useOmniStore }] = await Promise.all([
+            import('./stores/useOmniStore.js'),
+            nextTick(),
+          ]);
+          const omniStore = useOmniStore();
+          if (toggle) {
+            omniStore.toggle();
+          } else {
+            omniStore.open();
+          }
+        };
+
+        const keydownListener = (event) => {
+          const isMac = navigator.platform.toUpperCase().includes('MAC');
+          const mod = isMac ? event.metaKey : event.ctrlKey;
+          if (mod && !event.shiftKey && event.key.toLowerCase() === 'k') {
+            event.preventDefault();
+            void openOmni({ toggle: true });
+          }
+        };
+
+        const runtimeMessageListener = (message) => {
+          if (message?.request === 'open-omni') {
+            void openOmni({ toggle: true });
+          }
+        };
+
+        this.omniKeydownListener = keydownListener;
+        this.omniRuntimeMessageListener = runtimeMessageListener;
+        window.addEventListener('keydown', keydownListener);
+        try {
+          chrome.runtime.onMessage.addListener(runtimeMessageListener);
+        } catch (_) { /* not in extension context */ }
       },
 
       setupUpdateForegroundChecks() {

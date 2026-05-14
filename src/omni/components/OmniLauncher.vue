@@ -134,8 +134,14 @@ function getSharedDensityPreset(name) {
 export default {
   name: 'OmniLauncher',
   components: { OmniResultItem },
+  props: {
+    enableGlobalTriggers: {
+      type: Boolean,
+      default: true,
+    },
+  },
 
-  setup() {
+  setup(props) {
     const omniStore = useOmniStore();
     const i18n = useI18nStore();
     const { search } = useOmniSearch();
@@ -369,7 +375,9 @@ export default {
     }
 
     onMounted(() => {
-      window.addEventListener('keydown', onGlobalKeydown);
+      if (props.enableGlobalTriggers) {
+        window.addEventListener('keydown', onGlobalKeydown);
+      }
       window.addEventListener('resize', onResize);
 
       try {
@@ -377,17 +385,23 @@ export default {
       } catch (_) { /* noop */ }
 
       try {
-        chrome.runtime.onMessage.addListener(onRuntimeMessage);
+        if (props.enableGlobalTriggers) {
+          chrome.runtime.onMessage.addListener(onRuntimeMessage);
+        }
       } catch (_) { /* not in extension context */ }
     });
 
     onUnmounted(() => {
-      window.removeEventListener('keydown', onGlobalKeydown);
+      if (props.enableGlobalTriggers) {
+        window.removeEventListener('keydown', onGlobalKeydown);
+      }
       window.removeEventListener('resize', onResize);
       cancelAnimationFrame(scrollRaf);
       cancelAnimationFrame(configResizeRaf);
       try {
-        chrome.runtime.onMessage.removeListener(onRuntimeMessage);
+        if (props.enableGlobalTriggers) {
+          chrome.runtime.onMessage.removeListener(onRuntimeMessage);
+        }
       } catch (_) { /* noop */ }
     });
 
