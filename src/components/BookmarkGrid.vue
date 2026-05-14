@@ -64,7 +64,7 @@ import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageSe
 const STORAGE_KEY = 'midori_bookmarks';
 const CATS_KEY = 'midori_bookmark_categories';
 
-const DEFAULT_CATEGORIES = ['Personal', 'Work', 'Travel'];
+const DEFAULT_CATEGORIES = ['Personal', 'Work', 'Travel', 'Web3'];
 
 const DEFAULT_BOOKMARKS = {
   Personal: [
@@ -84,7 +84,8 @@ const DEFAULT_BOOKMARKS = {
   ],
   Web3: [
     { title: 'MiWallet', url: 'https://wallet.astian.org', domain: 'wallet.astian.org' },
-    { title: 'Kayak Cars', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fcars', domain: 'kayak.com' },
+    { title: 'ChangeNow', url: 'https://changenow.app.link/referral?link_id=7c257bad8fcf09', domain: 'changenow.io' },
+
   ],
 };
 
