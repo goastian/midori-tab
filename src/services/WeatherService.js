@@ -1,22 +1,29 @@
+import { getJson, setJsonDebounced } from './StorageService.js';
+
 const CACHE_KEY = 'midori_weather_cache_v1';
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 8;
+const CACHE_MAX_BYTES = 80_000;
+const FETCH_TIMEOUT_MS = 7000;
 
 function roundCoord(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
-function readCache() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
+async function readCache() {
+  const parsed = await getJson(CACHE_KEY, {});
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 function writeCache(cache) {
+  const entries = Object.entries(cache)
+    .sort(([, left], [, right]) => (right.timestamp || 0) - (left.timestamp || 0))
+    .slice(0, CACHE_MAX_ENTRIES);
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    setJsonDebounced(CACHE_KEY, Object.fromEntries(entries), {
+      delayMs: 800,
+      maxBytes: CACHE_MAX_BYTES,
+    });
   } catch {
     // Ignore storage quota errors.
   }
@@ -33,14 +40,14 @@ function getConditionKey(code) {
 }
 
 class WeatherService {
-  async getForecast({ latitude, longitude, unit = 'metric' }) {
+  async getForecast({ latitude, longitude, unit = 'metric', forceRefresh = false, signal = null }) {
     const lat = roundCoord(latitude);
     const lon = roundCoord(longitude);
     const cacheId = `${lat}|${lon}|${unit}`;
-    const cache = readCache();
+    const cache = await readCache();
     const now = Date.now();
 
-    if (cache[cacheId] && now - cache[cacheId].timestamp < CACHE_TTL_MS) {
+    if (!forceRefresh && cache[cacheId] && now - cache[cacheId].timestamp < CACHE_TTL_MS) {
       return { ...cache[cacheId].data, fromCache: true };
     }
 
@@ -54,13 +61,25 @@ class WeatherService {
     url.searchParams.set('temperature_unit', temperatureUnit);
 
     let response;
+    let timeoutId = null;
     try {
-      response = await fetch(url.toString(), { cache: 'no-store' });
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      timeoutId = controller ? globalThis.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS) : null;
+      if (signal && controller) {
+        if (signal.aborted) controller.abort();
+        else signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
+      response = await fetch(url.toString(), {
+        cache: forceRefresh ? 'reload' : 'default',
+        signal: controller?.signal,
+      });
     } catch (error) {
       if (cache[cacheId]) {
         return { ...cache[cacheId].data, fromCache: true, stale: true };
       }
       throw error;
+    } finally {
+      if (timeoutId) globalThis.clearTimeout(timeoutId);
     }
 
     if (!response.ok) {
