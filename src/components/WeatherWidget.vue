@@ -7,7 +7,7 @@
       </div>
       <div class="weather-actions">
         <button type="button" class="weather-btn" @click="toggleUnit">{{ unitLabel }}</button>
-        <button type="button" class="weather-btn" @click="refresh" :disabled="loading">↻</button>
+        <button type="button" class="weather-btn" @click="refresh(true)" :disabled="loading">↻</button>
       </div>
     </header>
 
@@ -38,6 +38,7 @@
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
 import weatherService from '../services/WeatherService.js';
+import { getJson, setJsonDebounced } from '../services/StorageService.js';
 
 const SETTINGS_KEY = 'midori_weather_settings_v1';
 
@@ -61,6 +62,7 @@ export default {
       forecast: null,
       manualLocation: '',
       settings: defaultSettings(),
+      requestController: null,
     };
   },
 
@@ -77,9 +79,13 @@ export default {
     },
   },
 
-  mounted() {
-    this.restoreSettings();
-    this.refresh();
+  async mounted() {
+    await this.restoreSettings();
+    await this.refresh();
+  },
+
+  beforeUnmount() {
+    this.abortRequest();
   },
 
   methods: {
@@ -88,9 +94,9 @@ export default {
       return Number.isFinite(numeric) ? Math.round(numeric) : '--';
     },
 
-    restoreSettings() {
+    async restoreSettings() {
       try {
-        const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+        const parsed = await getJson(SETTINGS_KEY, {});
         this.settings = {
           ...defaultSettings(),
           ...parsed,
@@ -103,24 +109,37 @@ export default {
 
     persistSettings() {
       try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
+        setJsonDebounced(SETTINGS_KEY, this.settings, { delayMs: 600, maxBytes: 12_000 });
       } catch {
         // Ignore persist failures.
       }
     },
 
-    async refresh() {
+    abortRequest() {
+      if (this.requestController) {
+        this.requestController.abort();
+        this.requestController = null;
+      }
+    },
+
+    async refresh(forceRefresh = false) {
       this.loading = true;
       this.error = '';
+      this.abortRequest();
+      this.requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
       try {
         this.forecast = await weatherService.getForecast({
           latitude: this.settings.latitude,
           longitude: this.settings.longitude,
           unit: this.settings.unit,
+          forceRefresh,
+          signal: this.requestController?.signal,
         });
-      } catch {
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
         this.error = this.i18n.$t('weather.errors.unavailable');
       } finally {
+        this.requestController = null;
         this.loading = false;
       }
     },
@@ -128,7 +147,7 @@ export default {
     toggleUnit() {
       this.settings.unit = this.settings.unit === 'metric' ? 'imperial' : 'metric';
       this.persistSettings();
-      this.refresh();
+      this.refresh(true);
     },
 
     async useCurrentLocation() {
@@ -154,7 +173,7 @@ export default {
         this.settings.locationLabel = this.i18n.$t('weather.currentLocationLabel');
         this.manualLocation = this.settings.locationLabel;
         this.persistSettings();
-        await this.refresh();
+        await this.refresh(true);
       } catch {
         this.error = this.i18n.$t('weather.errors.locationDenied');
         this.loading = false;
@@ -172,7 +191,7 @@ export default {
         endpoint.searchParams.set('name', city);
         endpoint.searchParams.set('count', '1');
 
-        const response = await fetch(endpoint.toString(), { cache: 'no-store' });
+        const response = await fetch(endpoint.toString(), { cache: 'default' });
         if (!response.ok) throw new Error('Geocode failed');
 
         const payload = await response.json();
@@ -186,7 +205,7 @@ export default {
         this.settings.longitude = result.longitude;
         this.settings.locationLabel = result.name;
         this.persistSettings();
-        await this.refresh();
+        await this.refresh(true);
       } catch {
         this.error = this.i18n.$t('weather.errors.cityNotFound');
       } finally {

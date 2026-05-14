@@ -93,22 +93,42 @@ export default {
       availableFeeds: getAvailableFeeds(),
       currentFeedIndex: 0,
       showFeedSelector: false,
-      autoRefreshInterval: null
+      autoRefreshInterval: null,
+      requestController: null,
+      visibilityListener: null,
+      observer: null,
+      isInViewport: true,
+      autoRefreshEnabled: false,
     }
   },
   
   mounted() {
-    this.loadFeed();
     // Cerrar selector al hacer clic fuera
     document.addEventListener('click', this.handleClickOutside);
+    this.visibilityListener = () => {
+      if (document.visibilityState === 'hidden') {
+        this.stopAutoRefreshTimer();
+        this.abortRequest();
+        return;
+      }
+      if (this.isInViewport) {
+        this.loadFeed();
+        this.syncAutoRefreshTimer();
+      }
+    };
+    document.addEventListener('visibilitychange', this.visibilityListener);
     this.updateFeedColor();
+    this.$nextTick(() => this.setupVisibilityObserver());
   },
   
   beforeUnmount() {
-    if (this.autoRefreshInterval) {
-      clearInterval(this.autoRefreshInterval);
-    }
+    this.stopAutoRefreshTimer();
+    this.abortRequest();
+    if (this.observer) this.observer.disconnect();
     document.removeEventListener('click', this.handleClickOutside);
+    if (this.visibilityListener) {
+      document.removeEventListener('visibilitychange', this.visibilityListener);
+    }
   },
   
   computed: {
@@ -126,14 +146,19 @@ export default {
   
   methods: {
     async loadFeed(forceRefresh = false) {
+      if (document.visibilityState === 'hidden') return;
       this.loading = true;
       this.error = null;
       
       const currentFeed = this.availableFeeds[this.currentFeedIndex];
       this.feedUrl = currentFeed.url;
+      this.abortRequest();
+      this.requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
       
       try {
-        const feedData = await fetchFeedPayload(this.feedUrl, forceRefresh);
+        const feedData = await fetchFeedPayload(this.feedUrl, forceRefresh, {
+          signal: this.requestController?.signal,
+        });
         const parsedData = parseFeedPayload(feedData);
 
         this.feedTitle = parsedData.feedTitle;
@@ -144,9 +169,11 @@ export default {
           console.log(`✅ RSS loaded from cache (${Math.round(feedData.cacheAge / 1000)}s old)`);
         }
       } catch (error) {
+        if (error?.name === 'AbortError') return;
         this.error = error.message;
         console.error('Error loading RSS feed:', error);
       } finally {
+        this.requestController = null;
         this.loading = false;
       }
     },
@@ -173,14 +200,52 @@ export default {
     },
     
     toggleAutoRefresh() {
+      this.autoRefreshEnabled = !this.autoRefreshEnabled;
+      this.syncAutoRefreshTimer();
+    },
+
+    syncAutoRefreshTimer() {
+      this.stopAutoRefreshTimer();
+      if (!this.autoRefreshEnabled || !this.isInViewport || document.visibilityState === 'hidden') return;
+      this.autoRefreshInterval = setInterval(() => {
+        this.loadFeed();
+      }, 300000); // 5 minutos
+    },
+
+    stopAutoRefreshTimer() {
       if (this.autoRefreshInterval) {
         clearInterval(this.autoRefreshInterval);
         this.autoRefreshInterval = null;
-      } else {
-        this.autoRefreshInterval = setInterval(() => {
-          this.loadFeed();
-        }, 300000); // 5 minutos
       }
+    },
+
+    abortRequest() {
+      if (this.requestController) {
+        this.requestController.abort();
+        this.requestController = null;
+      }
+    },
+
+    setupVisibilityObserver() {
+      const root = this.$el;
+      if (!root || typeof IntersectionObserver === 'undefined') {
+        this.isInViewport = true;
+        this.loadFeed();
+        this.syncAutoRefreshTimer();
+        return;
+      }
+      this.observer = new IntersectionObserver((entries) => {
+        const entry = entries[0];
+        this.isInViewport = Boolean(entry?.isIntersecting);
+        if (this.isInViewport && document.visibilityState !== 'hidden') {
+          this.loadFeed();
+          this.syncAutoRefreshTimer();
+          return;
+        }
+        this.stopAutoRefreshTimer();
+        this.abortRequest();
+      }, { threshold: 0.1 });
+      this.observer.observe(root);
     },
     
     handleClickOutside(event) {

@@ -2,7 +2,7 @@
   <div class="currency-widget">
     <header class="currency-header">
       <h3 class="currency-title">{{ i18n.$t('currency.title') }}</h3>
-      <button type="button" class="currency-refresh" @click="refresh" :disabled="loading">↻</button>
+      <button type="button" class="currency-refresh" @click="refresh(true)" :disabled="loading">↻</button>
     </header>
 
     <div class="currency-grid">
@@ -39,6 +39,7 @@
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
 import currencyService from '../services/CurrencyService.js';
+import { getJson, setJsonDebounced } from '../services/StorageService.js';
 
 const SETTINGS_KEY = 'midori_currency_settings_v1';
 
@@ -65,6 +66,7 @@ export default {
       to: 'EUR',
       amountInput: '1',
       currencyCodes: ['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'CAD', 'AUD', 'MXN', 'BRL', 'RUB', 'INR'],
+      requestController: null,
     };
   },
 
@@ -112,15 +114,19 @@ export default {
     },
   },
 
-  mounted() {
-    this.restoreSettings();
-    this.refresh();
+  async mounted() {
+    await this.restoreSettings();
+    await this.refresh();
+  },
+
+  beforeUnmount() {
+    this.abortRequest();
   },
 
   methods: {
-    restoreSettings() {
+    async restoreSettings() {
       try {
-        const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+        const parsed = await getJson(SETTINGS_KEY, {});
         const settings = { ...getDefaultSettings(), ...parsed };
         this.from = settings.from;
         this.to = settings.to;
@@ -135,27 +141,41 @@ export default {
 
     persistSettings() {
       try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+        setJsonDebounced(SETTINGS_KEY, {
           from: this.from,
           to: this.to,
           amountInput: this.amountInput,
-        }));
+        }, { delayMs: 700, maxBytes: 12_000 });
       } catch {
         // Ignore persist failures.
       }
     },
 
-    async refresh() {
+    abortRequest() {
+      if (this.requestController) {
+        this.requestController.abort();
+        this.requestController = null;
+      }
+    },
+
+    async refresh(forceRefresh = false) {
       this.loading = true;
       this.error = '';
+      this.abortRequest();
+      this.requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
       try {
-        const data = await currencyService.getRates(this.from);
+        const data = await currencyService.getRates(this.from, {
+          forceRefresh,
+          signal: this.requestController?.signal,
+        });
         this.rates = data.rates;
         this.fetchedAt = data.fetchedAt;
         this.isStale = Boolean(data.stale);
-      } catch {
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
         this.error = this.i18n.$t('currency.errors.unavailable');
       } finally {
+        this.requestController = null;
         this.loading = false;
       }
     },
