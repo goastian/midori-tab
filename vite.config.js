@@ -19,8 +19,11 @@ function classifyBundleFile(fileName) {
   if (fileName === 'omni-content.js') return 'content-script';
   if (fileName === 'index.js') return 'index';
   if (fileName === 'vendor.js' || /^assets\/vendor-.*\.js$/.test(fileName)) return 'vendor';
+  if (/^assets\/i18n-locales-.*\.js$/.test(fileName)) return 'i18n-locales';
+  if (/^assets\/omni-.*\.(js|css)$/.test(fileName)) return 'omni';
+  if (/^assets\/marketplace-.*\.(js|css)$/.test(fileName)) return 'marketplace';
   if (fileName.endsWith('.css')) return 'css';
-  if (/Widget|widgets/i.test(fileName)) return 'widget-chunk';
+  if (/Widget|widgets|SearchBox|BookmarkGrid/i.test(fileName)) return 'feature-chunk';
   if (fileName.endsWith('.js')) return 'chunk';
   return 'asset';
 }
@@ -123,6 +126,33 @@ function createBundleAnalyzerPlugin() {
   };
 }
 
+function manualChunks(id) {
+  if (id.includes('node_modules')) {
+    if (/[\\/]node_modules[\\/](vue|@vue|pinia|pinia-plugin-persistedstate)[\\/]/.test(id)) {
+      return 'vendor';
+    }
+    return undefined;
+  }
+
+  if (id.includes('/src/i18n/locales/')) {
+    return 'i18n-locales';
+  }
+
+  if (id.includes('/src/omni/')) {
+    return 'omni';
+  }
+
+  if (
+    id.includes('/src/components/MarketplaceBrowser.vue') ||
+    id.includes('/src/services/MarketplaceApiClient.js') ||
+    id.includes('/src/stores/useCatalogStore.js')
+  ) {
+    return 'marketplace';
+  }
+
+  return undefined;
+}
+
 export default defineConfig({
   plugins: [
     vue(),
@@ -159,9 +189,7 @@ export default defineConfig({
       },
       output: {
         entryFileNames: '[name].js',
-        manualChunks: {
-          vendor: ['vue', 'pinia', 'pinia-plugin-persistedstate'],
-        },
+        manualChunks,
       },
     },
     outDir: 'dist',
