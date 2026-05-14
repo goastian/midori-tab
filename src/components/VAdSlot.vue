@@ -1,15 +1,16 @@
 <template>
   <div
-    v-if="adsStore.hasAd"
+    v-if="!requested || adsStore.hasAd"
     ref="root"
     class="ad-slot"
-    :class="{ 'ad-slot--ready': visible }"
+    :class="{ 'ad-slot--ready': visible && adsStore.hasAd }"
     role="complementary"
     :aria-label="i18n.$t('ads.label') || 'Sponsored content'"
   >
-    <span class="ad-slot__badge">{{ i18n.$t('ads.badge') || 'Anuncio' }}</span>
+    <span v-if="adsStore.hasAd" class="ad-slot__badge">{{ i18n.$t('ads.badge') || 'Anuncio' }}</span>
 
     <button
+      v-if="adsStore.hasAd"
       type="button"
       class="ad-slot__dismiss"
       :aria-label="i18n.$t('ads.dismiss') || 'Dismiss ad'"
@@ -17,6 +18,7 @@
     >✕</button>
 
     <a
+      v-if="adsStore.hasAd"
       class="ad-slot__link"
       :href="ad.destination_url"
       target="_blank"
@@ -65,6 +67,7 @@ export default {
       observer: null,
       dwellTimer: null,
       imgFailed: false,
+      requested: false,
     };
   },
 
@@ -74,9 +77,7 @@ export default {
     },
   },
 
-  async mounted() {
-    // Best-effort load; safe to call multiple times.
-    await this.adsStore.loadAd();
+  mounted() {
     this.$nextTick(() => this.setupObserver());
   },
 
@@ -100,7 +101,8 @@ export default {
       if (!el || typeof IntersectionObserver === 'undefined') {
         // Fallback: assume visible after mount.
         this.visible = true;
-        this.scheduleImpression();
+        this.loadWhenVisible();
+        if (this.adsStore.hasAd) this.scheduleImpression();
         return;
       }
 
@@ -109,7 +111,8 @@ export default {
         if (!entry) return;
         if (entry.isIntersecting && entry.intersectionRatio >= VISIBILITY_THRESHOLD) {
           this.visible = true;
-          this.scheduleImpression();
+          this.loadWhenVisible();
+          if (this.adsStore.hasAd) this.scheduleImpression();
         } else {
           this.cancelImpression();
         }
@@ -127,12 +130,19 @@ export default {
     },
 
     scheduleImpression() {
-      if (this.dwellTimer || this.adsStore.impressionTracked) return;
+      if (!this.adsStore.hasAd || this.dwellTimer || this.adsStore.impressionTracked) return;
       this.dwellTimer = setTimeout(() => {
         this.dwellTimer = null;
         this.adsStore.trackImpression();
         this.$emit('impression', this.adsStore.currentAd);
       }, VISIBILITY_DWELL_MS);
+    },
+
+    async loadWhenVisible() {
+      if (this.requested || !this.visible) return;
+      this.requested = true;
+      await this.adsStore.loadAd();
+      if (this.visible && this.adsStore.hasAd) this.scheduleImpression();
     },
 
     cancelImpression() {
