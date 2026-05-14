@@ -59,6 +59,7 @@
 
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
+import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
 
 const STORAGE_KEY = 'midori_bookmarks';
 const CATS_KEY = 'midori_bookmark_categories';
@@ -96,18 +97,15 @@ export default {
   },
 
   data() {
-    const savedBm = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    const savedCats = JSON.parse(localStorage.getItem(CATS_KEY));
-    const categories = savedCats || [...DEFAULT_CATEGORIES];
     const i18n = useI18nStore();
 
     return {
-      bookmarks: savedBm || JSON.parse(JSON.stringify(DEFAULT_BOOKMARKS)),
-      categories,
-      activeTab: categories[0] || 'Personal',
+      bookmarks: JSON.parse(JSON.stringify(DEFAULT_BOOKMARKS)),
+      categories: [...DEFAULT_CATEGORIES],
+      activeTab: DEFAULT_CATEGORIES[0],
       faviconAttempts: {},
       i18n,
-      _saveTimer: null,
+      isLoaded: false,
     };
   },
 
@@ -133,10 +131,31 @@ export default {
   },
 
   methods: {
-    /** Persists bookmarks and categories to localStorage. */
-    save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.bookmarks));
-      localStorage.setItem(CATS_KEY, JSON.stringify(this.categories));
+    async loadBookmarks() {
+      const [savedBm, savedCats] = await Promise.all([
+        getJson(STORAGE_KEY, null),
+        getJson(CATS_KEY, null),
+      ]);
+      if (savedBm && typeof savedBm === 'object') {
+        this.bookmarks = savedBm;
+      }
+      if (Array.isArray(savedCats) && savedCats.length) {
+        this.categories = savedCats;
+      }
+      this.activeTab = this.categories[0] || 'Personal';
+      this.isLoaded = true;
+    },
+
+    saveBookmarksDebounced() {
+      setJsonDebounced(STORAGE_KEY, this.bookmarks, { delayMs: 700, maxBytes: 350_000 });
+      setJsonDebounced(CATS_KEY, this.categories, { delayMs: 700, maxBytes: 32_000 });
+    },
+
+    async flushBookmarks() {
+      await Promise.all([
+        flushDebounced(STORAGE_KEY, this.bookmarks, { maxBytes: 350_000 }),
+        flushDebounced(CATS_KEY, this.categories, { maxBytes: 32_000 }),
+      ]);
     },
 
     addCategory() {
@@ -147,7 +166,7 @@ export default {
       this.categories.push(trimmed);
       this.bookmarks[trimmed] = [];
       this.activeTab = trimmed;
-      this.save();
+      this.saveBookmarksDebounced();
     },
 
     deleteCategory(cat) {
@@ -159,7 +178,7 @@ export default {
       if (idx > -1) this.categories.splice(idx, 1);
       delete this.bookmarks[cat];
       if (this.activeTab === cat) this.activeTab = this.categories[0];
-      this.save();
+      this.saveBookmarksDebounced();
     },
 
     addBookmark() {
@@ -170,7 +189,7 @@ export default {
       try {
         const domain = new URL(url).hostname;
         this.bookmarks[this.activeTab].push({ title, url, domain });
-        this.save();
+        this.saveBookmarksDebounced();
       } catch { /* invalid url */ }
     },
 
@@ -186,7 +205,7 @@ export default {
           this.bookmarks[this.activeTab] = [];
         }
         this.bookmarks[this.activeTab].push({ title, url, domain });
-        this.save();
+        this.saveBookmarksDebounced();
       } catch { /* invalid url */ }
     },
 
@@ -201,7 +220,7 @@ export default {
         bm.url = url;
         bm.domain = new URL(url).hostname;
         delete bm.logo;
-        this.save();
+        this.saveBookmarksDebounced();
       } catch { /* invalid url */ }
     },
 
@@ -209,7 +228,7 @@ export default {
       const bm = this.bookmarks[this.activeTab][idx];
       if (!confirm(`${this.t.confirmDelete} "${bm.title}"?`)) return;
       this.bookmarks[this.activeTab].splice(idx, 1);
-      this.save();
+      this.saveBookmarksDebounced();
     },
 
     /** Returns the best favicon URL for a bookmark, cycling through services on error. */
@@ -253,18 +272,12 @@ export default {
     },
   },
 
-  watch: {
-    bookmarks: {
-      handler() {
-        clearTimeout(this._saveTimer);
-        this._saveTimer = setTimeout(() => this.save(), 500);
-      },
-      deep: true,
-    },
+  mounted() {
+    this.loadBookmarks();
   },
 
   beforeUnmount() {
-    clearTimeout(this._saveTimer);
+    this.flushBookmarks();
   },
 };
 </script>
