@@ -1,4 +1,5 @@
 const DDG_AC_URL = 'https://duckduckgo.com/ac/?q=';
+const MAX_SUGGESTIONS = 8;
 
 let controller = null;
 
@@ -18,5 +19,8 @@ export async function fetchSuggestions(query) {
   const data = await res.json();
   // DuckDuckGo returns [{ phrase: "..." }, ...]
   if (!Array.isArray(data)) return [];
-  return data.map(item => (typeof item === 'object' ? item.phrase : item)).filter(Boolean);
+  return data
+    .map(item => (typeof item === 'object' ? item.phrase : item))
+    .filter(Boolean)
+    .slice(0, MAX_SUGGESTIONS);
 }
