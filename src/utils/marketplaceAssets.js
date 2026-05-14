@@ -24,6 +24,79 @@ function resolveThemePreview(lightVars, darkVars) {
   };
 }
 
+function getAdaptiveWallpaperWidth() {
+  const viewportWidth = typeof window !== 'undefined' ? Math.max(window.innerWidth || 1280, 1280) : 1280;
+  const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1;
+  const deviceMemory = typeof navigator !== 'undefined' ? Number(navigator.deviceMemory || 4) : 4;
+  const estimated = Math.round(viewportWidth * dpr);
+  if (deviceMemory <= 2) return Math.min(estimated, 1280);
+  if (deviceMemory <= 4) return Math.min(estimated, 1440);
+  return Math.min(estimated, 1920);
+}
+
+function optimizeRemoteImageUrl(rawUrl, { width, quality = 70 } = {}) {
+  if (!rawUrl || !width) return rawUrl || '';
+  try {
+    const url = new URL(rawUrl);
+    if (/images\.unsplash\.com$/.test(url.hostname)) {
+      url.searchParams.set('w', String(width));
+      url.searchParams.set('fit', 'max');
+      url.searchParams.set('fm', 'webp');
+      url.searchParams.set('q', String(quality));
+      url.searchParams.set('dpr', '1');
+      return url.toString();
+    }
+    return rawUrl;
+  } catch {
+    return rawUrl || '';
+  }
+}
+
+function resolveMediaValue(media, keys) {
+  for (const key of keys) {
+    const value = media?.[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
+function resolveWallpaperMedia(asset, manifest) {
+  const payload = manifest.payload || {};
+  const media = Array.isArray(payload.media) ? payload.media[0] : {};
+  const preview = manifest.preview || {};
+  const distribution = manifest.distribution || {};
+  const finalUrl = resolveMediaValue(media, ['optimizedUrl', 'fullUrl', 'assetUrl', 'url'])
+    || resolveMediaValue(distribution, ['assetUrl', 'downloadUrl', 'url'])
+    || resolveMediaValue(preview, ['fullUrl', 'url'])
+    || asset.previewUrl
+    || '';
+  const previewUrl = resolveMediaValue(media, ['previewUrl', 'thumbnailUrl', 'thumbUrl'])
+    || resolveMediaValue(preview, ['thumbnailUrl', 'smallUrl', 'url'])
+    || finalUrl;
+  const srcSet = media?.srcset || media?.srcSet || preview?.srcset || preview?.srcSet || '';
+
+  return {
+    finalUrl,
+    previewUrl,
+    srcSet,
+  };
+}
+
+function buildImageSrcSet(rawUrl, existingSrcSet = '') {
+  if (existingSrcSet) return existingSrcSet;
+  if (!rawUrl) return '';
+  const entries = [960, 1280, 1440, 1920]
+    .map(width => ({
+      width,
+      url: optimizeRemoteImageUrl(rawUrl, { width, quality: width <= 960 ? 62 : 72 }),
+    }))
+    .filter(entry => entry.url && entry.url !== rawUrl);
+  if (!entries.length) return '';
+  return entries
+    .map(entry => `${entry.url} ${entry.width}w`)
+    .join(', ');
+}
+
 export function resolveBuiltinWidgetKey(asset) {
   const manifest = asset?.manifest || {};
   const payload = manifest.payload || {};
@@ -76,9 +149,18 @@ export function buildMarketplaceThemeDefinition(asset) {
 
 export function buildMarketplaceWallpaperBackground(asset) {
   const manifest = asset?.manifest || {};
-  const media = Array.isArray(manifest.payload?.media) ? manifest.payload.media[0] : null;
   const author = normalizeAuthor(asset.author);
-  const imageUrl = media?.url || manifest.preview?.url || asset.previewUrl || '';
+  const media = resolveWallpaperMedia(asset, manifest);
+  const adaptiveWidth = getAdaptiveWallpaperWidth();
+  const lowMemory = typeof navigator !== 'undefined' && Number(navigator.deviceMemory || 4) <= 2;
+  const imageUrl = optimizeRemoteImageUrl(media.finalUrl, {
+    width: adaptiveWidth,
+    quality: lowMemory ? 50 : 72,
+  });
+  const previewUrl = optimizeRemoteImageUrl(media.previewUrl || media.finalUrl, {
+    width: 480,
+    quality: 50,
+  });
 
   if (!imageUrl) {
     return null;
@@ -90,10 +172,11 @@ export function buildMarketplaceWallpaperBackground(asset) {
     assetSlug: asset.slug,
     source: 'marketplace',
     imageUrl,
-    previewUrl: imageUrl,
+    previewUrl,
+    imageSrcSet: buildImageSrcSet(media.finalUrl, media.srcSet),
     authorName: author.name,
     authorUrl: author.url,
-    sourceUrl: imageUrl,
+    sourceUrl: media.finalUrl || imageUrl,
   };
 }
 
@@ -107,6 +190,10 @@ export function normalizeMarketplaceAsset(rawAsset, options = {}) {
     : null;
   const appCompatibility = compatibility.app || {};
   const media = Array.isArray(manifest.payload?.media) ? manifest.payload.media[0] : null;
+  const wallpaperMedia = rawAsset.type === 'wallpaper'
+    ? resolveWallpaperMedia(rawAsset, manifest)
+    : null;
+  const lowMemory = typeof navigator !== 'undefined' && Number(navigator.deviceMemory || 4) <= 2;
 
   const isCompatible = isVersionCompatible(APP_VERSION, appCompatibility.minVersion, appCompatibility.maxVersion)
     && (!browserCompatibility || isVersionCompatible(APP_VERSION, browserCompatibility.minVersion, browserCompatibility.maxVersion));
@@ -127,7 +214,15 @@ export function normalizeMarketplaceAsset(rawAsset, options = {}) {
     manifest,
     checksum: version?.checksum || '',
     sizeBytes: version?.size_bytes || manifest.distribution?.sizeBytes || 0,
-    previewUrl: media?.url || manifest.preview?.url || '',
+    previewUrl: rawAsset.type === 'wallpaper'
+      ? optimizeRemoteImageUrl(wallpaperMedia?.previewUrl || wallpaperMedia?.finalUrl, { width: 480, quality: 50 })
+      : (media?.url || manifest.preview?.url || ''),
+    imageUrl: rawAsset.type === 'wallpaper'
+      ? optimizeRemoteImageUrl(wallpaperMedia?.finalUrl, { width: getAdaptiveWallpaperWidth(), quality: lowMemory ? 50 : 72 })
+      : '',
+    imageSrcSet: rawAsset.type === 'wallpaper'
+      ? buildImageSrcSet(wallpaperMedia?.finalUrl, wallpaperMedia?.srcSet)
+      : '',
     isCompatible,
     compatibility,
     builtinWidgetKey: resolveBuiltinWidgetKey({ ...rawAsset, manifest }),
