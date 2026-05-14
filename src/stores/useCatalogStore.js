@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import MarketplaceApiClient from '../services/MarketplaceApiClient.js';
+import { getJson, setJsonDebounced } from '../services/StorageService.js';
 import useTabStore from './useTabStore.js';
 import useThemeStore from './useThemeStore.js';
 import useWidgetsStore from './useWidgetsStore.js';
@@ -27,6 +28,9 @@ function createEmptyTypeMap(factory) {
 }
 
 const client = new MarketplaceApiClient();
+const CATALOG_CACHE_KEY = 'midori_marketplace_catalog_cache_v1';
+const CATALOG_CACHE_TTL_MS = 15 * 60 * 1000;
+const CATALOG_CACHE_MAX_ITEMS_PER_TYPE = 24;
 
 const useCatalogStore = defineStore('catalogStore', {
   state: () => ({
@@ -84,7 +88,45 @@ const useCatalogStore = defineStore('catalogStore', {
         return this.catalogByType[normalizedType];
       }
 
+      if (!force) {
+        const cachedItems = await this.loadCachedCatalog(normalizedType, normalizedQuery);
+        if (cachedItems.length) {
+          return cachedItems;
+        }
+      }
+
       return this.fetchCatalog(normalizedType, options);
+    },
+
+    async loadCachedCatalog(type, query) {
+      const cache = await getJson(CATALOG_CACHE_KEY, {});
+      const entry = cache?.[type];
+      if (!entry || entry.query !== query || Date.now() - entry.timestamp > CATALOG_CACHE_TTL_MS) {
+        return [];
+      }
+
+      const items = Array.isArray(entry.items)
+        ? entry.items.slice(0, CATALOG_CACHE_MAX_ITEMS_PER_TYPE)
+        : [];
+      this.catalogByType[type] = items;
+      this.metaByType[type] = {
+        ...EMPTY_META,
+        ...(entry.meta || {}),
+      };
+      this.queryByType[type] = query;
+      this.statusByType[type] = 'ready';
+      return items;
+    },
+
+    async saveCachedCatalog(type, query, items, meta) {
+      const cache = await getJson(CATALOG_CACHE_KEY, {});
+      cache[type] = {
+        timestamp: Date.now(),
+        query,
+        items: items.slice(0, CATALOG_CACHE_MAX_ITEMS_PER_TYPE),
+        meta,
+      };
+      setJsonDebounced(CATALOG_CACHE_KEY, cache, { delayMs: 800, maxBytes: 350_000 });
     },
 
     async fetchCatalog(type, options = {}) {
@@ -111,6 +153,7 @@ const useCatalogStore = defineStore('catalogStore', {
         };
         this.queryByType[normalizedType] = String(options.q || '').trim();
         this.statusByType[normalizedType] = 'ready';
+        this.saveCachedCatalog(normalizedType, this.queryByType[normalizedType], items, this.metaByType[normalizedType]);
 
         return items;
       } catch (error) {
