@@ -3,48 +3,65 @@
  * Optimiza las peticiones HTTP y reduce el consumo de ancho de banda
  */
 
+import { getJson, quotaSafeSet, remove, setJsonDebounced } from './StorageService.js';
+
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 const CACHE_STORAGE_KEY = 'rss_feeds_cache';
+const CACHE_MAX_ENTRIES = 12;
+const CACHE_MAX_BYTES = 300_000;
 
 class RssCacheService {
   constructor() {
     this.memoryCache = new Map();
-    this.loadFromLocalStorage();
+    this.ready = this.loadFromStorage();
   }
 
-  /**
-   * Cargar caché desde localStorage al iniciar
-   */
-  loadFromLocalStorage() {
+  async loadFromStorage() {
     try {
-      const stored = localStorage.getItem(CACHE_STORAGE_KEY);
-      if (stored) {
-        const data = JSON.parse(stored);
-        // Restaurar solo entradas válidas (no expiradas)
-        const now = Date.now();
-        Object.entries(data).forEach(([key, value]) => {
-          if (value.timestamp && (now - value.timestamp < CACHE_DURATION)) {
-            this.memoryCache.set(key, value);
-          }
-        });
-      }
+      const data = await getJson(CACHE_STORAGE_KEY, {});
+      const now = Date.now();
+      Object.entries(data || {}).forEach(([key, value]) => {
+        if (value.timestamp && (now - value.timestamp < CACHE_DURATION)) {
+          this.memoryCache.set(key, value);
+        }
+      });
+      this.pruneCache();
     } catch (error) {
-      console.warn('Error loading RSS cache from localStorage:', error);
+      console.warn('Error loading RSS cache:', error);
     }
   }
 
-  /**
-   * Guardar caché en localStorage
-   */
-  saveToLocalStorage() {
+  saveToStorage() {
     try {
-      const data = {};
-      this.memoryCache.forEach((value, key) => {
-        data[key] = value;
+      this.pruneCache();
+      setJsonDebounced(CACHE_STORAGE_KEY, Object.fromEntries(this.memoryCache), {
+        delayMs: 800,
+        maxBytes: CACHE_MAX_BYTES,
       });
-      localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(data));
     } catch (error) {
-      console.warn('Error saving RSS cache to localStorage:', error);
+      console.warn('Error saving RSS cache:', error);
+    }
+  }
+
+  pruneCache() {
+    const now = Date.now();
+    for (const [key, value] of this.memoryCache) {
+      if (!value?.timestamp || now - value.timestamp >= CACHE_DURATION) {
+        this.memoryCache.delete(key);
+      }
+    }
+
+    while (this.memoryCache.size > CACHE_MAX_ENTRIES) {
+      let oldestKey = null;
+      let oldestTs = Infinity;
+      for (const [key, value] of this.memoryCache) {
+        if (value.timestamp < oldestTs) {
+          oldestTs = value.timestamp;
+          oldestKey = key;
+        }
+      }
+      if (!oldestKey) break;
+      this.memoryCache.delete(oldestKey);
     }
   }
 
@@ -55,6 +72,8 @@ class RssCacheService {
    * @returns {Promise<Object>} - Datos del feed
    */
   async getFeed(feedUrl, forceRefresh = false) {
+    await this.ready;
+    this.pruneCache();
     const cacheKey = this.getCacheKey(feedUrl);
     const now = Date.now();
 
@@ -93,8 +112,7 @@ class RssCacheService {
         url: feedUrl
       });
 
-      // Persistir en localStorage (async, no bloquea)
-      setTimeout(() => this.saveToLocalStorage(), 0);
+      this.saveToStorage();
 
       return {
         ...data,
@@ -127,7 +145,7 @@ class RssCacheService {
   invalidateFeed(feedUrl) {
     const cacheKey = this.getCacheKey(feedUrl);
     this.memoryCache.delete(cacheKey);
-    this.saveToLocalStorage();
+    this.saveToStorage();
     console.log(`🗑️ RSS Cache invalidated: ${feedUrl}`);
   }
 
@@ -136,7 +154,7 @@ class RssCacheService {
    */
   clearAll() {
     this.memoryCache.clear();
-    localStorage.removeItem(CACHE_STORAGE_KEY);
+    remove(CACHE_STORAGE_KEY);
     console.log('🗑️ RSS Cache cleared completely');
   }
 
@@ -181,7 +199,7 @@ class RssCacheService {
     });
 
     if (cleaned > 0) {
-      this.saveToLocalStorage();
+      this.saveToStorage();
       console.log(`🧹 Cleaned ${cleaned} expired RSS cache entries`);
     }
 
@@ -191,10 +209,5 @@ class RssCacheService {
 
 // Singleton instance
 const rssCacheService = new RssCacheService();
-
-// Limpiar caché expirado cada 10 minutos
-setInterval(() => {
-  rssCacheService.cleanExpired();
-}, 10 * 60 * 1000);
 
 export default rssCacheService;
