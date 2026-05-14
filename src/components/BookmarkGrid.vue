@@ -73,6 +73,7 @@ const DEFAULT_BOOKMARKS = {
     { title: 'Kayak', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fflights', domain: 'kayak.com' },
     { title: 'Aliexpress', url: 'https://s.click.aliexpress.com/e/_c2xYL4uP', domain: 'aliexpress.us' },
     { title: 'Ebay', url: 'https://ebay.us/Tg0rAn', domain: 'ebay.us' },
+    { title: 'Stake', url: 'https://stake.com/?offer=astian200bon&c=pkaAEpM7', domain: 'stake.com' },
   ],
   Work: [
     { title: 'GitHub', url: 'https://github.com', domain: 'github.com' },
