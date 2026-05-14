@@ -8,24 +8,24 @@
       v-model="content"
       class="notes-area"
       :placeholder="placeholder"
-      @input="save"
+      @input="saveDebounced"
     ></textarea>
   </div>
 </template>
 
 <script>
+import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
+
 const STORAGE_KEY = 'midori_notes';
 
-/**
- * Simple persistent notepad widget.
- * Content is auto-saved to localStorage on every keystroke.
- */
 export default {
   name: 'NotesWidget',
 
   data() {
     return {
-      content: localStorage.getItem(STORAGE_KEY) || '',
+      content: '',
+      visibilityListener: null,
+      pagehideListener: null,
     };
   },
 
@@ -39,10 +39,35 @@ export default {
   },
 
   methods: {
-    /** Persists note content to localStorage. */
-    save() {
-      localStorage.setItem(STORAGE_KEY, this.content);
+    async load() {
+      this.content = await getJson(STORAGE_KEY, '');
     },
+
+    saveDebounced() {
+      setJsonDebounced(STORAGE_KEY, this.content, { delayMs: 800, maxBytes: 200_000 });
+    },
+
+    flush() {
+      return flushDebounced(STORAGE_KEY, this.content, { maxBytes: 200_000 }).catch(() => undefined);
+    },
+  },
+
+  mounted() {
+    this.load();
+    this.visibilityListener = () => {
+      if (document.visibilityState === 'hidden') {
+        this.flush();
+      }
+    };
+    this.pagehideListener = () => this.flush();
+    document.addEventListener('visibilitychange', this.visibilityListener);
+    window.addEventListener('pagehide', this.pagehideListener);
+  },
+
+  beforeUnmount() {
+    if (this.visibilityListener) document.removeEventListener('visibilitychange', this.visibilityListener);
+    if (this.pagehideListener) window.removeEventListener('pagehide', this.pagehideListener);
+    this.flush();
   },
 };
 </script>
