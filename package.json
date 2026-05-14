@@ -1,7 +1,7 @@
 {
   "name": "midori-newtab",
   "private": true,
-  "version": "1.0.22",
+  "version": "1.0.23",
   "type": "module",
   "scripts": {
     "dev:chrome": "npm run build:manifest:chrome && vite build --watch",
@@ -26,7 +26,6 @@
     "test:omni-legacy-lifecycle": "node --test tests/omni-legacy-lifecycle-controller.test.mjs"
   },
   "dependencies": {
-    "@fontsource/inter": "^5.2.8",
     "@iconify/vue": "^5.0.0",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.4.1",
