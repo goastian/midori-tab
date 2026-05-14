@@ -4,10 +4,13 @@
     <Transition name="bg-fade">
       <img
         :src="backgroundImage"
+        :srcset="backgroundSrcSet || undefined"
+        sizes="100vw"
         class="background"
         v-if="showImageBackground && backgroundImage"
         v-show="imageReady"
         decoding="async"
+        fetchpriority="low"
         @load="imageReady = true"
       />
     </Transition>
@@ -74,6 +77,7 @@
       return {
         loaded: true,
         backgroundImage: "",
+        backgroundSrcSet: "",
         imageReady: false,
         tabStore: useTabStore(),
         i18n: useI18nStore(),
@@ -190,10 +194,9 @@
       },
 
       async load() {
-        this.imageReady = false;
         if (this.tabStore.background?.type === 'MarketplaceWallpaper') {
           const background = this.tabStore.background;
-          this.backgroundImage = background.imageUrl || '';
+          this.applyBackgroundImage(background.imageUrl || '', background.imageSrcSet || '');
           this.imageAuthor = background.authorName || '';
           this.imageAuthorLink = background.authorUrl || '';
           this.imageLink = background.sourceUrl || background.imageUrl || '';
@@ -201,7 +204,7 @@
         }
 
         if (this.tabStore.background?.type !== 'Unsplash') {
-          this.backgroundImage = '';
+          this.applyBackgroundImage('', '');
           this.imageAuthor = '';
           this.imageAuthorLink = '';
           this.imageLink = '';
@@ -211,13 +214,24 @@
         try {
           const uns = new UnsService();
           await uns.setImagen();
-          this.backgroundImage = uns.getUrl();
+          this.applyBackgroundImage(uns.getUrl(), uns.getSrcSet?.() || '');
           this.imageAuthor = uns.getAuthor();
           this.imageAuthorLink = uns.getAuthorLink();
           this.imageLink = uns.getImageLink();
         } catch (e) {
           console.error("Error al cargar la imagen de fondo:", e);
         }
+      },
+
+      applyBackgroundImage(url, srcSet = '') {
+        const nextUrl = url || '';
+        const nextSrcSet = srcSet || '';
+        if (this.backgroundImage === nextUrl && this.backgroundSrcSet === nextSrcSet) {
+          return;
+        }
+        this.imageReady = false;
+        this.backgroundImage = nextUrl;
+        this.backgroundSrcSet = nextSrcSet;
       },
 
       setupDeferredMounts() {
