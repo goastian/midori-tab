@@ -3,12 +3,17 @@
     <div class="pw-header">
       <span class="pw-icon">🛡️</span>
       <span class="pw-title">{{ i18n.$t('privacy.title') }}</span>
+      <button class="pw-refresh" type="button" :disabled="loading" @click="refreshStats" title="Actualizar">↻</button>
       <span v-if="!available" class="pw-badge pw-badge--off">{{ i18n.$t('common.off') }}</span>
       <span v-else class="pw-badge pw-badge--on">{{ grade }}</span>
     </div>
 
-    <div v-if="!available" class="pw-empty">
-      <p class="pw-empty-text">{{ i18n.$t('privacy.notAvailable') }}</p>
+    <div v-if="loading" class="pw-empty">
+      <p class="pw-empty-text">{{ i18n.$t('common.loading') || 'Loading...' }}</p>
+    </div>
+
+    <div v-else-if="!available" class="pw-empty">
+      <p class="pw-empty-text">{{ error || i18n.$t('privacy.notAvailable') }}</p>
     </div>
 
     <div v-else class="pw-stats">
@@ -63,6 +68,8 @@ const FIREFOX_PRIVACY_ID = 'midori-protection@astian.org';
  * Conservative estimate: blocking a tracker/ad script saves ~50ms of load time.
  */
 const MS_PER_BLOCK = 50;
+const RETRY_BASE_MS = 30_000;
+const RETRY_MAX_MS = 5 * 60_000;
 
 /**
  * Sends a cross-extension message to Midori Privacy.
@@ -107,7 +114,12 @@ export default {
       totalBlocked: 0,
       categories: null,
       grade: 'A+',
-      pollTimer: null,
+      loading: false,
+      error: '',
+      retryTimer: null,
+      retryCount: 0,
+      visibilityListener: null,
+      fetchToken: 0,
     };
   },
 
@@ -147,28 +159,70 @@ export default {
 
   methods: {
     /** Fetches stats from Midori Privacy extension. */
-    async fetchStats() {
+    async fetchStats({ manual = false } = {}) {
+      if (document.visibilityState === 'hidden' && !manual) return;
+      const token = ++this.fetchToken;
+      this.loading = true;
+      this.error = '';
       const data = await sendToPrivacy({ action: 'get-stats-summary', days: 7 });
+      if (token !== this.fetchToken) return;
       if (!data || data.error) {
         this.available = false;
+        this.error = data?.error || '';
+        this.loading = false;
+        this.scheduleRetry();
         return;
       }
       this.available = true;
       this.totalBlocked = data.totalBlocked || 0;
       this.categories = data.categories || null;
       this.grade = data.privacyGrade || 'A+';
+      this.retryCount = 0;
+      this.loading = false;
+      this.clearRetry();
+    },
+
+    refreshStats() {
+      this.clearRetry();
+      this.fetchStats({ manual: true });
+    },
+
+    scheduleRetry() {
+      this.clearRetry();
+      if (document.visibilityState === 'hidden') return;
+      const delay = Math.min(RETRY_BASE_MS * (2 ** this.retryCount), RETRY_MAX_MS);
+      this.retryCount += 1;
+      this.retryTimer = window.setTimeout(() => {
+        this.retryTimer = null;
+        this.fetchStats();
+      }, delay);
+    },
+
+    clearRetry() {
+      if (this.retryTimer) {
+        clearTimeout(this.retryTimer);
+        this.retryTimer = null;
+      }
     },
   },
 
   mounted() {
     this.fetchStats();
-    // Poll every 30 seconds for fresh data
-    this.pollTimer = setInterval(() => this.fetchStats(), 30_000);
+    this.visibilityListener = () => {
+      if (document.visibilityState === 'hidden') {
+        this.clearRetry();
+        return;
+      }
+      this.fetchStats();
+    };
+    document.addEventListener('visibilitychange', this.visibilityListener);
   },
 
   beforeUnmount() {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
+    this.fetchToken += 1;
+    this.clearRetry();
+    if (this.visibilityListener) {
+      document.removeEventListener('visibilitychange', this.visibilityListener);
     }
   },
 };
@@ -202,6 +256,21 @@ export default {
   font-weight: 600;
   color: var(--color-text, #C4F0E0);
   flex: 1;
+}
+
+.pw-refresh {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-border, rgba(126,196,168,0.15));
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface-sunken, #060A10);
+  color: var(--color-text-muted, #5A9A82);
+  cursor: pointer;
+}
+
+.pw-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .pw-badge {
