@@ -60,30 +60,6 @@
 	}
 }
 
-@font-face {
-	font-family: "Inter";
-	font-style: normal;
-	font-weight: 400;
-	src: url("chrome-extension://__MSG_@@extension_id__/assets/Inter-Regular.ttf");
-}
-@font-face {
-	font-family: "Inter";
-	font-style: normal;
-	font-weight: 500;
-	src: url("chrome-extension://__MSG_@@extension_id__/assets/Inter-Medium.ttf");
-}
-@font-face {
-	font-family: "Inter";
-	font-style: normal;
-	font-weight: 600;
-	src: url("chrome-extension://__MSG_@@extension_id__/assets/Inter-SemiBold.ttf");
-}
-@font-face {
-	font-family: "Inter";
-	font-style: normal;
-	font-weight: 700;
-	src: url("chrome-extension://__MSG_@@extension_id__/assets/Inter-Bold.ttf");
-}
 .omni-extension * {
 	display: block;
 	width: unset;
@@ -97,7 +73,7 @@
 	line-height: normal;
 }
 .omni-extension {
-	font-family: Inter !important;
+	font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
 	z-index: 99999999999;
 }
 .omni-extension #omni-wrap {
@@ -199,7 +175,7 @@
 	display: block;
 	color: var(--text);
 	caret-color: var(--accent);
-	font-family: Inter !important;
+	font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
 	margin-top: 5px;
 	margin-bottom: 5px;
 	box-sizing: border-box;
@@ -344,7 +320,7 @@
 }
 #omni-extension-toast {
 	text-align: center;
-	font-family: Inter;
+	font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 	font-weight: 500;
 	font-size: 14px;
 	position: fixed;
