@@ -6,6 +6,7 @@
 
 const OMNI_CONTENT_SCRIPT_FILES = ['omni-content.js'];
 const OMNI_QUERY_TTL = 5_000;
+const OMNI_QUERY_CACHE_MAX = 50;
 const OMNI_MAX_RESULTS = 100;
 const OMNI_LOCALE_STORAGE_KEY = 'midori-locale';
 const omniQueryCache = new Map();
@@ -118,8 +119,31 @@ async function getStoredLocale() {
   return normalizeLocale(data?.[OMNI_LOCALE_STORAGE_KEY]);
 }
 
-function clearOmniQueryCache() {
-  omniQueryCache.clear();
+function pruneOmniQueryCache(now = Date.now()) {
+  for (const [key, entry] of omniQueryCache) {
+    if (!entry || now - entry.ts >= OMNI_QUERY_TTL) {
+      omniQueryCache.delete(key);
+    }
+  }
+
+  while (omniQueryCache.size > OMNI_QUERY_CACHE_MAX) {
+    const oldestKey = omniQueryCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    omniQueryCache.delete(oldestKey);
+  }
+}
+
+function clearOmniQueryCache(dependency = null) {
+  if (!dependency) {
+    omniQueryCache.clear();
+    return;
+  }
+
+  for (const [key, entry] of omniQueryCache) {
+    if (entry?.deps?.includes(dependency)) {
+      omniQueryCache.delete(key);
+    }
+  }
 }
 
 function isRestrictedOmniUrl(url) {
@@ -196,29 +220,69 @@ async function ensureTabsCache() {
   if (tabsCacheReady) return;
   const tabs = await callChrome(chrome.tabs.query.bind(chrome.tabs), {});
   for (const tab of tabs || []) {
-    tabsCache.set(tab.id, normaliseTab(tab));
+    if (tab?.id) {
+      tabsCache.delete(tab.id);
+      tabsCache.set(tab.id, normaliseTab(tab));
+    }
   }
   tabsCacheReady = true;
+  await pruneTabsCache();
+}
+
+function rememberTab(tab) {
+  if (!tab?.id) return;
+  tabsCache.delete(tab.id);
+  tabsCache.set(tab.id, normaliseTab(tab));
+  void pruneTabsCache();
+}
+
+async function pruneTabsCache() {
+  if (tabsCache.size <= TABS_CACHE_MAX) return;
+
+  const currentWindowTabs = await safeCallChrome(chrome.tabs.query.bind(chrome.tabs), { currentWindow: true });
+  const keepIds = new Set((currentWindowTabs || []).map((tab) => tab.id).filter(Boolean));
+  const recentEntries = Array.from(tabsCache.entries()).reverse();
+  const nextCache = new Map();
+
+  for (const [tabId, tab] of recentEntries) {
+    if (keepIds.has(tabId)) {
+      nextCache.set(tabId, tab);
+    }
+  }
+
+  for (const [tabId, tab] of recentEntries) {
+    if (nextCache.size >= TABS_CACHE_MAX) break;
+    if (!nextCache.has(tabId)) {
+      nextCache.set(tabId, tab);
+    }
+  }
+
+  tabsCache.clear();
+  for (const [tabId, tab] of Array.from(nextCache.entries()).reverse()) {
+    tabsCache.set(tabId, tab);
+  }
 }
 
 chrome.tabs.onCreated.addListener((tab) => {
-  tabsCache.set(tab.id, normaliseTab(tab));
-  clearOmniQueryCache();
+  rememberTab(tab);
+  clearOmniQueryCache('tabs');
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabsCache.delete(tabId);
-  clearOmniQueryCache();
+  clearOmniQueryCache('tabs');
+  clearOmniQueryCache('active-tab');
 });
 
 chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
   tabsCache.delete(removedTabId);
-  clearOmniQueryCache();
+  clearOmniQueryCache('tabs');
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (tabsCache.has(tabId)) {
     const existing = tabsCache.get(tabId);
+    tabsCache.delete(tabId);
     tabsCache.set(tabId, {
       ...existing,
       title: tab.title ?? existing.title,
@@ -229,17 +293,20 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     });
   } else {
     // Tab appeared without onCreated (e.g. restored session)
-    tabsCache.set(tabId, normaliseTab(tab));
+    rememberTab(tab);
   }
-  clearOmniQueryCache();
+  clearOmniQueryCache('tabs');
+  if (tab.active) {
+    clearOmniQueryCache('active-tab');
+  }
 });
 
 chrome.tabs.onActivated.addListener(() => {
-  clearOmniQueryCache();
+  clearOmniQueryCache('active-tab');
 });
 
 chrome.windows.onFocusChanged.addListener(() => {
-  clearOmniQueryCache();
+  clearOmniQueryCache('active-tab');
 });
 
 // ─── Bookmarks Cache ────────────────────────────────────────────────────────
@@ -250,7 +317,7 @@ function invalidateBookmarks() {
   clearTimeout(bookmarksInvalidateTimer);
   bookmarksInvalidateTimer = setTimeout(() => {
     bookmarksCache = null;
-    clearOmniQueryCache();
+    clearOmniQueryCache('bookmarks');
   }, 1000);
 }
 
@@ -447,32 +514,108 @@ async function getDynamicActions() {
   return [muteAction, pinAction];
 }
 
-async function collectOmniData() {
-  await ensureStaticActions();
-  await ensureTabsCache();
+async function collectOmniData(options = {}) {
+  const {
+    includeTabs = true,
+    includeBookmarks = true,
+    includeActions = true,
+    includeDynamicActions = true,
+  } = options;
+
+  if (includeTabs) {
+    await ensureTabsCache();
+  }
+  if (includeActions) {
+    await ensureStaticActions();
+  }
 
   const [bookmarks, dynamicActions] = await Promise.all([
-    getBookmarks(),
-    getDynamicActions(),
+    includeBookmarks ? getBookmarks() : Promise.resolve([]),
+    includeActions && includeDynamicActions ? getDynamicActions() : Promise.resolve([]),
   ]);
 
   return {
-    tabs: Array.from(tabsCache.values()),
+    tabs: includeTabs ? Array.from(tabsCache.values()) : [],
     bookmarks,
-    actions: [...dynamicActions, ...staticActions],
+    actions: includeActions ? [...dynamicActions, ...staticActions] : [],
+  };
+}
+
+function getOmniQueryPlan(lower) {
+  if (lower.startsWith('/history')) {
+    return {
+      deps: ['history'],
+      includeTabs: false,
+      includeBookmarks: false,
+      includeActions: false,
+      includeDynamicActions: false,
+    };
+  }
+
+  if (lower.startsWith('/bookmarks')) {
+    return {
+      deps: ['bookmarks'],
+      includeTabs: false,
+      includeBookmarks: true,
+      includeActions: false,
+      includeDynamicActions: false,
+    };
+  }
+
+  if (lower.startsWith('/tabs')) {
+    return {
+      deps: ['tabs'],
+      includeTabs: true,
+      includeBookmarks: false,
+      includeActions: false,
+      includeDynamicActions: false,
+    };
+  }
+
+  if (lower.startsWith('/actions') || lower === '') {
+    return {
+      deps: ['active-tab', 'actions'],
+      includeTabs: false,
+      includeBookmarks: false,
+      includeActions: true,
+      includeDynamicActions: true,
+    };
+  }
+
+  if (lower.startsWith('/remove')) {
+    return {
+      deps: ['tabs', 'bookmarks'],
+      includeTabs: true,
+      includeBookmarks: true,
+      includeActions: false,
+      includeDynamicActions: false,
+    };
+  }
+
+  return {
+    deps: ['tabs', 'bookmarks', 'active-tab', 'actions'],
+    includeTabs: true,
+    includeBookmarks: true,
+    includeActions: true,
+    includeDynamicActions: true,
   };
 }
 
 async function queryOmni(rawQuery) {
   const expanded = expandOmniShorthand(rawQuery || '');
   const lower = expanded.toLowerCase().trim();
+  const now = Date.now();
+  pruneOmniQueryCache(now);
   const cached = omniQueryCache.get(lower);
 
-  if (cached && Date.now() - cached.ts < OMNI_QUERY_TTL) {
+  if (cached && now - cached.ts < OMNI_QUERY_TTL) {
+    omniQueryCache.delete(lower);
+    omniQueryCache.set(lower, cached);
     return cached.results;
   }
 
-  const data = await collectOmniData();
+  const queryPlan = getOmniQueryPlan(lower);
+  const data = await collectOmniData(queryPlan);
   const { tabs, bookmarks, actions } = data;
   let results = [];
 
@@ -543,7 +686,8 @@ async function queryOmni(rawQuery) {
   }
 
   const boundedResults = results.slice(0, OMNI_MAX_RESULTS);
-  omniQueryCache.set(lower, { results: boundedResults, ts: Date.now() });
+  omniQueryCache.set(lower, { results: boundedResults, ts: Date.now(), deps: queryPlan.deps });
+  pruneOmniQueryCache();
   return boundedResults;
 }
 
@@ -552,6 +696,21 @@ async function getCurrentTab() {
   const tabs = await callChrome(chrome.tabs.query.bind(chrome.tabs), { active: true, currentWindow: true });
   const [tab] = tabs || [];
   return tab;
+}
+
+function isDestructiveOmniItem(item, removeMode = false) {
+  const destructiveActions = new Set([
+    'close-tab',
+    'close-window',
+    'remove-all',
+    'remove-history',
+    'remove-cookies',
+    'remove-cache',
+    'remove-local-storage',
+    'remove-passwords',
+  ]);
+
+  return Boolean(removeMode || destructiveActions.has(item?.action));
 }
 
 async function switchTab(tab) {
@@ -692,6 +851,11 @@ async function executeOmniItem(message) {
   const query = message.query || '';
   const removeMode = Boolean(message.removeMode);
   const newTab = Boolean(message.newTab);
+  const confirmed = Boolean(message.confirmed);
+
+  if (isDestructiveOmniItem(item, removeMode) && !confirmed) {
+    return { handled: false, requiresConfirmation: true };
+  }
 
   if (removeMode) {
     await executeAction({ request: 'remove', type: item.type, action: item });
@@ -749,6 +913,12 @@ async function handleMessage(message) {
     case 'query-omni': {
       const results = await queryOmni(message.query ?? '');
       return { results };
+    }
+
+    case 'open-omni': {
+      const tab = await getCurrentTab();
+      await openOmniInTab(tab);
+      return { ok: true };
     }
 
     case 'get-omni-config': {
@@ -847,6 +1017,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // ─── Keyboard shortcut & toolbar click ──────────────────────────────────────
 async function openOmniInTab(tab) {
   if (!tab) return;
+  await Promise.all([
+    ensureTabsCache().catch(() => undefined),
+    ensureStaticActions().catch(() => undefined),
+  ]);
+
   const url = tab.url || '';
   // Can't send to privileged system pages
   if (isRestrictedOmniUrl(url)) {
@@ -881,11 +1056,6 @@ if (toolbarActionApi?.onClicked) {
 // ─── Install lifecycle ──────────────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install' || details.reason === 'update') {
-    await ensureTabsCache().catch(() => undefined);
-    await ensureStaticActions().catch(() => undefined);
+    omniQueryCache.clear();
   }
 });
-
-// Eager initialise caches on service worker start
-ensureTabsCache().catch(console.error);
-ensureStaticActions().catch(console.error);
