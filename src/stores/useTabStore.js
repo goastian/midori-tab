@@ -101,6 +101,12 @@ const useTabStore = defineStore('tabStore', {
           body.style.backgroundColor = '';
           body.className = '';
       }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('midori:background-changed', {
+          detail: { background: this.background },
+        }));
+      }
     },
 
     openLinkTab(url) {
