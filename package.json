@@ -10,6 +10,7 @@
     "build:manifest:firefox": "node build-manifest.js manifest/firefox.json",
     "build:chrome": "npm run build:manifest:chrome && vite build",
     "build:firefox": "npm run build:manifest:firefox && vite build",
+    "analyze:bundle": "ANALYZE_BUNDLE=1 npm run build:chrome",
     "package:chrome": "npm run build:chrome && node scripts/package.js chrome",
     "package:firefox": "npm run build:firefox && node scripts/package.js firefox",
     "preview": "vite preview",
