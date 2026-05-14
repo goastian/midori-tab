@@ -1,7 +1,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
 
 const STORAGE_KEY = 'midori_calendar_events';
-const REMINDER_CHECK_INTERVAL = 30000;
+const CALENDAR_MAX_BYTES = 160_000;
+const MAX_REMINDER_TIMEOUT = 24 * 60 * 60 * 1000;
 
 function pad(value) {
   return String(value).padStart(2, '0');
@@ -58,16 +60,12 @@ function sortEvents(events) {
   });
 }
 
-function loadSavedEvents() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    if (!Array.isArray(raw)) {
-      return [];
-    }
-    return sortEvents(raw.map(normalizeEvent).filter(event => event.date && event.id));
-  } catch {
+async function loadSavedEvents() {
+  const raw = await getJson(STORAGE_KEY, []);
+  if (!Array.isArray(raw)) {
     return [];
   }
+  return sortEvents(raw.map(normalizeEvent).filter(event => event.date && event.id));
 }
 
 export function useCalendar(i18n) {
@@ -77,13 +75,14 @@ export function useCalendar(i18n) {
   const viewMonth = ref(now.getMonth());
   const viewYear = ref(now.getFullYear());
   const selectedDate = ref(defaultDate);
-  const events = ref(loadSavedEvents());
+  const events = ref([]);
   const composerOpen = ref(false);
   const editingEventId = ref(null);
   const draft = ref(createDraft(defaultDate));
   const formError = ref('');
   const activeReminders = ref([]);
   const reminderTimer = ref(null);
+  const visibilityListener = ref(null);
 
   const currentLocale = computed(() => i18n.locale || undefined);
   const year = computed(() => viewYear.value);
@@ -165,7 +164,47 @@ export function useCalendar(i18n) {
   });
 
   function persistEvents() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events.value));
+    setJsonDebounced(STORAGE_KEY, events.value, {
+      delayMs: 600,
+      maxBytes: CALENDAR_MAX_BYTES,
+    }).catch(() => {});
+  }
+
+  function clearReminderTimer() {
+    if (reminderTimer.value) {
+      window.clearTimeout(reminderTimer.value);
+      reminderTimer.value = null;
+    }
+  }
+
+  function getNextReminderDelay() {
+    const nowTs = Date.now();
+    let nextTs = Infinity;
+
+    for (const event of events.value) {
+      if (!event.reminderMinutes || event.notifiedAt) continue;
+      const eventStart = parseEventDateTime(event.date, event.time);
+      if (!eventStart) continue;
+      const reminderAt = eventStart.getTime() - (event.reminderMinutes * 60 * 1000);
+      if (reminderAt < nextTs) nextTs = reminderAt;
+    }
+
+    if (!Number.isFinite(nextTs)) return null;
+    return Math.max(0, Math.min(nextTs - nowTs, MAX_REMINDER_TIMEOUT));
+  }
+
+  function scheduleReminderCheck() {
+    clearReminderTimer();
+    if (document.visibilityState === 'hidden') return;
+
+    const delay = getNextReminderDelay();
+    if (delay === null) return;
+
+    reminderTimer.value = window.setTimeout(() => {
+      reminderTimer.value = null;
+      checkReminders();
+      scheduleReminderCheck();
+    }, delay);
   }
 
   function prevMonth() {
@@ -301,12 +340,14 @@ export function useCalendar(i18n) {
     persistEvents();
     closeComposer();
     checkReminders();
+    scheduleReminderCheck();
   }
 
   function removeEvent(eventId) {
     events.value = events.value.filter(event => event.id !== eventId);
     activeReminders.value = activeReminders.value.filter(reminder => reminder.id !== eventId);
     persistEvents();
+    scheduleReminderCheck();
   }
 
   function reminderCopy(minutes) {
@@ -343,15 +384,28 @@ export function useCalendar(i18n) {
     }
   }
 
-  onMounted(() => {
+  onMounted(async () => {
+    events.value = await loadSavedEvents();
     checkReminders();
-    reminderTimer.value = window.setInterval(() => checkReminders(), REMINDER_CHECK_INTERVAL);
+    scheduleReminderCheck();
+    visibilityListener.value = () => {
+      if (document.visibilityState === 'hidden') {
+        clearReminderTimer();
+        flushDebounced(STORAGE_KEY, events.value, { maxBytes: CALENDAR_MAX_BYTES }).catch(() => {});
+        return;
+      }
+      checkReminders();
+      scheduleReminderCheck();
+    };
+    document.addEventListener('visibilitychange', visibilityListener.value);
     document.addEventListener('keydown', handleEscape);
   });
 
   onBeforeUnmount(() => {
-    if (reminderTimer.value) {
-      window.clearInterval(reminderTimer.value);
+    clearReminderTimer();
+    flushDebounced(STORAGE_KEY, events.value, { maxBytes: CALENDAR_MAX_BYTES }).catch(() => {});
+    if (visibilityListener.value) {
+      document.removeEventListener('visibilitychange', visibilityListener.value);
     }
     document.removeEventListener('keydown', handleEscape);
   });
