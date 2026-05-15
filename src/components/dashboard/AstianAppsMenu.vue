@@ -100,7 +100,7 @@ export default {
   data() {
     return {
       astianApps: [
-        { id: 'cloud', name: 'Astian Cloud', url: 'https://cloud.astian.org' },
+        { id: 'cloud', name: 'Astian Cloud', url: 'https://cloud2.astian.org' },
         { id: 'notes', name: 'Astian Notes', url: 'https://notes.astian.org' },
         { id: 'calendar', name: 'Calendar', url: 'https://calendar.astian.org' },
         { id: 'vpn', name: 'Astian VPN', url: 'https://vpn.astian.org' },
