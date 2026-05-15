@@ -1,8 +1,10 @@
 <template>
   <DashboardShell
     :i18n="i18n"
+    :apps-menu-open="showAppsMenu"
     @open-settings="openSettings"
     @toggle-quick-settings="showQuickSettings = !showQuickSettings"
+    @toggle-apps-menu="showAppsMenu = !showAppsMenu"
   >
     <section v-if="widgetsStore.enabled.search" class="dash-search">
       <Suspense>
@@ -76,6 +78,11 @@
       @close="showShortcutDialog = false"
       @submit-shortcut="submitShortcut"
     />
+
+    <AstianAppsMenu
+      :visible="showAppsMenu"
+      @close="showAppsMenu = false"
+    />
   </DashboardShell>
 </template>
 
@@ -84,6 +91,7 @@ import { defineAsyncComponent } from 'vue';
 import useTabStore from '../stores/useTabStore';
 import useWidgetsStore from '../stores/useWidgetsStore';
 import useI18nStore from '../stores/useI18nStore.js';
+import AstianAppsMenu from '../components/dashboard/AstianAppsMenu.vue';
 import DashboardActions from '../components/dashboard/DashboardActions.vue';
 import DashboardShell from '../components/dashboard/DashboardShell.vue';
 import MarketplaceSheet from '../components/dashboard/MarketplaceSheet.vue';
@@ -96,6 +104,7 @@ export default {
   name: 'MinimalistDashboard',
 
   components: {
+    AstianAppsMenu,
     BookmarkGrid: defineAsyncComponent(() => import('../components/BookmarkGrid.vue')),
     BrowserBookmarksWidget: defineAsyncComponent(() => import('../components/BrowserBookmarksWidget.vue')),
     CalendarWidget: defineAsyncComponent(() => import('../components/CalendarWidget.vue')),
@@ -128,6 +137,7 @@ export default {
       activeMarketplaceType: 'wallpaper',
       showShortcutDialog: false,
       showQuickSettings: false,
+      showAppsMenu: false,
     };
   },
 

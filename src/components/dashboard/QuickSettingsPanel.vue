@@ -71,9 +71,9 @@ export default {
   background: rgba(0, 0, 0, 0.25);
   z-index: 8500;
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: flex-end;
-  padding: 1rem;
+  padding: 1.5rem 1.25rem;
 }
 
 .quick-panel {
