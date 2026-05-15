@@ -13,7 +13,7 @@ if (typeof window !== 'undefined' && window.matchMedia) {
 
 const useTabStore = defineStore('tabStore', {
   state: () => ({
-    tabName: 'New Tab',
+    tabName: 'Midori Tab',
     theme: 'light',
     density: 'comfortable',
     background: {
@@ -23,7 +23,7 @@ const useTabStore = defineStore('tabStore', {
     },
     state: false,
     openLink: 'Self Tab',
-    autoTheme: true,
+    autoTheme: false,
     showAds: true,
   }),
 
