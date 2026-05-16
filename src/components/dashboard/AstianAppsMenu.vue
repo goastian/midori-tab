@@ -107,7 +107,7 @@ export default {
         { id: 'browser', name: 'Midori Browser', url: 'https://astian.org/midori-browser' },
         { id: 'search', name: 'AstianGO', url: 'https://astiango.com' },
         { id: 'mail', name: 'Astian Mail', url: 'https://mail.astian.org' },
-        { id: 'ads', name: 'Astian Ads', url: 'https://ads.astian.org' },
+        { id: 'ads', name: 'Midori Wallet', url: 'https://wallet.astian.org' },
         { id: 'sync', name: 'Midori Sync', url: 'https://sync.astian.org' },
       ],
     };
