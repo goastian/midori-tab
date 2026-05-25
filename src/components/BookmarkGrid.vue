@@ -14,7 +14,8 @@
           class="tab-delete"
           @click.stop="deleteCategory(cat)"
           :title="t.deleteCategory"
-        >×</button>
+          :aria-label="t.deleteCategory"
+        >x</button>
       </div>
       <button class="tab-add" @click="addCategory" :title="t.addCategory">+</button>
     </div>
@@ -27,8 +28,12 @@
         class="card"
       >
         <div class="card-actions">
-          <button class="card-action-btn" @click.prevent="editBookmark(idx)" :title="t.edit">✏️</button>
-          <button class="card-action-btn" @click.prevent="deleteBookmark(idx)" :title="t.delete">🗑️</button>
+          <button class="card-action-btn" @click.prevent="editBookmark(idx)" :title="t.edit" :aria-label="t.edit">
+            <DashboardIcon name="edit" :size="13" :stroke-width="1.8" aria-hidden="true" />
+          </button>
+          <button class="card-action-btn" @click.prevent="deleteBookmark(idx)" :title="t.delete" :aria-label="t.delete">
+            <DashboardIcon name="trash" :size="13" :stroke-width="1.8" aria-hidden="true" />
+          </button>
         </div>
         <a
           :href="bm.url"
@@ -60,6 +65,7 @@
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
+import DashboardIcon from './icons/DashboardIcon.vue';
 
 const STORAGE_KEY = 'midori_bookmarks';
 const CATS_KEY = 'midori_bookmark_categories';
@@ -92,6 +98,9 @@ const DEFAULT_BOOKMARKS = {
 
 export default {
   name: 'BookmarkGrid',
+  components: {
+    DashboardIcon,
+  },
 
   props: {
     /** How links open: 'Self Tab' | 'New Tab' */
@@ -295,13 +304,14 @@ export default {
 /* ── Tabs ── */
 .tabs-bar {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.25rem;
   flex-wrap: wrap;
   align-items: center;
-  background: var(--surface-raised, #0F1520);
+  background: var(--surface-island, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  padding: 4px;
-  border-radius: var(--radius-sm, 6px);
+  padding: var(--nova-segment-padding, 4px);
+  border-radius: var(--nova-island-radius, 12px);
+  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
   align-self: flex-start;
 }
 
@@ -319,12 +329,12 @@ export default {
   font-size: 0.8rem;
   background: transparent;
   color: var(--color-text-muted, #5A9A82);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--nova-control-radius, 8px);
   transition: all var(--transition-fast, 0.1s ease);
 }
 
 .tab-item.active .tab-btn {
-  background: var(--color-accent-bg, rgba(4,164,105,0.08));
+  background: var(--surface-control-hover, rgba(4,164,105,0.08));
   color: var(--color-text, #C4F0E0);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
 }
@@ -366,7 +376,7 @@ export default {
   font-weight: 700;
   background: var(--color-primary, #04A469);
   color: white;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--nova-control-radius, 8px);
   transition: background var(--transition-fast, 0.1s ease);
 }
 
@@ -377,13 +387,13 @@ export default {
 /* ── Grid ── */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 0.55rem;
 }
 
 .card {
   position: relative;
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--nova-panel-radius, 14px);
   overflow: visible;
 }
 
@@ -402,12 +412,13 @@ export default {
 
 .card-action-btn {
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm, 6px);
   width: 22px;
   height: 22px;
   border: none;
   font-size: 0.7rem;
-  background: var(--surface-overlay, #1E2D3D);
+  background: var(--surface-control, #1E2D3D);
+  color: var(--color-text-muted, #5A9A82);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -417,28 +428,28 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 1rem 0.5rem;
-  background: var(--surface-raised, #0F1520);
+  gap: 0.55rem;
+  padding: 0.85rem 0.55rem;
+  background: var(--surface-island, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--nova-panel-radius, 14px);
   text-decoration: none;
   color: var(--color-text, #C4F0E0);
   cursor: pointer;
   transition: all var(--transition-fast, 0.1s ease);
-  min-height: 90px;
+  min-height: 84px;
   justify-content: center;
 }
 
 .card-link:hover {
-  background: var(--surface-overlay, #1E2D3D);
+  background: var(--surface-control-hover, #1E2D3D);
   border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .card-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-sm, 6px);
+  width: 38px;
+  height: 38px;
+  border-radius: var(--nova-control-radius, 8px);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -450,7 +461,7 @@ export default {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--nova-control-radius, 8px);
 }
 
 .card-title {

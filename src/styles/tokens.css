@@ -75,16 +75,26 @@
 
   /* ── Border Radius ── */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
+
+  /* ── Nova Flat UI primitives ── */
+  --nova-control-radius: 8px;
+  --nova-island-radius: 12px;
+  --nova-panel-radius: 14px;
+  --nova-control-height: 38px;
+  --nova-search-height: 48px;
+  --nova-segment-padding: 4px;
 
   /* ── Shadows (flat — minimal, no glow) ── */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.14);
   --shadow-xl: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --shadow-flat: 0 1px 3px rgba(8, 13, 20, 0.14);
+  --shadow-floating: 0 8px 24px rgba(8, 13, 20, 0.18);
 
   /* ── Transitions (fast — 150ms max for flat UI) ── */
   --transition-fast: 0.1s ease;
@@ -107,6 +117,9 @@
   --surface-raised: #F4F7F6;
   --surface-overlay: #FFFFFF;
   --surface-sunken: #DDE4E0;
+  --surface-island: rgba(244, 247, 246, 0.94);
+  --surface-control: rgba(255, 255, 255, 0.92);
+  --surface-control-hover: #FFFFFF;
 
   --color-text: #1A2B26;
   --color-text-secondary: #3A5B4D;
@@ -114,6 +127,7 @@
 
   --color-border: #C0CFC8;
   --color-border-hover: #99B3A8;
+  --color-border-strong: rgba(58, 91, 77, 0.32);
 
   --color-accent-bg: rgba(4, 164, 105, 0.08);
   --color-accent-border: rgba(4, 164, 105, 0.2);
@@ -142,6 +156,9 @@
   --surface-raised: var(--ms-chrome);
   --surface-overlay: var(--ms-panel);
   --surface-sunken: #060A10;
+  --surface-island: rgba(15, 21, 32, 0.92);
+  --surface-control: rgba(30, 45, 61, 0.86);
+  --surface-control-hover: rgba(42, 62, 80, 0.92);
 
   --color-text: var(--ms-text);
   --color-text-secondary: var(--ms-sage);
@@ -149,6 +166,7 @@
 
   --color-border: rgba(126, 196, 168, 0.1);
   --color-border-hover: rgba(126, 196, 168, 0.2);
+  --color-border-strong: rgba(126, 196, 168, 0.28);
 
   --color-accent-bg: rgba(4, 164, 105, 0.1);
   --color-accent-border: rgba(4, 164, 105, 0.25);

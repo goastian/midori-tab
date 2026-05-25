@@ -1,9 +1,13 @@
 <template>
   <div class="privacy-widget">
     <div class="pw-header">
-      <span class="pw-icon">🛡️</span>
+      <span class="pw-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9.5 12.5 11.5 14.5 15.5 9.5"/></svg>
+      </span>
       <span class="pw-title">{{ i18n.$t('privacy.title') }}</span>
-      <button class="pw-refresh" type="button" :disabled="loading" @click="refreshStats" title="Actualizar">↻</button>
+      <button class="pw-refresh" type="button" :disabled="loading" @click="refreshStats" title="Actualizar" aria-label="Actualizar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.2 9A7 7 0 0 1 18.7 7.3L20 11"/><path d="M17.8 15A7 7 0 0 1 5.3 16.7L4 13"/></svg>
+      </button>
       <span v-if="!available" class="pw-badge pw-badge--off">{{ i18n.$t('common.off') }}</span>
       <span v-else class="pw-badge pw-badge--on">{{ grade }}</span>
     </div>
@@ -231,10 +235,10 @@ export default {
 <style scoped>
 .privacy-widget {
   width: 100%;
-  background: var(--surface-raised, #0F1520);
+  background: var(--surface-island, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
-  padding: 1rem;
+  border-radius: var(--nova-panel-radius, 14px);
+  padding: 0.85rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -248,7 +252,21 @@ export default {
 }
 
 .pw-icon {
-  font-size: 1.1rem;
+  width: 18px;
+  height: 18px;
+  color: var(--color-primary, #04A469);
+  display: inline-flex;
+}
+
+.pw-icon svg,
+.pw-refresh svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .pw-title {
@@ -262,8 +280,8 @@ export default {
   width: 24px;
   height: 24px;
   border: 1px solid var(--color-border, rgba(126,196,168,0.15));
-  border-radius: var(--radius-sm, 6px);
-  background: var(--surface-sunken, #060A10);
+  border-radius: var(--nova-control-radius, 8px);
+  background: var(--surface-control, #060A10);
   color: var(--color-text-muted, #5A9A82);
   cursor: pointer;
 }
@@ -277,7 +295,7 @@ export default {
   font-size: 0.65rem;
   font-weight: 700;
   padding: 0.15rem 0.45rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm, 6px);
   text-transform: uppercase;
 }
 
@@ -318,8 +336,8 @@ export default {
   align-items: center;
   gap: 0.2rem;
   padding: 0.5rem 0.25rem;
-  background: var(--surface-overlay, rgba(30,45,61,0.5));
-  border-radius: var(--radius-sm, 6px);
+  background: var(--surface-control, rgba(30,45,61,0.5));
+  border-radius: var(--nova-control-radius, 8px);
 }
 
 .pw-stat-value {
@@ -334,7 +352,7 @@ export default {
   font-weight: 500;
   color: var(--color-text-muted, #5A9A82);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0;
 }
 
 /* ── Categories breakdown ── */

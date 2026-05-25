@@ -45,20 +45,21 @@ export default {
   transform: translateX(-50%);
   z-index: 900;
   display: flex;
-  gap: 0.35rem;
-  padding: 0.3rem;
-  background: var(--surface-raised, #0F1520);
+  gap: 0.25rem;
+  padding: var(--nova-segment-padding, 4px);
+  background: var(--surface-island, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: 2rem;
-  box-shadow: var(--shadow-md, 0 2px 8px rgba(0,0,0,0.1));
+  border-radius: var(--nova-island-radius, 12px);
+  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
 }
 
 .switcher-pill {
   display: flex;
   align-items: center;
   gap: 0.3rem;
+  min-height: 30px;
   padding: 0.35rem 0.85rem;
-  border-radius: 1.5rem;
+  border-radius: var(--nova-control-radius, 8px);
   border: 1px solid transparent;
   background: transparent;
   color: var(--color-text-muted, #5A9A82);
@@ -70,12 +71,12 @@ export default {
 }
 
 .switcher-pill:hover {
-  background: var(--surface-overlay, #1E2D3D);
+  background: var(--surface-control-hover, #1E2D3D);
   color: var(--color-text, white);
 }
 
 .switcher-pill.active {
-  background: color-mix(in srgb, var(--pill-color, var(--ms-primary, #04A469)) 25%, var(--surface-overlay, #1E2D3D));
+  background: color-mix(in srgb, var(--pill-color, var(--ms-primary, #04A469)) 22%, var(--surface-control-hover, #1E2D3D));
   border-color: color-mix(in srgb, var(--pill-color, var(--ms-primary, #04A469)) 40%, transparent);
   color: var(--color-text, white);
 }

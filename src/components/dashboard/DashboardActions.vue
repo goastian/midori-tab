@@ -45,22 +45,23 @@ export default {
   transform: translateX(-50%);
   z-index: 80;
   display: flex;
-  gap: 0.5rem;
-  padding: 0.35rem;
-  background: var(--surface-raised, rgba(15,21,32,0.8));
+  gap: 0.25rem;
+  padding: var(--nova-segment-padding, 4px);
+  background: var(--surface-island, rgba(15,21,32,0.86));
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
-  backdrop-filter: blur(12px);
+  border-radius: var(--nova-island-radius, 12px);
+  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
 }
 
 .action-btn {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.5rem 1rem;
+  min-height: 34px;
+  padding: 0.45rem 0.85rem;
   background: transparent;
   border: none;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--nova-control-radius, 8px);
   color: var(--color-text-muted, #5A9A82);
   font-size: 0.82rem;
   font-weight: 500;
@@ -70,7 +71,26 @@ export default {
 }
 
 .action-btn:hover {
-  background: var(--surface-overlay, #1E2D3D);
+  background: var(--surface-control-hover, #1E2D3D);
   color: var(--color-text, #C4F0E0);
+}
+
+@media (max-height: 640px) {
+  .bottom-actions {
+    position: static;
+    transform: none;
+    margin-top: 0.25rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .bottom-actions {
+    max-width: calc(100vw - 1.5rem);
+    overflow-x: auto;
+  }
+
+  .action-btn {
+    padding-inline: 0.65rem;
+  }
 }
 </style>

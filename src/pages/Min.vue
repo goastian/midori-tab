@@ -240,7 +240,7 @@ export default {
 
 .widget-card {
   position: relative;
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--nova-panel-radius, 14px);
 }
 
 .widget-close {
@@ -253,9 +253,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-overlay, rgba(30,45,61,0.85));
+  background: var(--surface-control, rgba(30,45,61,0.85));
   border: none;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--nova-control-radius, 8px);
   color: var(--color-text-muted, #5A9A82);
   font-size: 0.7rem;
   cursor: pointer;
@@ -274,9 +274,9 @@ export default {
 
 .async-placeholder {
   width: 100%;
-  background: var(--surface-raised, rgba(15,21,32,0.76));
+  background: var(--surface-island, rgba(15,21,32,0.76));
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--nova-panel-radius, 14px);
   overflow: hidden;
   position: relative;
 }

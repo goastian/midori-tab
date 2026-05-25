@@ -227,29 +227,31 @@ export default {
 <style scoped>
 .search-box {
   width: 100%;
-  background: var(--surface-raised, #0F1520);
-  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
-  padding: 4px;
-  transition: border-color var(--transition-fast, 0.1s ease);
+  background: var(--surface-island, #0F1520);
+  border: 1px solid var(--color-border-strong, rgba(126,196,168,0.22));
+  border-radius: var(--nova-panel-radius, 14px);
+  padding: var(--nova-segment-padding, 4px);
+  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
+  transition: border-color var(--transition-fast, 0.1s ease), box-shadow var(--transition-fast, 0.1s ease);
   position: relative;
 }
 
 .search-box:focus-within {
   border-color: var(--color-primary, #04A469);
+  box-shadow: 0 0 0 3px var(--color-accent-border, rgba(4,164,105,0.2));
 }
 
 .search-inner {
   display: flex;
   align-items: center;
   gap: 0;
-  background: var(--surface-sunken, #060A10);
-  border-radius: var(--radius-sm, 6px);
-  padding: 0.25rem 0.5rem;
+  min-height: var(--nova-search-height, 48px);
+  background: var(--surface-control, #060A10);
+  border-radius: var(--nova-island-radius, 12px);
+  padding: 0.25rem 0.35rem 0.25rem 0.75rem;
   position: relative;
 }
 
-/* Search input */
 .search-input {
   flex: 1;
   background: transparent;
@@ -257,7 +259,7 @@ export default {
   outline: none;
   color: var(--color-text, #C4F0E0);
   font-size: 0.95rem;
-  padding: 0.5rem 0.5rem;
+  padding: 0.5rem;
   font-family: inherit;
   min-width: 0;
 }
@@ -272,19 +274,18 @@ export default {
   box-shadow: none;
 }
 
-/* Search button */
 .search-btn {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
   background: var(--color-primary, #04A469);
   border: none;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--nova-control-radius, 8px);
   color: white;
-  width: 34px;
-  height: 34px;
   cursor: pointer;
-  flex-shrink: 0;
   transition: background var(--transition-fast, 0.1s ease);
 }
 
@@ -292,18 +293,17 @@ export default {
   background: var(--color-primary-hover, #4de0b2);
 }
 
-/* Suggestions dropdown */
 .suggestions-dropdown {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: var(--surface-raised, #0F1520);
-  border: 1px solid var(--color-border, rgba(126,196,168,0.15));
-  border-radius: var(--radius-md, 10px);
   z-index: 50;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  background: var(--surface-island, #0F1520);
+  border: 1px solid var(--color-border-strong, rgba(126,196,168,0.15));
+  border-radius: var(--nova-panel-radius, 14px);
+  box-shadow: var(--shadow-floating, 0 8px 24px rgba(0, 0, 0, 0.18));
 }
 
 .suggestions-list {
@@ -319,7 +319,7 @@ export default {
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--nova-control-radius, 8px);
   cursor: pointer;
   color: var(--color-text, #C4F0E0);
   font-size: 0.9rem;
@@ -328,7 +328,7 @@ export default {
 
 .suggestion-item:hover,
 .suggestion-item.active {
-  background: var(--surface-overlay, #1E2D3D);
+  background: var(--surface-control-hover, #1E2D3D);
 }
 
 .suggestion-icon {

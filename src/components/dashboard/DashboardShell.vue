@@ -78,8 +78,8 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.5rem 2rem 5rem;
-  gap: 1.25rem;
+  padding: 1.25rem 2rem 5rem;
+  gap: 1rem;
   font-size: 13px;
   box-sizing: border-box;
 }
@@ -91,30 +91,34 @@ export default {
   right: 1rem;
   z-index: 50;
   display: flex;
-  gap: 0.5rem;
+  gap: 0.35rem;
   align-items: center;
+  padding: var(--nova-segment-padding, 4px);
+  background: var(--surface-island, rgba(255,255,255,0.9));
+  border: 1px solid var(--color-border, rgba(0,0,0,0.1));
+  border-radius: var(--nova-island-radius, 12px);
+  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
 }
 
 .top-btn {
-  width: 36px;
-  height: 36px;
+  width: var(--nova-control-height, 38px);
+  height: var(--nova-control-height, 38px);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-raised, rgba(255,255,255,0.85));
-  border: 1px solid var(--color-border, rgba(0,0,0,0.1));
-  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--nova-control-radius, 8px);
   color: var(--color-text-muted, #5A7B6D);
   cursor: pointer;
   transition: all 0.15s ease;
-  backdrop-filter: blur(8px);
 }
 
 .top-btn:hover {
-  background: var(--surface-overlay, #ffffff);
+  background: var(--surface-control-hover, #ffffff);
   color: var(--color-text, #1A2B26);
   border-color: var(--color-border-hover, rgba(0,0,0,0.18));
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: none;
 }
 
 /* Hamburger lines */
@@ -155,32 +159,31 @@ export default {
   bottom: 1.5rem;
   right: 1rem;
   z-index: 80;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-raised, rgba(255,255,255,0.9));
+  background: var(--surface-island, rgba(255,255,255,0.9));
   border: 1px solid var(--color-border, rgba(0,0,0,0.1));
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--nova-island-radius, 12px);
   color: var(--color-text-muted, #5A7B6D);
   cursor: pointer;
   transition: all 0.15s ease;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
 }
 
 .quick-fab:hover {
   background: var(--color-primary, #04A469);
   color: #ffffff;
   border-color: var(--color-primary, #04A469);
-  box-shadow: 0 4px 16px rgba(4, 164, 105, 0.3);
+  box-shadow: var(--shadow-floating, 0 8px 24px rgba(8,13,20,0.18));
   transform: translateY(-1px);
 }
 
 /* ── Header ───────────────────────────────────────────────── */
 .dash-header {
-  padding-top: 0.5rem;
+  padding-top: 0.35rem;
   display: flex;
   justify-content: center;
 }
@@ -188,5 +191,16 @@ export default {
 :global([data-density='compact']) .dashboard {
   padding: 1rem 1.25rem 4.25rem;
   gap: 0.9rem;
+}
+
+@media (max-height: 640px) {
+  .dashboard {
+    padding-bottom: 1.25rem;
+  }
+
+  .quick-fab {
+    bottom: 0.75rem;
+    right: 0.75rem;
+  }
 }
 </style>

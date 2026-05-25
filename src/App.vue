@@ -15,7 +15,7 @@
       />
     </Transition>
     <div class="credits" v-if="showCredits">
-      📷 Photo by 
+      <span class="credits__label">Photo</span> by 
       <a :href="imageAuthorLink" target="_blank" rel="noopener noreferrer">{{ imageAuthor }}</a> 
       on <a :href="imageLink" target="_blank" rel="noopener noreferrer">{{ imageLabel }}</a>
     </div>
@@ -383,6 +383,21 @@
   min-height: 100vh;
   display: flex;
   position: relative;
+  overflow-x: hidden;
+  background: transparent;
+}
+
+.viewport::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: rgba(8, 13, 20, 0.16);
+}
+
+:root[data-theme='light'] .viewport::after {
+  background: rgba(232, 237, 235, 0.08);
 }
 
 .container {
@@ -447,16 +462,21 @@
 
 .credits {
   position: fixed;
-  bottom: 0;
-  left: 0;
+  bottom: 0.75rem;
+  left: 0.75rem;
   font-size: .75rem;
   color: var(--color-text-muted, #7A9B8D);
-  background-color: var(--surface-raised, #0F1520);
-  border-top: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-right: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  padding: .35rem .6rem;
-  border-radius: 0 var(--radius-sm, 6px) 0 0;
+  background-color: var(--surface-island, #0F1520);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  padding: .35rem .55rem;
+  border-radius: var(--nova-control-radius, 8px);
   z-index: 3;
+  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
+}
+
+.credits__label {
+  color: var(--color-text, #C4F0E0);
+  font-weight: 600;
 }
 
 .credits a {
@@ -474,13 +494,12 @@
   right: 1rem;
   width: min(92vw, 360px);
   z-index: 50;
-  background: linear-gradient(160deg, rgba(0, 61, 47, 0.94), rgba(0, 34, 27, 0.93));
-  border: 1px solid rgba(126, 196, 168, 0.45);
-  border-radius: 14px;
-  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.28);
+  background: var(--surface-island, rgba(0, 61, 47, 0.94));
+  border: 1px solid var(--color-border-strong, rgba(126, 196, 168, 0.45));
+  border-radius: var(--nova-panel-radius, 14px);
+  box-shadow: var(--shadow-floating, 0 8px 24px rgba(0, 0, 0, 0.18));
   padding: 0.9rem 0.95rem;
   color: #e6fff7;
-  backdrop-filter: blur(8px);
 }
 
 .update-toast__badge {
@@ -491,7 +510,7 @@
   padding: 0.2rem 0.6rem;
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
   background: rgba(0, 184, 148, 0.18);
   border: 1px solid rgba(0, 184, 148, 0.35);
@@ -519,7 +538,7 @@
 
 .update-toast__button {
   flex: 1;
-  border-radius: 10px;
+  border-radius: var(--nova-control-radius, 8px);
   border: 1px solid transparent;
   padding: 0.5rem 0.65rem;
   font-size: 0.8rem;

@@ -81,8 +81,8 @@ export default {
   max-width: calc(100vw - 2rem);
   background: var(--surface-base, #080D14);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-lg, 16px);
-  box-shadow: var(--shadow-xl, 0 8px 32px rgba(0,0,0,0.3));
+  border-radius: var(--nova-panel-radius, 14px);
+  box-shadow: var(--shadow-floating, 0 8px 24px rgba(0,0,0,0.18));
   overflow: hidden;
 }
 
@@ -92,7 +92,7 @@ export default {
   justify-content: space-between;
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  background: var(--surface-raised, #0F1520);
+  background: var(--surface-island, #0F1520);
 }
 
 .quick-title {
@@ -109,7 +109,7 @@ export default {
   justify-content: center;
   background: var(--surface-overlay, #1E2D3D);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--nova-control-radius, 8px);
   color: var(--color-text-muted, #5A9A82);
   font-size: 0.9rem;
   cursor: pointer;
@@ -128,9 +128,9 @@ export default {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 0.85rem;
-  background: var(--surface-raised, #0F1520);
+  background: var(--surface-island, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--nova-control-radius, 8px);
   color: var(--color-text, #C4F0E0);
   cursor: pointer;
   transition: all 0.12s ease;
@@ -138,7 +138,7 @@ export default {
 }
 
 .quick-item:hover {
-  background: var(--surface-overlay, #1E2D3D);
+  background: var(--surface-control-hover, #1E2D3D);
   border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 

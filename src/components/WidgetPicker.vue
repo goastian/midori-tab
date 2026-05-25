@@ -7,7 +7,7 @@
       <div v-if="visible" class="widget-sheet">
         <div class="sheet-header">
           <span class="sheet-title">{{ i18n.$t('dashboard.widgetsSheet.title') }}</span>
-          <button class="sheet-close" type="button" :aria-label="i18n.$t('dashboard.widgetsSheet.close')" @click="$emit('close')">✕</button>
+          <button class="sheet-close" type="button" :aria-label="i18n.$t('dashboard.widgetsSheet.close')" @click="$emit('close')">x</button>
         </div>
         <div class="sheet-grid">
           <button
@@ -67,9 +67,9 @@ export default {
   z-index: 8001;
   background: var(--surface-base, #080D14);
   border-top: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-lg, 16px) var(--radius-lg, 16px) 0 0;
+  border-radius: var(--nova-panel-radius, 14px) var(--nova-panel-radius, 14px) 0 0;
   padding: 1.25rem 2rem 2rem;
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-floating, 0 -8px 24px rgba(0, 0, 0, 0.18));
 }
 
 .sheet-header {
@@ -93,7 +93,7 @@ export default {
   justify-content: center;
   background: var(--surface-overlay, #1E2D3D);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--nova-control-radius, 8px);
   color: var(--color-text-muted, #5A9A82);
   font-size: 0.9rem;
   cursor: pointer;
@@ -119,9 +119,9 @@ export default {
   gap: 0.5rem;
   padding: 1rem 1.25rem;
   min-width: 80px;
-  background: var(--surface-raised, #0F1520);
+  background: var(--surface-island, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--nova-control-radius, 8px);
   color: var(--color-text-muted, #5A9A82);
   cursor: pointer;
   transition: all 0.12s ease;
@@ -129,7 +129,7 @@ export default {
 }
 
 .sheet-item:hover {
-  background: var(--surface-overlay, #1E2D3D);
+  background: var(--surface-control-hover, #1E2D3D);
   border-color: var(--color-border-hover, rgba(126,196,168,0.2));
   color: var(--color-text, #C4F0E0);
 }
