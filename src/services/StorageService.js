@@ -2,24 +2,42 @@ const DEFAULT_VERSION = 1;
 const DEFAULT_DEBOUNCE_MS = 600;
 const timers = new Map();
 
+function hasRuntimeLastError() {
+  return typeof chrome !== 'undefined' && chrome.runtime?.lastError;
+}
+
 function getExtensionStorage() {
   const api = typeof browser !== 'undefined' ? browser : (typeof chrome !== 'undefined' ? chrome : null);
   return api?.storage?.local || null;
 }
 
+function usesPromiseStorage(storage) {
+  return typeof browser !== 'undefined' && storage === browser?.storage?.local;
+}
+
 function storageGet(storage, key) {
   return new Promise((resolve, reject) => {
     try {
-      const maybePromise = storage.get(key, (result) => {
-        const lastError = typeof chrome !== 'undefined' ? chrome.runtime?.lastError : null;
-        if (lastError) reject(new Error(lastError.message));
-        else resolve(result);
-      });
-      if (maybePromise && typeof maybePromise.then === 'function') {
-        maybePromise.then(resolve, reject);
-      } else if (storage.get.length < 2) {
-        resolve(maybePromise);
+      if (usesPromiseStorage(storage)) {
+        const maybePromise = storage.get(key);
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          maybePromise.then(resolve, reject);
+        } else {
+          resolve(maybePromise);
+        }
+        return;
       }
+
+      if (typeof storage.get === 'function') {
+        storage.get(key, (result) => {
+          const lastError = hasRuntimeLastError();
+          if (lastError) reject(new Error(lastError.message));
+          else resolve(result);
+        });
+        return;
+      }
+
+      resolve(undefined);
     } catch (error) {
       reject(error);
     }
@@ -29,16 +47,26 @@ function storageGet(storage, key) {
 function storageSet(storage, payload) {
   return new Promise((resolve, reject) => {
     try {
-      const maybePromise = storage.set(payload, () => {
-        const lastError = typeof chrome !== 'undefined' ? chrome.runtime?.lastError : null;
-        if (lastError) reject(new Error(lastError.message));
-        else resolve();
-      });
-      if (maybePromise && typeof maybePromise.then === 'function') {
-        maybePromise.then(resolve, reject);
-      } else if (storage.set.length < 2) {
-        resolve(maybePromise);
+      if (usesPromiseStorage(storage)) {
+        const maybePromise = storage.set(payload);
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          maybePromise.then(resolve, reject);
+        } else {
+          resolve(maybePromise);
+        }
+        return;
       }
+
+      if (typeof storage.set === 'function') {
+        storage.set(payload, () => {
+          const lastError = hasRuntimeLastError();
+          if (lastError) reject(new Error(lastError.message));
+          else resolve();
+        });
+        return;
+      }
+
+      resolve();
     } catch (error) {
       reject(error);
     }
@@ -48,16 +76,26 @@ function storageSet(storage, payload) {
 function storageRemove(storage, key) {
   return new Promise((resolve, reject) => {
     try {
-      const maybePromise = storage.remove(key, () => {
-        const lastError = typeof chrome !== 'undefined' ? chrome.runtime?.lastError : null;
-        if (lastError) reject(new Error(lastError.message));
-        else resolve();
-      });
-      if (maybePromise && typeof maybePromise.then === 'function') {
-        maybePromise.then(resolve, reject);
-      } else if (storage.remove.length < 2) {
-        resolve(maybePromise);
+      if (usesPromiseStorage(storage)) {
+        const maybePromise = storage.remove(key);
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          maybePromise.then(resolve, reject);
+        } else {
+          resolve(maybePromise);
+        }
+        return;
       }
+
+      if (typeof storage.remove === 'function') {
+        storage.remove(key, () => {
+          const lastError = hasRuntimeLastError();
+          if (lastError) reject(new Error(lastError.message));
+          else resolve();
+        });
+        return;
+      }
+
+      resolve();
     } catch (error) {
       reject(error);
     }
@@ -79,35 +117,60 @@ function unwrapPayload(payload, fallback) {
   return payload ?? fallback;
 }
 
-function readLocalStorage(key, fallback) {
+function isWrappedPayload(payload) {
+  return payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'value');
+}
+
+function getPayloadTimestamp(payload) {
+  return isWrappedPayload(payload) && Number.isFinite(Number(payload.updatedAt)) ? Number(payload.updatedAt) : 0;
+}
+
+function pickNewestPayload(primary, secondary, fallback) {
+  if (primary === undefined && secondary === undefined) return fallback;
+  if (primary === undefined) return unwrapPayload(secondary, fallback);
+  if (secondary === undefined) return unwrapPayload(primary, fallback);
+
+  return unwrapPayload(
+    getPayloadTimestamp(secondary) > getPayloadTimestamp(primary) ? secondary : primary,
+    fallback,
+  );
+}
+
+function readLocalStoragePayload(key) {
   try {
     const raw = localStorage.getItem(key);
-    if (raw === null) return fallback;
-    return unwrapPayload(JSON.parse(raw), fallback);
+    if (raw === null) return undefined;
+    return JSON.parse(raw);
   } catch {
     try {
-      return localStorage.getItem(key) ?? fallback;
+      const raw = localStorage.getItem(key);
+      return raw === null ? undefined : raw;
     } catch {
-      return fallback;
+      return undefined;
     }
   }
 }
 
 function writeLocalStorage(key, value, version = DEFAULT_VERSION) {
-  localStorage.setItem(key, JSON.stringify(wrapPayload(value, version)));
+  try {
+    localStorage.setItem(key, JSON.stringify(wrapPayload(value, version)));
+  } catch {
+    /* localStorage can be unavailable in restricted extension contexts. */
+  }
 }
 
 export async function getJson(key, fallback = null) {
+  const localPayload = readLocalStoragePayload(key);
   const storage = getExtensionStorage();
   if (storage?.get) {
     try {
       const result = await storageGet(storage, key);
-      return unwrapPayload(result?.[key], fallback);
+      return pickNewestPayload(result?.[key], localPayload, fallback);
     } catch {
-      return readLocalStorage(key, fallback);
+      return unwrapPayload(localPayload, fallback);
     }
   }
-  return readLocalStorage(key, fallback);
+  return unwrapPayload(localPayload, fallback);
 }
 
 export async function quotaSafeSet(key, value, options = {}) {
@@ -119,6 +182,8 @@ export async function quotaSafeSet(key, value, options = {}) {
     throw new Error(`Storage payload for ${key} exceeds ${maxBytes} bytes.`);
   }
 
+  writeLocalStorage(key, value, version);
+
   const storage = getExtensionStorage();
   if (storage?.set) {
     try {
@@ -128,13 +193,12 @@ export async function quotaSafeSet(key, value, options = {}) {
       console.warn(`[StorageService] chrome.storage write failed for ${key}:`, error);
     }
   }
-
-  writeLocalStorage(key, value, version);
   return true;
 }
 
 export function setJsonDebounced(key, value, options = {}) {
   const delay = Number(options.delayMs) >= 0 ? Number(options.delayMs) : DEFAULT_DEBOUNCE_MS;
+  writeLocalStorage(key, value, options.version || DEFAULT_VERSION);
   const previous = timers.get(key);
   if (previous) clearTimeout(previous);
 
