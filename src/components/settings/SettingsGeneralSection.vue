@@ -20,7 +20,7 @@
       </div>
       <Input
         :modelValue="title"
-        placeholder="New Tab"
+        :placeholder="i18n.$t('general.newTab')"
         round
         full
         @update:modelValue="$emit('update:title', $event)"
@@ -29,16 +29,16 @@
 
     <div class="setting-item">
       <div class="setting-info">
-        <span class="setting-label">{{ i18n.t.spaces?.enable || 'Activar Spaces' }}</span>
-        <span class="setting-description">{{ i18n.t.spaces?.enableDesc || 'Cambia entre espacios de trabajo personalizados' }}</span>
+        <span class="setting-label">{{ i18n.$t('spaces.enable') }}</span>
+        <span class="setting-description">{{ i18n.$t('spaces.enableDesc') }}</span>
       </div>
       <Switch :state="spacesStore.enabled" @click="$emit('toggle-spaces')" />
     </div>
 
     <div class="setting-item">
       <div class="setting-info">
-        <span class="setting-label">{{ i18n.t.general?.showAds || 'Show ads' }}</span>
-        <span class="setting-description">{{ i18n.t.general?.showAdsDesc || 'Display sponsored content on the New Tab page' }}</span>
+        <span class="setting-label">{{ i18n.$t('general.showAds') }}</span>
+        <span class="setting-description">{{ i18n.$t('general.showAdsDesc') }}</span>
       </div>
       <Switch :state="settings.showAds" @click="$emit('toggle-ads')" />
     </div>

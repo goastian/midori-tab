@@ -34,6 +34,7 @@
 </template>
 
 <script>
+import { getWidgetCopy } from '../i18n/widget-copy.js';
 import useI18nStore from '../stores/useI18nStore.js';
 
 const DEFAULT_LIMIT = 12;
@@ -111,13 +112,7 @@ export default {
   computed: {
     copy() {
       const section = this.i18n.t.browserBookmarks || {};
-      return {
-        title: section.title || 'Browser bookmarks',
-        searchPlaceholder: section.searchPlaceholder || 'Search browser bookmarks...',
-        loading: section.loading || 'Loading bookmarks...',
-        empty: section.empty || 'No bookmarks available.',
-        unavailable: section.unavailable || 'Bookmarks API unavailable.',
-      };
+      return { ...getWidgetCopy(this.i18n.locale).browserBookmarks, ...section };
     },
     renderedItems() {
       if (this.items.length <= VIRTUAL_THRESHOLD) return this.items;

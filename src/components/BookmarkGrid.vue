@@ -123,17 +123,16 @@ export default {
   computed: {
     /** Returns i18n translations for bookmarks UI. */
     t() {
-      const bk = this.i18n.t.bookmarks || {};
       return {
-        add: bk.add || 'Añadir',
-        edit: bk.edit || 'Editar',
-        delete: bk.delete || 'Eliminar',
-        addCategory: bk.addCategory || 'Añadir categoría',
-        deleteCategory: bk.deleteCategory || 'Eliminar categoría',
-        newCategory: bk.newCategory || 'Nombre de la nueva categoría:',
-        bookmarkName: bk.bookmarkName || 'Nombre del marcador:',
-        bookmarkUrl: bk.bookmarkUrl || 'URL del marcador:',
-        confirmDelete: bk.confirmDelete || '¿Eliminar',
+        add: this.i18n.$t('bookmarks.add'),
+        edit: this.i18n.$t('bookmarks.edit'),
+        delete: this.i18n.$t('bookmarks.delete'),
+        addCategory: this.i18n.$t('bookmarks.addCategory'),
+        deleteCategory: this.i18n.$t('bookmarks.deleteCategory'),
+        newCategory: this.i18n.$t('bookmarks.newCategory'),
+        bookmarkName: this.i18n.$t('bookmarks.bookmarkName'),
+        bookmarkUrl: this.i18n.$t('bookmarks.bookmarkUrl'),
+        confirmDelete: this.i18n.$t('bookmarks.confirmDelete'),
       };
     },
     currentBookmarks() {

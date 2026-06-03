@@ -5,7 +5,7 @@
         <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9.5 12.5 11.5 14.5 15.5 9.5"/></svg>
       </span>
       <span class="pw-title">{{ i18n.$t('privacy.title') }}</span>
-      <button class="pw-refresh" type="button" :disabled="loading" @click="refreshStats" title="Actualizar" aria-label="Actualizar">
+      <button class="pw-refresh" type="button" :disabled="loading" @click="refreshStats" :title="copy.refresh" :aria-label="copy.refresh">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.2 9A7 7 0 0 1 18.7 7.3L20 11"/><path d="M17.8 15A7 7 0 0 1 5.3 16.7L4 13"/></svg>
       </button>
       <span v-if="!available" class="pw-badge pw-badge--off">{{ i18n.$t('common.off') }}</span>
@@ -13,7 +13,7 @@
     </div>
 
     <div v-if="loading" class="pw-empty">
-      <p class="pw-empty-text">{{ i18n.$t('common.loading') || 'Loading...' }}</p>
+      <p class="pw-empty-text">{{ copy.loading }}</p>
     </div>
 
     <div v-else-if="!available" class="pw-empty">
@@ -56,6 +56,7 @@
 </template>
 
 <script>
+import { getWidgetCopy } from '../i18n/widget-copy.js';
 import useI18nStore from '../stores/useI18nStore.js';
 
 /**
@@ -128,6 +129,9 @@ export default {
   },
 
   computed: {
+    copy() {
+      return getWidgetCopy(this.i18n.locale).privacyWidget;
+    },
     /** Formats blocked count with K/M suffixes. */
     formattedBlocked() {
       const n = this.totalBlocked;

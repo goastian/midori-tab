@@ -2,7 +2,7 @@
   <div class="rss-widget">
     <div class="widget-header">
       <div class="feed-selector">
-        <button @click="previousFeed" class="feed-nav-btn" :disabled="loading" title="Fuente anterior">
+        <button @click="previousFeed" class="feed-nav-btn" :disabled="loading" :title="copy.previousFeed">
           ‹
         </button>
         <div class="feed-info" @click="toggleFeedSelector">
@@ -11,15 +11,15 @@
           </h3>
           <span class="feed-description">{{ availableFeeds[currentFeedIndex].description }}</span>
         </div>
-        <button @click="nextFeed" class="feed-nav-btn" :disabled="loading" title="Siguiente fuente">
+        <button @click="nextFeed" class="feed-nav-btn" :disabled="loading" :title="copy.nextFeed">
           ›
         </button>
       </div>
       <div class="header-actions">
-        <button @click="toggleAutoRefresh" class="auto-refresh-btn" :class="{ active: autoRefreshInterval }" title="Auto-refresh">
+        <button @click="toggleAutoRefresh" class="auto-refresh-btn" :class="{ active: autoRefreshInterval }" :title="copy.autoRefresh">
           ⏰
         </button>
-        <button @click="refreshFeed" class="refresh-btn" :disabled="loading" title="Actualizar">
+        <button @click="refreshFeed" class="refresh-btn" :disabled="loading" :title="copy.refresh">
           <span v-if="loading">⟳</span>
           <span v-else>↻</span>
         </button>
@@ -43,12 +43,12 @@
     
     <div v-if="loading" class="loading">
       <div class="spinner"></div>
-      <p>Cargando noticias...</p>
+      <p>{{ copy.loading }}</p>
     </div>
     
     <div v-else-if="error" class="error">
       <p>{{ error }}</p>
-      <button @click="loadFeed" class="retry-btn">Reintentar</button>
+      <button @click="loadFeed" class="retry-btn">{{ copy.retry }}</button>
     </div>
     
     <div v-else class="feed-content">
@@ -80,11 +80,14 @@ import {
   parseFeedPayload,
   truncateFeedText,
 } from '../services/RssWidgetService.js';
+import useI18nStore from '../stores/useI18nStore.js';
+import { getWidgetCopy } from '../i18n/widget-copy.js';
 
 export default {
   name: 'RssWidget',
   data() {
     return {
+      i18n: useI18nStore(),
       feedUrl: 'https://feeds.bbci.co.uk/news/rss.xml',
       feedTitle: 'BBC News',
       feedItems: [],
@@ -132,6 +135,9 @@ export default {
   },
   
   computed: {
+    copy() {
+      return getWidgetCopy(this.i18n.locale).rssWidget;
+    },
     currentFeedColor() {
       return getFeedColor(this.availableFeeds, this.currentFeedIndex);
     }

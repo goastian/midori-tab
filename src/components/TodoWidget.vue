@@ -1,7 +1,7 @@
 <template>
   <div class="todo-widget">
     <div class="todo-header">
-      <span class="todo-title">✅ Tareas</span>
+      <span class="todo-title">✅ {{ copy.title }}</span>
       <span class="todo-count">{{ doneCount }}/{{ items.length }}</span>
     </div>
 
@@ -9,7 +9,7 @@
       <input
         v-model="newTask"
         class="todo-input"
-        placeholder="Nueva tarea..."
+        :placeholder="copy.placeholder"
         @keydown.enter="addTask"
       />
       <button class="todo-add-btn" @click="addTask">+</button>
@@ -24,12 +24,14 @@
         <button class="todo-delete" @click="removeItem(idx)">×</button>
       </li>
     </ul>
-    <p v-else class="todo-empty">Sin tareas pendientes</p>
+    <p v-else class="todo-empty">{{ copy.empty }}</p>
   </div>
 </template>
 
 <script>
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
+import useI18nStore from '../stores/useI18nStore.js';
+import { getWidgetCopy } from '../i18n/widget-copy.js';
 
 const STORAGE_KEY = 'midori_todos';
 
@@ -40,10 +42,14 @@ export default {
     return {
       items: [],
       newTask: '',
+      i18n: useI18nStore(),
     };
   },
 
   computed: {
+    copy() {
+      return getWidgetCopy(this.i18n.locale).todoWidget;
+    },
     doneCount() {
       return this.items.filter(i => i.done).length;
     },

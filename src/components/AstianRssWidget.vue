@@ -1,7 +1,7 @@
 <template>
   <div class="astian-rss-widget">
     <div class="widget-header">
-      <h3>🚀 Astian News</h3>
+      <h3>🚀 {{ copy.title }}</h3>
       <button @click="refreshFeed" class="refresh-btn" :disabled="loading">
         <span v-if="loading">⟳</span>
         <span v-else>↻</span>
@@ -10,12 +10,12 @@
 
     <div v-if="loading" class="loading">
       <div class="spinner"></div>
-      <p>Cargando noticias de Astian...</p>
+      <p>{{ copy.loading }}</p>
     </div>
 
     <div v-else-if="error" class="error">
       <p>{{ error }}</p>
-      <button @click="loadFeed" class="retry-btn">Reintentar</button>
+      <button @click="loadFeed" class="retry-btn">{{ copy.retry }}</button>
     </div>
 
     <div v-else class="feed-content">
@@ -30,7 +30,7 @@
         </div>
         <p class="news-description">{{ truncateText(item.description, 120) }}</p>
         <div class="news-footer">
-          <span class="news-category">Astian</span>
+          <span class="news-category">{{ copy.category }}</span>
         </div>
       </div>
     </div>
@@ -38,6 +38,8 @@
 </template>
 
 <script>
+import { getWidgetCopy } from '../i18n/widget-copy.js';
+import useI18nStore from '../stores/useI18nStore.js';
 import rssCacheService from '../services/RssCacheService.js';
 
 export default {
@@ -48,8 +50,15 @@ export default {
       feedTitle: 'Astian News',
       feedItems: [],
       loading: false,
-      error: null
+      error: null,
+      i18n: useI18nStore(),
     }
+  },
+
+  computed: {
+    copy() {
+      return getWidgetCopy(this.i18n.locale).astianRssWidget;
+    },
   },
 
   mounted() {

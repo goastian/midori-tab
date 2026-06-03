@@ -57,21 +57,21 @@
     <!-- Active Theme Preview -->
     <div class="active-preview">
       <div class="preview-section">
-        <span class="preview-label">Light</span>
+        <span class="preview-label">{{ copy.light }}</span>
         <div class="preview-swatch-row">
-          <div class="swatch" :style="swatchStyle('light', '--color-bg')" title="Background"></div>
-          <div class="swatch" :style="swatchStyle('light', '--color-primary')" title="Primary"></div>
-          <div class="swatch" :style="swatchStyle('light', '--color-text')" title="Text"></div>
-          <div class="swatch" :style="swatchStyle('light', '--theme-accent')" title="Accent"></div>
+          <div class="swatch" :style="swatchStyle('light', '--color-bg')" :title="copy.background"></div>
+          <div class="swatch" :style="swatchStyle('light', '--color-primary')" :title="copy.primary"></div>
+          <div class="swatch" :style="swatchStyle('light', '--color-text')" :title="copy.text"></div>
+          <div class="swatch" :style="swatchStyle('light', '--theme-accent')" :title="copy.accent"></div>
         </div>
       </div>
       <div class="preview-section">
-        <span class="preview-label">Dark</span>
+        <span class="preview-label">{{ copy.dark }}</span>
         <div class="preview-swatch-row">
-          <div class="swatch" :style="swatchStyle('dark', '--color-bg')" title="Background"></div>
-          <div class="swatch" :style="swatchStyle('dark', '--color-primary')" title="Primary"></div>
-          <div class="swatch" :style="swatchStyle('dark', '--color-text')" title="Text"></div>
-          <div class="swatch" :style="swatchStyle('dark', '--theme-accent')" title="Accent"></div>
+          <div class="swatch" :style="swatchStyle('dark', '--color-bg')" :title="copy.background"></div>
+          <div class="swatch" :style="swatchStyle('dark', '--color-primary')" :title="copy.primary"></div>
+          <div class="swatch" :style="swatchStyle('dark', '--color-text')" :title="copy.text"></div>
+          <div class="swatch" :style="swatchStyle('dark', '--theme-accent')" :title="copy.accent"></div>
         </div>
       </div>
     </div>
@@ -85,12 +85,12 @@
             class="variant-tab"
             :class="{ active: editVariant === 'light' }"
             @click="editVariant = 'light'"
-          >Light</button>
+          >{{ copy.light }}</button>
           <button
             class="variant-tab"
             :class="{ active: editVariant === 'dark' }"
             @click="editVariant = 'dark'"
-          >Dark</button>
+          >{{ copy.dark }}</button>
         </div>
         <div class="custom-fields">
           <div class="color-field" v-for="field in editableFields" :key="field.key">
@@ -110,6 +110,7 @@
 
 <script>
 import { defineAsyncComponent } from 'vue';
+import { getWidgetCopy } from '../i18n/widget-copy.js';
 import useThemeStore from '../stores/useThemeStore.js';
 import useTabStore from '../stores/useTabStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
@@ -133,6 +134,9 @@ export default {
   },
 
   computed: {
+    copy() {
+      return getWidgetCopy(this.i18n.locale).themePicker;
+    },
     editableFields() {
       const t = this.i18n.t.themes;
       return [

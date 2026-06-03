@@ -15,6 +15,8 @@
 
 <script>
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
+import useI18nStore from '../stores/useI18nStore.js';
+import { getWidgetCopy } from '../i18n/widget-copy.js';
 
 const STORAGE_KEY = 'midori_notes';
 
@@ -26,15 +28,19 @@ export default {
       content: '',
       visibilityListener: null,
       pagehideListener: null,
+      i18n: useI18nStore(),
     };
   },
 
   computed: {
+    copy() {
+      return getWidgetCopy(this.i18n.locale).notesWidget;
+    },
     charCount() {
-      return `${this.content.length} chars`;
+      return this.copy.chars.replace('{n}', String(this.content.length));
     },
     placeholder() {
-      return 'Escribe tus notas aqui...';
+      return this.copy.placeholder;
     },
   },
 
