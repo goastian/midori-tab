@@ -1,7 +1,7 @@
 <template>
   <div class="notes-widget">
     <div class="notes-header">
-      <span class="notes-title">📝 Notas</span>
+      <span class="notes-title">📝 {{ copy.title }}</span>
       <span class="notes-count">{{ charCount }}</span>
     </div>
     <textarea
