@@ -237,6 +237,7 @@ export default {
       unavailable: 'Weather service unavailable.',
       noGeolocation: 'Geolocation is not available.',
       locationDenied: 'Could not get your location.',
+      locationRequired: 'Allow current location or enter a city.',
       cityNotFound: 'City not found.',
     },
   },

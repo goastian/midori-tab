@@ -5,6 +5,11 @@ const widgetCopyByLocale = {
       placeholder: 'Write your notes here...',
       chars: '{n} chars',
     },
+    todoWidget: {
+      title: 'Tasks',
+      placeholder: 'Add a task...',
+      empty: 'No tasks yet.',
+    },
     browserBookmarks: {
       title: 'Browser bookmarks',
       searchPlaceholder: 'Search browser bookmarks...',
@@ -44,6 +49,11 @@ const widgetCopyByLocale = {
       title: 'Notas',
       placeholder: 'Escribe tus notas aquí...',
       chars: '{n} caracteres',
+    },
+    todoWidget: {
+      title: 'Tareas',
+      placeholder: 'Añadir una tarea...',
+      empty: 'Sin tareas todavía.',
     },
     browserBookmarks: {
       title: 'Marcadores del navegador',
@@ -85,6 +95,11 @@ const widgetCopyByLocale = {
       placeholder: 'Escreva suas notas aqui...',
       chars: '{n} caracteres',
     },
+    todoWidget: {
+      title: 'Tarefas',
+      placeholder: 'Adicionar uma tarefa...',
+      empty: 'Ainda não há tarefas.',
+    },
     browserBookmarks: {
       title: 'Favoritos do navegador',
       searchPlaceholder: 'Buscar favoritos do navegador...',
@@ -124,6 +139,11 @@ const widgetCopyByLocale = {
       title: 'Notes',
       placeholder: 'Écrivez vos notes ici...',
       chars: '{n} caractères',
+    },
+    todoWidget: {
+      title: 'Tâches',
+      placeholder: 'Ajouter une tâche...',
+      empty: 'Aucune tâche pour le moment.',
     },
     browserBookmarks: {
       title: 'Favoris du navigateur',
@@ -165,6 +185,11 @@ const widgetCopyByLocale = {
       placeholder: 'Schreiben Sie hier Ihre Notizen...',
       chars: '{n} Zeichen',
     },
+    todoWidget: {
+      title: 'Aufgaben',
+      placeholder: 'Aufgabe hinzufügen...',
+      empty: 'Noch keine Aufgaben.',
+    },
     browserBookmarks: {
       title: 'Browser-Lesezeichen',
       searchPlaceholder: 'Browser-Lesezeichen suchen...',
@@ -204,6 +229,11 @@ const widgetCopyByLocale = {
       title: 'Заметки',
       placeholder: 'Пишите заметки здесь...',
       chars: '{n} символов',
+    },
+    todoWidget: {
+      title: 'Задачи',
+      placeholder: 'Добавить задачу...',
+      empty: 'Задач пока нет.',
     },
     browserBookmarks: {
       title: 'Закладки браузера',
@@ -245,6 +275,11 @@ const widgetCopyByLocale = {
       placeholder: '在这里写下你的笔记...',
       chars: '{n} 个字符',
     },
+    todoWidget: {
+      title: '任务',
+      placeholder: '添加任务...',
+      empty: '还没有任务。',
+    },
     browserBookmarks: {
       title: '浏览器书签',
       searchPlaceholder: '搜索浏览器书签...',
@@ -285,6 +320,11 @@ const widgetCopyByLocale = {
       placeholder: 'ここにメモを書いてください...',
       chars: '{n} 文字',
     },
+    todoWidget: {
+      title: 'タスク',
+      placeholder: 'タスクを追加...',
+      empty: 'タスクはまだありません。',
+    },
     browserBookmarks: {
       title: 'ブラウザのブックマーク',
       searchPlaceholder: 'ブラウザのブックマークを検索...',
@@ -324,6 +364,11 @@ const widgetCopyByLocale = {
       title: 'Note',
       placeholder: 'Scrivi qui le tue note...',
       chars: '{n} caratteri',
+    },
+    todoWidget: {
+      title: 'Attività',
+      placeholder: 'Aggiungi attività...',
+      empty: 'Nessuna attività.',
     },
     browserBookmarks: {
       title: 'Segnalibri del browser',
@@ -367,7 +412,11 @@ function normalizeLocale(locale) {
 
 export function getWidgetCopy(locale) {
   const normalized = normalizeLocale(locale);
-  return widgetCopyByLocale[normalized] || widgetCopyByLocale.en;
+  const localized = widgetCopyByLocale[normalized] || {};
+  return {
+    ...widgetCopyByLocale.en,
+    ...localized,
+  };
 }
 
 export default getWidgetCopy;

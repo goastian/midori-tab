@@ -16,6 +16,15 @@ const DEFAULT_ENABLED = {
   todo: false,
 };
 
+const WIDGET_ALIASES = {
+  task: 'todo',
+  tasks: 'todo',
+};
+
+function normalizeWidgetKey(widget) {
+  return WIDGET_ALIASES[widget] || widget;
+}
+
 /**
  * Store that manages which widgets are enabled and their display order.
  * Supports drag & drop reordering via the `order` array.
@@ -38,8 +47,9 @@ const useWidgetsStore = defineStore('widgetsStore', {
   actions: {
     /** Toggles a widget on/off by key. */
     toggle(widget) {
-      if (widget in this.enabled) {
-        this.enabled[widget] = !this.enabled[widget];
+      const key = normalizeWidgetKey(widget);
+      if (key in this.enabled) {
+        this.enabled[key] = !this.enabled[key];
       }
     },
 
@@ -110,6 +120,14 @@ const useWidgetsStore = defineStore('widgetsStore', {
         store.order = [...DEFAULT_ORDER];
       }
 
+      if (raw.enabled && typeof raw.enabled === 'object') {
+        for (const [alias, target] of Object.entries(WIDGET_ALIASES)) {
+          if (raw.enabled[alias] && target in store.enabled) {
+            store.enabled[target] = true;
+          }
+        }
+      }
+
       if (!store.enabled || typeof store.enabled !== 'object') {
         store.enabled = { ...DEFAULT_ENABLED };
       }
@@ -122,6 +140,12 @@ const useWidgetsStore = defineStore('widgetsStore', {
       }
 
       // Ensure order array contains all widget keys
+      if (Array.isArray(store.order)) {
+        store.order = [...new Set(store.order.map(normalizeWidgetKey).filter(key => key in DEFAULT_ENABLED))];
+      } else {
+        store.order = [];
+      }
+
       for (const key of DEFAULT_ORDER) {
         if (!store.order.includes(key)) {
           store.order.push(key);
