@@ -93,7 +93,7 @@ export default {
   async mounted() {
     await this.restoreSettings();
     if (!hasValidCoordinates(this.settings) || this.shouldReplaceLegacyDefault()) {
-      await this.useCurrentLocation({ automatic: true });
+      await this.useApproximateLocation();
       if (hasValidCoordinates(this.settings)) return;
     }
     await this.refresh();
@@ -151,6 +151,36 @@ export default {
         // Fall back to coordinates so the widget never shows a wrong default city.
       }
       return `${this.i18n.$t('weather.currentLocationLabel')} (${formatCoordinates(latitude, longitude)})`;
+    },
+
+    async useApproximateLocation() {
+      this.loading = true;
+      this.error = '';
+
+      try {
+        const response = await fetch('https://ipwho.is/', { cache: 'default' });
+        if (!response.ok) throw new Error('IP location failed');
+
+        const payload = await response.json();
+        const latitude = Number(payload?.latitude);
+        const longitude = Number(payload?.longitude);
+        if (payload?.success === false || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          throw new Error('IP location unavailable');
+        }
+
+        this.settings.latitude = latitude;
+        this.settings.longitude = longitude;
+        this.settings.locationLabel = [payload.city, payload.country].filter(Boolean).join(', ')
+          || await this.resolveLocationLabel(latitude, longitude);
+        this.settings.locationSource = 'ip';
+        this.manualLocation = this.settings.locationLabel;
+        this.persistSettings();
+        await this.refresh(true);
+      } catch {
+        this.forecast = null;
+        this.error = this.i18n.$t('weather.errors.locationRequired');
+        this.loading = false;
+      }
     },
 
     persistSettings() {
