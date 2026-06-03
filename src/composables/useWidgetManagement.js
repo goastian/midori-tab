@@ -24,7 +24,9 @@ const WIDGET_COMPONENT_MAP = {
 
 export function useWidgetManagement({ widgetsStore, i18n }) {
   function getActiveGridWidgets() {
-    return GRID_KEYS.filter(key => widgetsStore.enabled[key]);
+    const orderedKeys = Array.isArray(widgetsStore.activeWidgets) ? widgetsStore.activeWidgets : [];
+    const normalizedOrder = orderedKeys.length ? orderedKeys : GRID_KEYS;
+    return normalizedOrder.filter(key => GRID_KEYS.includes(key) && widgetsStore.enabled[key]);
   }
 
   function getAvailableWidgets() {

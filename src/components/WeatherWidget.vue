@@ -45,10 +45,21 @@ const SETTINGS_KEY = 'midori_weather_settings_v1';
 function defaultSettings() {
   return {
     unit: 'metric',
-    latitude: 40.4168,
-    longitude: -3.7038,
-    locationLabel: 'Madrid',
+    latitude: null,
+    longitude: null,
+    locationLabel: '',
+    locationSource: 'auto',
   };
+}
+
+function hasValidCoordinates(settings) {
+  return Number.isFinite(Number(settings.latitude)) && Number.isFinite(Number(settings.longitude));
+}
+
+function formatCoordinates(latitude, longitude) {
+  const lat = Number(latitude).toFixed(2);
+  const lon = Number(longitude).toFixed(2);
+  return `${lat}, ${lon}`;
 }
 
 export default {
@@ -81,6 +92,10 @@ export default {
 
   async mounted() {
     await this.restoreSettings();
+    if (!hasValidCoordinates(this.settings) || this.shouldReplaceLegacyDefault()) {
+      await this.useCurrentLocation({ automatic: true });
+      if (hasValidCoordinates(this.settings)) return;
+    }
     await this.refresh();
   },
 
@@ -107,6 +122,37 @@ export default {
       }
     },
 
+    shouldReplaceLegacyDefault() {
+      const label = String(this.settings.locationLabel || '').trim().toLowerCase();
+      return (!this.settings.locationSource || this.settings.locationSource === 'auto') && label === 'madrid';
+    },
+
+    async resolveLocationLabel(latitude, longitude) {
+      try {
+        const endpoint = new URL('https://nominatim.openstreetmap.org/reverse');
+        endpoint.searchParams.set('format', 'jsonv2');
+        endpoint.searchParams.set('lat', String(latitude));
+        endpoint.searchParams.set('lon', String(longitude));
+        endpoint.searchParams.set('zoom', '10');
+        endpoint.searchParams.set('addressdetails', '1');
+        endpoint.searchParams.set('accept-language', this.i18n.locale || 'en');
+
+        const response = await fetch(endpoint.toString(), { cache: 'default' });
+        if (!response.ok) throw new Error('Reverse geocode failed');
+
+        const payload = await response.json();
+        const address = payload?.address || {};
+        const place = address.city || address.town || address.village || address.municipality || address.county || address.state;
+        const country = address.country;
+        if (place && country) return `${place}, ${country}`;
+        if (place) return place;
+        if (payload?.name) return payload.name;
+      } catch {
+        // Fall back to coordinates so the widget never shows a wrong default city.
+      }
+      return `${this.i18n.$t('weather.currentLocationLabel')} (${formatCoordinates(latitude, longitude)})`;
+    },
+
     persistSettings() {
       try {
         setJsonDebounced(SETTINGS_KEY, this.settings, { delayMs: 600, maxBytes: 12_000 });
@@ -123,6 +169,13 @@ export default {
     },
 
     async refresh(forceRefresh = false) {
+      if (!hasValidCoordinates(this.settings)) {
+        this.forecast = null;
+        this.error = this.i18n.$t('weather.errors.locationRequired');
+        this.loading = false;
+        return;
+      }
+
       this.loading = true;
       this.error = '';
       this.abortRequest();
@@ -150,9 +203,10 @@ export default {
       this.refresh(true);
     },
 
-    async useCurrentLocation() {
+    async useCurrentLocation(options = {}) {
+      const automatic = Boolean(options.automatic);
       if (!navigator.geolocation) {
-        this.error = this.i18n.$t('weather.errors.noGeolocation');
+        if (!automatic) this.error = this.i18n.$t('weather.errors.noGeolocation');
         return;
       }
 
@@ -170,12 +224,15 @@ export default {
 
         this.settings.latitude = position.coords.latitude;
         this.settings.longitude = position.coords.longitude;
-        this.settings.locationLabel = this.i18n.$t('weather.currentLocationLabel');
+        this.settings.locationLabel = await this.resolveLocationLabel(position.coords.latitude, position.coords.longitude);
+        this.settings.locationSource = 'auto';
         this.manualLocation = this.settings.locationLabel;
         this.persistSettings();
         await this.refresh(true);
       } catch {
-        this.error = this.i18n.$t('weather.errors.locationDenied');
+        this.error = automatic
+          ? this.i18n.$t('weather.errors.locationRequired')
+          : this.i18n.$t('weather.errors.locationDenied');
         this.loading = false;
       }
     },
@@ -203,7 +260,8 @@ export default {
 
         this.settings.latitude = result.latitude;
         this.settings.longitude = result.longitude;
-        this.settings.locationLabel = result.name;
+        this.settings.locationLabel = [result.name, result.country].filter(Boolean).join(', ');
+        this.settings.locationSource = 'manual';
         this.persistSettings();
         await this.refresh(true);
       } catch {
