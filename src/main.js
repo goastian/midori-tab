@@ -6,10 +6,13 @@ import persistedState from 'pinia-plugin-persistedstate';
 import './styles/tokens.css'
 import './styles/animations.css'
 import './style.css'
+import applyInitialTheme from './bootstrap/applyInitialTheme.js'
 import useI18nStore from './stores/useI18nStore.js'
 import useTabStore from './stores/useTabStore.js'
 import useThemeStore from './stores/useThemeStore.js'
 import { getBrowserInfo } from './utils/browserInfo.js'
+
+applyInitialTheme()
 
 const app = createApp(App)
 const pinia = createPinia();

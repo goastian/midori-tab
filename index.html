@@ -8,20 +8,6 @@
   </head>
   <body>
     <div id="app"></div>
-    <script>
-      // Apply theme instantly to prevent FOUC (flash of unstyled content)
-      try {
-        var raw = localStorage.getItem('tabStore');
-        if (raw) {
-          var s = JSON.parse(raw);
-          var theme = s.theme || 'light';
-          if (s.autoTheme) {
-            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-          }
-          document.documentElement.setAttribute('data-theme', theme);
-        }
-      } catch(e) {}
-    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

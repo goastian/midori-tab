@@ -60,18 +60,60 @@ function resolveMediaValue(media, keys) {
   return '';
 }
 
-function resolveWallpaperMedia(asset, manifest) {
+function normalizeMarketplaceApiBaseUrl(rawBaseUrl) {
+  if (!rawBaseUrl) return '';
+
+  const trimmed = String(rawBaseUrl).trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+  if (trimmed.endsWith('/api/v1')) return trimmed;
+  if (trimmed.endsWith('/api')) return `${trimmed}/v1`;
+  return `${trimmed}/api/v1`;
+}
+
+function resolveMarketplaceApiBaseUrl(explicitBaseUrl = '') {
+  if (explicitBaseUrl) {
+    return normalizeMarketplaceApiBaseUrl(explicitBaseUrl);
+  }
+
+  const envBase = typeof import.meta !== 'undefined'
+    ? (import.meta.env?.VITE_MARKETPLACE_API_BASE_URL || import.meta.env?.VITE_PASSPORT_SERVER || '')
+    : '';
+
+  return normalizeMarketplaceApiBaseUrl(envBase);
+}
+
+function buildWallpaperDownloadUrl(asset, explicitBaseUrl = '') {
+  if (!asset?.slug) {
+    return '';
+  }
+
+  const baseUrl = resolveMarketplaceApiBaseUrl(explicitBaseUrl);
+  if (!baseUrl) {
+    return `/api/v1/assets/${encodeURIComponent(asset.slug)}/download`;
+  }
+
+  return `${baseUrl}/assets/${encodeURIComponent(asset.slug)}/download`;
+}
+
+function resolveWallpaperMedia(asset, manifest, options = {}) {
   const payload = manifest.payload || {};
   const media = Array.isArray(payload.media) ? payload.media[0] : {};
   const preview = manifest.preview || {};
   const distribution = manifest.distribution || {};
+  const assetPreviewUrl = resolveMediaValue(asset, ['previewUrl', 'preview_url'])
+    || resolveMediaValue(asset?.preview, ['url', 'thumbnailUrl', 'smallUrl'])
+    || resolveMediaValue(asset, ['imageUrl', 'image_url']);
+  const assetDownloadUrl = resolveMediaValue(asset, ['downloadUrl', 'download_url'])
+    || buildWallpaperDownloadUrl(asset, options.apiBaseUrl);
   const finalUrl = resolveMediaValue(media, ['optimizedUrl', 'fullUrl', 'assetUrl', 'url'])
     || resolveMediaValue(distribution, ['assetUrl', 'downloadUrl', 'url'])
     || resolveMediaValue(preview, ['fullUrl', 'url'])
-    || asset.previewUrl
+    || assetDownloadUrl
+    || assetPreviewUrl
     || '';
   const previewUrl = resolveMediaValue(media, ['previewUrl', 'thumbnailUrl', 'thumbUrl'])
     || resolveMediaValue(preview, ['thumbnailUrl', 'smallUrl', 'url'])
+    || assetPreviewUrl
     || finalUrl;
   const srcSet = media?.srcset || media?.srcSet || preview?.srcset || preview?.srcSet || '';
 
@@ -150,14 +192,16 @@ export function buildMarketplaceThemeDefinition(asset) {
 export function buildMarketplaceWallpaperBackground(asset) {
   const manifest = asset?.manifest || {};
   const author = normalizeAuthor(asset.author);
-  const media = resolveWallpaperMedia(asset, manifest);
+  const media = resolveWallpaperMedia(asset, manifest, { apiBaseUrl: asset.apiBaseUrl || '' });
   const adaptiveWidth = getAdaptiveWallpaperWidth();
   const lowMemory = typeof navigator !== 'undefined' && Number(navigator.deviceMemory || 4) <= 2;
-  const imageUrl = optimizeRemoteImageUrl(media.finalUrl, {
+  const sourceUrl = media.finalUrl || asset.imageUrl || asset.previewUrl || buildWallpaperDownloadUrl(asset, asset.apiBaseUrl || '');
+  const previewSourceUrl = media.previewUrl || asset.previewUrl || asset.imageUrl || sourceUrl;
+  const imageUrl = optimizeRemoteImageUrl(sourceUrl, {
     width: adaptiveWidth,
     quality: lowMemory ? 50 : 72,
   });
-  const previewUrl = optimizeRemoteImageUrl(media.previewUrl || media.finalUrl, {
+  const previewUrl = optimizeRemoteImageUrl(previewSourceUrl, {
     width: 480,
     quality: 50,
   });
@@ -173,10 +217,10 @@ export function buildMarketplaceWallpaperBackground(asset) {
     source: 'marketplace',
     imageUrl,
     previewUrl,
-    imageSrcSet: buildImageSrcSet(media.finalUrl, media.srcSet),
+    imageSrcSet: buildImageSrcSet(sourceUrl, media.srcSet),
     authorName: author.name,
     authorUrl: author.url,
-    sourceUrl: media.finalUrl || imageUrl,
+    sourceUrl: sourceUrl || imageUrl,
   };
 }
 
@@ -190,8 +234,9 @@ export function normalizeMarketplaceAsset(rawAsset, options = {}) {
     : null;
   const appCompatibility = compatibility.app || {};
   const media = Array.isArray(manifest.payload?.media) ? manifest.payload.media[0] : null;
+  const apiBaseUrl = resolveMarketplaceApiBaseUrl(options.apiBaseUrl || '');
   const wallpaperMedia = rawAsset.type === 'wallpaper'
-    ? resolveWallpaperMedia(rawAsset, manifest)
+    ? resolveWallpaperMedia(rawAsset, manifest, { apiBaseUrl })
     : null;
   const lowMemory = typeof navigator !== 'undefined' && Number(navigator.deviceMemory || 4) <= 2;
 
@@ -214,11 +259,15 @@ export function normalizeMarketplaceAsset(rawAsset, options = {}) {
     manifest,
     checksum: version?.checksum || '',
     sizeBytes: version?.size_bytes || manifest.distribution?.sizeBytes || 0,
+    apiBaseUrl,
+    downloadUrl: rawAsset.type === 'wallpaper'
+      ? (resolveMediaValue(rawAsset, ['downloadUrl', 'download_url']) || buildWallpaperDownloadUrl(rawAsset, apiBaseUrl))
+      : '',
     previewUrl: rawAsset.type === 'wallpaper'
-      ? optimizeRemoteImageUrl(wallpaperMedia?.previewUrl || wallpaperMedia?.finalUrl, { width: 480, quality: 50 })
+      ? optimizeRemoteImageUrl(wallpaperMedia?.previewUrl || wallpaperMedia?.finalUrl || buildWallpaperDownloadUrl(rawAsset, apiBaseUrl), { width: 480, quality: 50 })
       : (media?.url || manifest.preview?.url || ''),
     imageUrl: rawAsset.type === 'wallpaper'
-      ? optimizeRemoteImageUrl(wallpaperMedia?.finalUrl, { width: getAdaptiveWallpaperWidth(), quality: lowMemory ? 50 : 72 })
+      ? optimizeRemoteImageUrl(wallpaperMedia?.finalUrl || buildWallpaperDownloadUrl(rawAsset, apiBaseUrl), { width: getAdaptiveWallpaperWidth(), quality: lowMemory ? 50 : 72 })
       : '',
     imageSrcSet: rawAsset.type === 'wallpaper'
       ? buildImageSrcSet(wallpaperMedia?.finalUrl, wallpaperMedia?.srcSet)

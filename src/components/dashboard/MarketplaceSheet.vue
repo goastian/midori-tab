@@ -7,7 +7,17 @@
       <div v-if="visible" class="marketplace-sheet">
         <div class="sheet-header">
           <span class="sheet-title">{{ i18n.$t('marketplace.title') }}</span>
-          <button class="sheet-close" type="button" @click="$emit('close')" :aria-label="i18n.$t('marketplace.close')">x</button>
+          <div class="sheet-actions">
+            <a
+              class="sheet-explore"
+              href="https://marketplace.astian.org"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ i18n.$t('marketplace.exploreMore') }}
+            </a>
+            <button class="sheet-close" type="button" @click="$emit('close')" :aria-label="i18n.$t('marketplace.close')">x</button>
+          </div>
         </div>
         <MarketplaceBrowser
           :types="['wallpaper', 'widget']"
@@ -77,10 +87,36 @@ export default {
   margin-bottom: 1rem;
 }
 
+.sheet-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .sheet-title {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--color-text, white);
+}
+
+.sheet-explore {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-primary, #04a469);
+  color: var(--color-text, white);
+  background: color-mix(in srgb, var(--color-primary, #04a469) 12%, transparent);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.sheet-explore:hover {
+  background: color-mix(in srgb, var(--color-primary, #04a469) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary, #04a469) 75%, white);
 }
 
 .sheet-close {

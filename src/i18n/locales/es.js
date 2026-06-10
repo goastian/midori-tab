@@ -142,6 +142,7 @@ export default {
     installed: 'Instalado',
     incompatible: 'No compatible',
     noDescription: 'Todavía no hay descripción disponible.',
+    exploreMore: 'Explorar más',
     openThemes: 'Explorar temas remotos',
     openAssets: 'Abrir catálogo',
     themeCtaTitle: 'Temas del marketplace',

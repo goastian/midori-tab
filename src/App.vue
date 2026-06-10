@@ -10,7 +10,7 @@
         v-if="showImageBackground && backgroundImage"
         v-show="imageReady"
         decoding="async"
-        fetchpriority="low"
+        fetchpriority="high"
         @load="imageReady = true"
       />
     </Transition>
@@ -90,6 +90,7 @@
         imageAuthor: "",
         imageAuthorLink: "",
         imageLink: "",
+        marketplaceBlobUrl: '',
         autoTheme: null,
         updateCheckIntervalId: null,
         updateForegroundListener: null,
@@ -137,8 +138,8 @@
     },
 
     mounted() {
-      this.load();
       this.loadSettings();
+      this.load();
       this.setupWallpaperRefresh();
       this.setupDeferredMounts();
       this.setupOmniLazyTriggers();
@@ -186,6 +187,7 @@
         } catch (_) { /* noop */ }
         this.omniRuntimeMessageListener = null;
       }
+      this.releaseMarketplaceBlobUrl();
     },
 
     methods: {
@@ -196,12 +198,14 @@
       async load() {
         if (this.tabStore.background?.type === 'MarketplaceWallpaper') {
           const background = this.tabStore.background;
-          this.applyBackgroundImage(background.imageUrl || '', background.imageSrcSet || '');
+          await this.loadMarketplaceWallpaper(background);
           this.imageAuthor = background.authorName || '';
           this.imageAuthorLink = background.authorUrl || '';
           this.imageLink = background.sourceUrl || background.imageUrl || '';
           return;
         }
+
+        this.releaseMarketplaceBlobUrl();
 
         if (this.tabStore.background?.type !== 'Unsplash') {
           this.applyBackgroundImage('', '');
@@ -223,15 +227,127 @@
         }
       },
 
-      applyBackgroundImage(url, srcSet = '') {
+      applyBackgroundImage(url, srcSet = '', options = {}) {
         const nextUrl = url || '';
         const nextSrcSet = srcSet || '';
+        const immediate = Boolean(options.immediate);
         if (this.backgroundImage === nextUrl && this.backgroundSrcSet === nextSrcSet) {
+          if (immediate && !this.imageReady) {
+            this.imageReady = true;
+          }
           return;
         }
-        this.imageReady = false;
+        this.imageReady = immediate;
         this.backgroundImage = nextUrl;
         this.backgroundSrcSet = nextSrcSet;
+      },
+
+      releaseMarketplaceBlobUrl() {
+        if (this.marketplaceBlobUrl && this.marketplaceBlobUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(this.marketplaceBlobUrl);
+        }
+        this.marketplaceBlobUrl = '';
+      },
+
+      isMarketplaceDownloadUrl(url) {
+        return typeof url === 'string' && /\/api\/v1\/assets\/[^/]+\/download(?:$|\?)/.test(url);
+      },
+
+      async preloadImage(url) {
+        if (!url) return;
+
+        await new Promise((resolve) => {
+          const img = new Image();
+          img.decoding = 'async';
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          img.src = url;
+        });
+      },
+
+      async resolveMarketplaceDownloadImage(downloadUrl, assetSlug) {
+        this.releaseMarketplaceBlobUrl();
+
+        try {
+          if (typeof caches !== 'undefined') {
+            const cache = await caches.open('midori-marketplace-wallpapers-v1');
+            const request = new Request(downloadUrl, { method: 'GET', mode: 'cors', credentials: 'omit' });
+            let response = await cache.match(request);
+
+            if (!response) {
+              response = await fetch(request);
+              const contentType = response?.headers?.get('content-type') || '';
+              if (response.ok && contentType.includes('image/')) {
+                await cache.put(request, response.clone());
+              }
+            }
+
+            if (!response?.ok) {
+              return '';
+            }
+
+            const responseContentType = response.headers?.get('content-type') || '';
+            if (!responseContentType.includes('image/')) {
+              return '';
+            }
+
+            const blob = await response.blob();
+            if (!blob || !blob.type || !blob.type.startsWith('image/')) {
+              return '';
+            }
+
+            this.marketplaceBlobUrl = URL.createObjectURL(blob);
+            return this.marketplaceBlobUrl;
+          }
+
+          const response = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
+          if (!response.ok) {
+            return '';
+          }
+
+          const blob = await response.blob();
+          if (!blob || !blob.type || !blob.type.startsWith('image/')) {
+            return '';
+          }
+
+          this.marketplaceBlobUrl = URL.createObjectURL(blob);
+          return this.marketplaceBlobUrl;
+        } catch (error) {
+          console.warn('Marketplace wallpaper fallback failed', { assetSlug, error });
+          return '';
+        }
+      },
+
+      async loadMarketplaceWallpaper(background) {
+        const previewUrl = background?.previewUrl || '';
+        const sourceUrl = background?.imageUrl || background?.downloadUrl || '';
+        const srcSet = background?.imageSrcSet || '';
+
+        if (previewUrl) {
+          this.applyBackgroundImage(previewUrl, '', { immediate: true });
+        }
+
+        if (!sourceUrl) {
+          if (!previewUrl) {
+            this.applyBackgroundImage('', '');
+          }
+          return;
+        }
+
+        let resolvedUrl = sourceUrl;
+        if (this.isMarketplaceDownloadUrl(sourceUrl)) {
+          resolvedUrl = await this.resolveMarketplaceDownloadImage(sourceUrl, background?.assetSlug || '');
+        }
+
+        if (!resolvedUrl) {
+          if (!previewUrl) {
+            this.applyBackgroundImage('', '');
+          }
+          return;
+        }
+
+        await this.preloadImage(resolvedUrl);
+        this.applyBackgroundImage(resolvedUrl, resolvedUrl.startsWith('blob:') ? '' : srcSet);
       },
 
       setupDeferredMounts() {

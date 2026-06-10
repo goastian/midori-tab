@@ -136,6 +136,7 @@ export default {
     installed: 'Installed',
     incompatible: 'Not compatible',
     noDescription: 'No description available yet.',
+      exploreMore: 'Explore more',
     openThemes: 'Browse remote themes',
     openAssets: 'Open catalog',
     themeCtaTitle: 'Marketplace themes',

@@ -18,6 +18,10 @@
     "https://api.rss2json.com/*",
     "https://api.unsplash.com/*",
     "https://api.github.com/*",
+    "https://api.open-meteo.com/*",
+    "https://geocoding-api.open-meteo.com/*",
+    "https://ipwho.is/*",
+    "https://nominatim.openstreetmap.org/*",
     "https://duckduckgo.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
@@ -63,5 +67,5 @@
       "strict_min_version": "109.0"
     }
   },
-  "version": "1.0.27"
+  "version": "1.0.29"
 }

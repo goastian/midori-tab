@@ -28,9 +28,17 @@ function createEmptyTypeMap(factory) {
 }
 
 const client = new MarketplaceApiClient();
-const CATALOG_CACHE_KEY = 'midori_marketplace_catalog_cache_v1';
+const CATALOG_CACHE_KEY = 'midori_marketplace_catalog_cache_v2';
 const CATALOG_CACHE_TTL_MS = 15 * 60 * 1000;
 const CATALOG_CACHE_MAX_ITEMS_PER_TYPE = 24;
+
+function toPlainObject(value, fallback) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return fallback;
+  }
+}
 
 const useCatalogStore = defineStore('catalogStore', {
   state: () => ({
@@ -119,12 +127,12 @@ const useCatalogStore = defineStore('catalogStore', {
     },
 
     async saveCachedCatalog(type, query, items, meta) {
-      const cache = await getJson(CATALOG_CACHE_KEY, {});
+      const cache = toPlainObject(await getJson(CATALOG_CACHE_KEY, {}), {});
       cache[type] = {
         timestamp: Date.now(),
         query,
-        items: items.slice(0, CATALOG_CACHE_MAX_ITEMS_PER_TYPE),
-        meta,
+        items: toPlainObject(items.slice(0, CATALOG_CACHE_MAX_ITEMS_PER_TYPE), []),
+        meta: toPlainObject(meta, { ...EMPTY_META }),
       };
       setJsonDebounced(CATALOG_CACHE_KEY, cache, { delayMs: 800, maxBytes: 350_000 });
     },
@@ -143,7 +151,7 @@ const useCatalogStore = defineStore('catalogStore', {
         });
 
         const items = Array.isArray(response?.data)
-          ? response.data.map(item => normalizeMarketplaceAsset(item))
+          ? response.data.map(item => normalizeMarketplaceAsset(item, { apiBaseUrl: client.baseUrl }))
           : [];
 
         this.catalogByType[normalizedType] = items;
