@@ -70,7 +70,7 @@ import DashboardIcon from './icons/DashboardIcon.vue';
 const STORAGE_KEY = 'midori_bookmarks';
 const CATS_KEY = 'midori_bookmark_categories';
 
-const DEFAULT_CATEGORIES = ['Personal', 'Work', 'Travel', 'Web3'];
+const DEFAULT_CATEGORIES = ['Personal', 'Travel', 'Web3'];
 
 const DEFAULT_BOOKMARKS = {
   Personal: [
@@ -80,10 +80,6 @@ const DEFAULT_BOOKMARKS = {
     { title: 'Aliexpress', url: 'https://s.click.aliexpress.com/e/_c2xYL4uP', domain: 'aliexpress.us' },
     { title: 'Ebay', url: 'https://ebay.us/Tg0rAn', domain: 'ebay.us' },
     { title: 'Stake', url: 'https://stake.com/?offer=astian200bon&c=pkaAEpM7', domain: 'stake.com' },
-  ],
-  Work: [
-    { title: 'GitHub', url: 'https://github.com', domain: 'github.com' },
-    { title: 'Notion', url: 'https://notion.so', domain: 'notion.so' },
   ],
   Travel: [
     { title: 'Kayak Hotels', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fhotels', domain: 'kayak.com' },
