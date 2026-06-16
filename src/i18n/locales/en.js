@@ -264,11 +264,13 @@ export default {
       blocked: 'Blocked',
       saved: 'Saved',
       time: 'Time',
+      today: 'Today',
     },
     categories: {
       trackers: 'Trackers',
       ads: 'Ads',
       fingerprinters: 'Fingerprint',
+      other: 'Other',
     },
   },
   calendar: {

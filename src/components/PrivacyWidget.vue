@@ -1,23 +1,14 @@
 <template>
   <div class="privacy-widget">
     <div class="pw-header">
-      <span class="pw-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9.5 12.5 11.5 14.5 15.5 9.5"/></svg>
-      </span>
+      <span class="pw-icon">🛡️</span>
       <span class="pw-title">{{ i18n.$t('privacy.title') }}</span>
-      <button class="pw-refresh" type="button" :disabled="loading" @click="refreshStats" :title="copy.refresh" :aria-label="copy.refresh">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.2 9A7 7 0 0 1 18.7 7.3L20 11"/><path d="M17.8 15A7 7 0 0 1 5.3 16.7L4 13"/></svg>
-      </button>
       <span v-if="!available" class="pw-badge pw-badge--off">{{ i18n.$t('common.off') }}</span>
-      <span v-else class="pw-badge pw-badge--on">{{ grade }}</span>
+      <span v-else class="pw-badge pw-badge--on">{{ statusLabel }}</span>
     </div>
 
-    <div v-if="loading" class="pw-empty">
-      <p class="pw-empty-text">{{ copy.loading }}</p>
-    </div>
-
-    <div v-else-if="!available" class="pw-empty">
-      <p class="pw-empty-text">{{ error || i18n.$t('privacy.notAvailable') }}</p>
+    <div v-if="!available" class="pw-empty">
+      <p class="pw-empty-text">{{ i18n.$t('privacy.notAvailable') }}</p>
     </div>
 
     <div v-else class="pw-stats">
@@ -33,30 +24,28 @@
         <span class="pw-stat-value">{{ formattedTime }}</span>
         <span class="pw-stat-label">{{ i18n.$t('privacy.stats.time') }}</span>
       </div>
+      <div class="pw-stat">
+        <span class="pw-stat-value">{{ formattedToday }}</span>
+        <span class="pw-stat-label">{{ i18n.$t('privacy.stats.today') }}</span>
+      </div>
     </div>
 
-    <div v-if="available && categories" class="pw-categories">
-      <div class="pw-cat" v-if="categories.trackers">
-        <span class="pw-cat-dot pw-cat-dot--tracker"></span>
-        <span class="pw-cat-label">{{ i18n.$t('privacy.categories.trackers') }}</span>
-        <span class="pw-cat-count">{{ categories.trackers }}</span>
-      </div>
-      <div class="pw-cat" v-if="categories.ads">
-        <span class="pw-cat-dot pw-cat-dot--ad"></span>
-        <span class="pw-cat-label">{{ i18n.$t('privacy.categories.ads') }}</span>
-        <span class="pw-cat-count">{{ categories.ads }}</span>
-      </div>
-      <div class="pw-cat" v-if="categories.fingerprinters">
-        <span class="pw-cat-dot pw-cat-dot--fp"></span>
-        <span class="pw-cat-label">{{ i18n.$t('privacy.categories.fingerprinters') }}</span>
-        <span class="pw-cat-count">{{ categories.fingerprinters }}</span>
+    <div v-if="available && visibleCategories.length" class="pw-categories">
+      <div
+        v-for="category in visibleCategories"
+        :key="category.key"
+        class="pw-cat"
+      >
+        <span :class="['pw-cat-dot', `pw-cat-dot--${category.key}`]"></span>
+        <span class="pw-cat-label">{{ category.label }}</span>
+        <span class="pw-cat-count">{{ formatCompact(category.count) }}</span>
       </div>
     </div>
+
   </div>
 </template>
 
 <script>
-import { getWidgetCopy } from '../i18n/widget-copy.js';
 import useI18nStore from '../stores/useI18nStore.js';
 
 /**
@@ -68,13 +57,8 @@ import useI18nStore from '../stores/useI18nStore.js';
 /** Firefox extension ID for Midori Privacy */
 const FIREFOX_PRIVACY_ID = 'midori-protection@astian.org';
 
-/**
- * Average page load time saved per blocked request (ms).
- * Conservative estimate: blocking a tracker/ad script saves ~50ms of load time.
- */
-const MS_PER_BLOCK = 50;
-const RETRY_BASE_MS = 30_000;
-const RETRY_MAX_MS = 5 * 60_000;
+const DEFAULT_MS_PER_BLOCK = 3_000;
+const DEFAULT_BYTES_PER_BLOCK = 45 * 1024;
 
 /**
  * Sends a cross-extension message to Midori Privacy.
@@ -117,120 +101,99 @@ export default {
       i18n: useI18nStore(),
       available: false,
       totalBlocked: 0,
+      todayBlocked: 0,
+      timeSavedMs: 0,
+      bandwidthSavedBytes: 0,
       categories: null,
+      enabled: false,
+      backgroundState: 'idle',
       grade: 'A+',
-      loading: false,
-      error: '',
-      retryTimer: null,
-      retryCount: 0,
-      visibilityListener: null,
-      fetchToken: 0,
+      pollTimer: null,
     };
   },
 
   computed: {
-    copy() {
-      return getWidgetCopy(this.i18n.locale).privacyWidget;
-    },
     /** Formats blocked count with K/M suffixes. */
     formattedBlocked() {
-      const n = this.totalBlocked;
-      if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-      if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-      return String(n);
+      return this.formatCompact(this.totalBlocked);
     },
 
-    /**
-     * Estimates bandwidth saved.
-     * Uses ~35KB per blocked request (industry average for ads/trackers).
-     */
+    formattedToday() {
+      return this.formatCompact(this.todayBlocked);
+    },
+
     formattedBandwidth() {
-      const bytes = this.totalBlocked * 35 * 1024;
+      const bytes = this.bandwidthSavedBytes || this.totalBlocked * DEFAULT_BYTES_PER_BLOCK;
       if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB';
       if (bytes >= 1_048_576) return (bytes / 1_048_576).toFixed(1) + ' MB';
       if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
       return bytes + ' B';
     },
 
-    /**
-     * Estimates time saved based on blocked requests.
-     * ~50ms saved per blocked request.
-     */
     formattedTime() {
-      const totalMs = this.totalBlocked * MS_PER_BLOCK;
+      const totalMs = this.timeSavedMs || this.totalBlocked * DEFAULT_MS_PER_BLOCK;
       const totalSec = totalMs / 1000;
       if (totalSec >= 3600) return (totalSec / 3600).toFixed(1) + 'h';
       if (totalSec >= 60) return (totalSec / 60).toFixed(1) + 'min';
       return totalSec.toFixed(0) + 's';
     },
+
+    statusLabel() {
+      if (!this.enabled) return this.i18n.$t('common.off');
+      if (this.backgroundState.includes('loading')) return this.i18n.$t('privacy.loading');
+      return this.grade;
+    },
+
+    visibleCategories() {
+      const categories = this.categories || {};
+      return [
+        ['ads', this.i18n.$t('privacy.categories.ads')],
+        ['trackers', this.i18n.$t('privacy.categories.trackers')],
+        ['fingerprinters', this.i18n.$t('privacy.categories.fingerprinters')],
+        ['other', this.i18n.$t('privacy.categories.other')],
+      ]
+        .map(([key, label]) => ({ key, label, count: Number(categories[key]) || 0 }))
+        .filter((category) => category.count > 0)
+        .slice(0, 4);
+    },
   },
 
   methods: {
+    formatCompact(value) {
+      const n = Number(value) || 0;
+      if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+      if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+      return String(n);
+    },
+
     /** Fetches stats from Midori Privacy extension. */
-    async fetchStats({ manual = false } = {}) {
-      if (document.visibilityState === 'hidden' && !manual) return;
-      const token = ++this.fetchToken;
-      this.loading = true;
-      this.error = '';
+    async fetchStats() {
       const data = await sendToPrivacy({ action: 'get-stats-summary', days: 7 });
-      if (token !== this.fetchToken) return;
       if (!data || data.error) {
         this.available = false;
-        this.error = data?.error || '';
-        this.loading = false;
-        this.scheduleRetry();
         return;
       }
       this.available = true;
       this.totalBlocked = data.totalBlocked || 0;
+      this.todayBlocked = data.todayBlocked || 0;
+      this.timeSavedMs = data.timeSavedMs || 0;
+      this.bandwidthSavedBytes = data.bandwidthSavedBytes || 0;
       this.categories = data.categories || null;
+      this.enabled = Boolean(data.enabled);
+      this.backgroundState = String(data.state || '').toLowerCase();
       this.grade = data.privacyGrade || 'A+';
-      this.retryCount = 0;
-      this.loading = false;
-      this.clearRetry();
-    },
-
-    refreshStats() {
-      this.clearRetry();
-      this.fetchStats({ manual: true });
-    },
-
-    scheduleRetry() {
-      this.clearRetry();
-      if (document.visibilityState === 'hidden') return;
-      const delay = Math.min(RETRY_BASE_MS * (2 ** this.retryCount), RETRY_MAX_MS);
-      this.retryCount += 1;
-      this.retryTimer = window.setTimeout(() => {
-        this.retryTimer = null;
-        this.fetchStats();
-      }, delay);
-    },
-
-    clearRetry() {
-      if (this.retryTimer) {
-        clearTimeout(this.retryTimer);
-        this.retryTimer = null;
-      }
     },
   },
 
   mounted() {
     this.fetchStats();
-    this.visibilityListener = () => {
-      if (document.visibilityState === 'hidden') {
-        this.clearRetry();
-        return;
-      }
-      this.fetchStats();
-    };
-    document.addEventListener('visibilitychange', this.visibilityListener);
+    // Poll quickly so new-tab stats track the blocker as pages load.
+    this.pollTimer = setInterval(() => this.fetchStats(), 1_000);
   },
 
   beforeUnmount() {
-    this.fetchToken += 1;
-    this.clearRetry();
-    if (this.visibilityListener) {
-      document.removeEventListener('visibilitychange', this.visibilityListener);
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
     }
   },
 };
@@ -239,10 +202,10 @@ export default {
 <style scoped>
 .privacy-widget {
   width: 100%;
-  background: var(--surface-island, #0F1520);
+  background: var(--surface-raised, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--nova-panel-radius, 14px);
-  padding: 0.85rem;
+  border-radius: var(--radius-md, 10px);
+  padding: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -256,21 +219,7 @@ export default {
 }
 
 .pw-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--color-primary, #04A469);
-  display: inline-flex;
-}
-
-.pw-icon svg,
-.pw-refresh svg {
-  width: 100%;
-  height: 100%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  font-size: 1.1rem;
 }
 
 .pw-title {
@@ -280,26 +229,11 @@ export default {
   flex: 1;
 }
 
-.pw-refresh {
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--color-border, rgba(126,196,168,0.15));
-  border-radius: var(--nova-control-radius, 8px);
-  background: var(--surface-control, #060A10);
-  color: var(--color-text-muted, #5A9A82);
-  cursor: pointer;
-}
-
-.pw-refresh:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
 .pw-badge {
   font-size: 0.65rem;
   font-weight: 700;
   padding: 0.15rem 0.45rem;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: 4px;
   text-transform: uppercase;
 }
 
@@ -330,7 +264,7 @@ export default {
 /* ── Stats row ── */
 .pw-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.5rem;
 }
 
@@ -340,8 +274,8 @@ export default {
   align-items: center;
   gap: 0.2rem;
   padding: 0.5rem 0.25rem;
-  background: var(--surface-control, rgba(30,45,61,0.5));
-  border-radius: var(--nova-control-radius, 8px);
+  background: var(--surface-overlay, rgba(30,45,61,0.5));
+  border-radius: var(--radius-sm, 6px);
 }
 
 .pw-stat-value {
@@ -349,6 +283,9 @@ export default {
   font-weight: 700;
   color: var(--color-primary, #04A469);
   line-height: 1;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .pw-stat-label {
@@ -356,13 +293,14 @@ export default {
   font-weight: 500;
   color: var(--color-text-muted, #5A9A82);
   text-transform: uppercase;
-  letter-spacing: 0;
+  letter-spacing: 0.03em;
 }
 
 /* ── Categories breakdown ── */
 .pw-categories {
-  display: flex;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem 0.75rem;
   padding-top: 0.25rem;
 }
 
@@ -371,6 +309,7 @@ export default {
   align-items: center;
   gap: 0.3rem;
   font-size: 0.7rem;
+  min-width: 0;
 }
 
 .pw-cat-dot {
@@ -380,16 +319,29 @@ export default {
   flex-shrink: 0;
 }
 
-.pw-cat-dot--tracker { background: #f59e0b; }
-.pw-cat-dot--ad { background: #ef4444; }
-.pw-cat-dot--fp { background: #8b5cf6; }
+.pw-cat-dot--trackers { background: #f59e0b; }
+.pw-cat-dot--ads { background: #ef4444; }
+.pw-cat-dot--fingerprinters { background: #8b5cf6; }
+.pw-cat-dot--cosmetics { background: #06b6d4; }
+.pw-cat-dot--pages { background: #22c55e; }
+.pw-cat-dot--other { background: #94a3b8; }
 
 .pw-cat-label {
   color: var(--color-text-muted, #5A9A82);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pw-cat-count {
   font-weight: 600;
   color: var(--color-text, #C4F0E0);
+  margin-left: auto;
+}
+
+@media (max-width: 520px) {
+  .pw-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

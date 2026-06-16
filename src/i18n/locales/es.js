@@ -270,11 +270,13 @@ export default {
       blocked: 'Bloqueados',
       saved: 'Ahorrado',
       time: 'Tiempo',
+      today: 'Hoy',
     },
     categories: {
       trackers: 'Trackers',
       ads: 'Anuncios',
       fingerprinters: 'Huella digital',
+      other: 'Otros',
     },
   },
   calendar: {
