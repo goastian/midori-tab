@@ -102,6 +102,7 @@ const useTabStore = defineStore('tabStore', {
           break;
         case 'Unsplash':
         case 'MarketplaceWallpaper':
+        case 'LocalFolder':
           {
             const previewUrl = this.background.previewUrl || this.background.imageUrl || '';
             body.style.backgroundColor = '#0f1520';

@@ -1,7 +1,7 @@
 <template>
   <div class="dropdown" @click="toggleDropdown" ref="dropdown">
     <button class="dropdown-button">
-      {{ currentValue || placeholder }}
+      {{ displayLabel(currentValue) || placeholder }}
       <span class="arrow" :class="{ open: isOpen }">▼</span>
     </button>
 
@@ -11,7 +11,7 @@
         :key="option"
         @click.stop="selectOption(option)"
       >
-        {{ option }}
+        {{ displayLabel(option) }}
       </li>
     </ul>
   </div>
@@ -25,6 +25,10 @@ export default {
     options: {
       type: Array,
       required: true,
+    },
+    labels: {
+      type: Object,
+      default: () => ({}),
     },
     placeholder: {
       type: String,
@@ -42,6 +46,10 @@ export default {
     },
   },
   methods: {
+    displayLabel(option) {
+      if (option === null || option === undefined) return ''
+      return this.labels[option] || option
+    },
     toggleDropdown() {
       this.isOpen = !this.isOpen
     },

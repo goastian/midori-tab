@@ -56,6 +56,23 @@ export default {
     autoThemeDesc: 'Cambia automáticamente claro de día, oscuro de noche',
 
     availableGradients: 'Gradientes disponibles',
+
+    bgGradient: 'Gradiente',
+    bgUnsplash: 'Unsplash',
+    bgLocalFolder: 'Carpeta local',
+    bgSolid: 'Sólido',
+    bgMarketplace: 'Marketplace',
+
+    localFolderTitle: 'Fondos desde tu computadora',
+    localFolderHint: 'Elige una carpeta o imágenes de tu computadora. Se quedan en tu dispositivo y se muestran al azar en cada nueva pestaña.',
+    chooseFolder: 'Elegir carpeta',
+    chooseImages: 'Elegir imágenes',
+    localLoading: 'Guardando imágenes…',
+    localImagesLoaded: '{count} imágenes listas',
+    localFolderEmpty: 'Aún no hay imágenes seleccionadas',
+    clearImages: 'Quitar',
+    localNoImages: 'No se encontraron imágenes válidas en la selección.',
+    localSaveError: 'No se pudieron guardar las imágenes seleccionadas.',
   },
 
   // Themes

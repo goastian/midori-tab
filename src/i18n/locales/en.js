@@ -54,6 +54,23 @@ export default {
     autoThemeDesc: 'Automatically switches light during day, dark at night',
 
     availableGradients: 'Available gradients',
+
+    bgGradient: 'Gradient',
+    bgUnsplash: 'Unsplash',
+    bgLocalFolder: 'Local folder',
+    bgSolid: 'Solid',
+    bgMarketplace: 'Marketplace',
+
+    localFolderTitle: 'Wallpapers from your computer',
+    localFolderHint: 'Pick a folder or images from your computer. They stay on your device and are shown at random on each new tab.',
+    chooseFolder: 'Choose folder',
+    chooseImages: 'Choose images',
+    localLoading: 'Saving images…',
+    localImagesLoaded: '{count} images ready',
+    localFolderEmpty: 'No images selected yet',
+    clearImages: 'Remove',
+    localNoImages: 'No valid images found in the selection.',
+    localSaveError: 'Could not save the selected images.',
   },
 
   themes: {

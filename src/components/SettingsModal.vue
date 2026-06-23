@@ -112,7 +112,7 @@ export default {
       ],
       openLinks: ['Self Tab', 'New Tab'],
       gradients: ['bg-orange', 'bg-green', 'bg-deal', 'bg-purple'],
-      backgrounds: ['Gradient', 'Unsplash'],
+      backgrounds: ['Gradient', 'Unsplash', 'LocalFolder'],
     };
   },
 

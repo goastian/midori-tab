@@ -62,6 +62,7 @@
   import useI18nStore from './stores/useI18nStore.js';
   import useTabStore from './stores/useTabStore.js';
   import UnsService from './services/UnsService.js';
+  import LocalWallpaperService from './services/LocalWallpaperService.js';
   import Minimalist from './pages/Min.vue';
   import SpaceSwitcher from './components/SpaceSwitcher.vue';
   import { useAutoTheme } from './composables/useAutoTheme.js';
@@ -91,6 +92,7 @@
         imageAuthorLink: "",
         imageLink: "",
         marketplaceBlobUrl: '',
+        localBlobUrl: '',
         autoTheme: null,
         updateCheckIntervalId: null,
         updateForegroundListener: null,
@@ -116,7 +118,7 @@
 
     computed: {
       showImageBackground() {
-        return ['Unsplash', 'MarketplaceWallpaper'].includes(this.tabStore.background?.type);
+        return ['Unsplash', 'MarketplaceWallpaper', 'LocalFolder'].includes(this.tabStore.background?.type);
       },
 
       showCredits() {
@@ -188,6 +190,7 @@
         this.omniRuntimeMessageListener = null;
       }
       this.releaseMarketplaceBlobUrl();
+      this.releaseLocalBlobUrl();
     },
 
     methods: {
@@ -198,6 +201,7 @@
       async load() {
         if (this.tabStore.background?.type === 'MarketplaceWallpaper') {
           const background = this.tabStore.background;
+          this.releaseLocalBlobUrl();
           await this.loadMarketplaceWallpaper(background);
           this.imageAuthor = background.authorName || '';
           this.imageAuthorLink = background.authorUrl || '';
@@ -206,6 +210,13 @@
         }
 
         this.releaseMarketplaceBlobUrl();
+
+        if (this.tabStore.background?.type === 'LocalFolder') {
+          await this.loadLocalWallpaper();
+          return;
+        }
+
+        this.releaseLocalBlobUrl();
 
         if (this.tabStore.background?.type !== 'Unsplash') {
           this.applyBackgroundImage('', '');
@@ -247,6 +258,40 @@
           URL.revokeObjectURL(this.marketplaceBlobUrl);
         }
         this.marketplaceBlobUrl = '';
+      },
+
+      releaseLocalBlobUrl() {
+        if (this.localBlobUrl && this.localBlobUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(this.localBlobUrl);
+        }
+        this.localBlobUrl = '';
+      },
+
+      async loadLocalWallpaper() {
+        this.imageAuthor = '';
+        this.imageAuthorLink = '';
+        this.imageLink = '';
+
+        const previousBlobUrl = this.localBlobUrl;
+        try {
+          const service = new LocalWallpaperService();
+          await service.setImagen();
+          const url = service.getUrl();
+          if (url) {
+            this.localBlobUrl = url;
+            await this.preloadImage(url);
+            this.applyBackgroundImage(url, '');
+          } else {
+            this.applyBackgroundImage('', '');
+          }
+        } catch (error) {
+          console.warn('Local wallpaper load failed', error);
+          this.applyBackgroundImage('', '');
+        } finally {
+          if (previousBlobUrl && previousBlobUrl !== this.localBlobUrl && previousBlobUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(previousBlobUrl);
+          }
+        }
       },
 
       isMarketplaceDownloadUrl(url) {
@@ -365,7 +410,7 @@
 
       setupWallpaperRefresh() {
         const listener = () => {
-          if (this.tabStore.background?.type === 'Unsplash') {
+          if (['Unsplash', 'LocalFolder'].includes(this.tabStore.background?.type)) {
             this.load();
           }
         };
