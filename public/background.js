@@ -9,6 +9,7 @@ const OMNI_QUERY_TTL = 5_000;
 const OMNI_QUERY_CACHE_MAX = 50;
 const OMNI_MAX_RESULTS = 100;
 const OMNI_LOCALE_STORAGE_KEY = 'midori-locale';
+const OMNI_STATIC_ACTIONS_FILE = 'omni-static-actions.json';
 const omniQueryCache = new Map();
 
 const OMNI_SHARED_CONFIG_FILE = 'omni-ui.shared.json';
@@ -196,6 +197,7 @@ async function ensureOmniContentScript(tabId) {
 // ─── Differential Tabs Cache ───────────────────────────────────────────────
 const tabsCache = new Map(); // tabId → normalised tab object
 let tabsCacheReady = false;
+let tabsPrunePromise = null;
 const TABS_CACHE_MAX = 500;
 
 function normaliseTab(tab) {
@@ -238,28 +240,38 @@ function rememberTab(tab) {
 
 async function pruneTabsCache() {
   if (tabsCache.size <= TABS_CACHE_MAX) return;
+  if (tabsPrunePromise) return tabsPrunePromise;
 
-  const currentWindowTabs = await safeCallChrome(chrome.tabs.query.bind(chrome.tabs), { currentWindow: true });
-  const keepIds = new Set((currentWindowTabs || []).map((tab) => tab.id).filter(Boolean));
-  const recentEntries = Array.from(tabsCache.entries()).reverse();
-  const nextCache = new Map();
+  tabsPrunePromise = (async () => {
+    const currentWindowTabs = await safeCallChrome(chrome.tabs.query.bind(chrome.tabs), { currentWindow: true });
+    const keepIds = new Set((currentWindowTabs || []).map((tab) => tab.id).filter(Boolean));
+    const recentEntries = Array.from(tabsCache.entries()).reverse();
+    const nextCache = new Map();
 
-  for (const [tabId, tab] of recentEntries) {
-    if (keepIds.has(tabId)) {
-      nextCache.set(tabId, tab);
+    for (const [tabId, tab] of recentEntries) {
+      if (nextCache.size >= TABS_CACHE_MAX) break;
+      if (keepIds.has(tabId)) {
+        nextCache.set(tabId, tab);
+      }
     }
-  }
 
-  for (const [tabId, tab] of recentEntries) {
-    if (nextCache.size >= TABS_CACHE_MAX) break;
-    if (!nextCache.has(tabId)) {
-      nextCache.set(tabId, tab);
+    for (const [tabId, tab] of recentEntries) {
+      if (nextCache.size >= TABS_CACHE_MAX) break;
+      if (!nextCache.has(tabId)) {
+        nextCache.set(tabId, tab);
+      }
     }
-  }
 
-  tabsCache.clear();
-  for (const [tabId, tab] of Array.from(nextCache.entries()).reverse()) {
-    tabsCache.set(tabId, tab);
+    tabsCache.clear();
+    for (const [tabId, tab] of Array.from(nextCache.entries()).reverse()) {
+      tabsCache.set(tabId, tab);
+    }
+  })();
+
+  try {
+    await tabsPrunePromise;
+  } finally {
+    tabsPrunePromise = null;
   }
 }
 
@@ -347,6 +359,7 @@ async function getBookmarks() {
 
 // ─── Static Actions ─────────────────────────────────────────────────────────
 let staticActions = null;
+let staticActionsPromise = null;
 let platformOs = null;
 
 async function getPlatformOs() {
@@ -416,58 +429,53 @@ async function getOmniUiConfig(message = {}) {
   };
 }
 
-function buildStaticActions(isMac) {
+async function loadStaticActionTemplates() {
+  const response = await fetch(chrome.runtime.getURL(OMNI_STATIC_ACTIONS_FILE), { cache: 'no-cache' });
+  if (!response.ok) throw new Error(`Unable to fetch ${OMNI_STATIC_ACTIONS_FILE}`);
+  const payload = await response.json();
+  return Array.isArray(payload) ? payload : [];
+}
+
+function resolveActionKeys(keys, isMac) {
   const mod = isMac ? '⌘' : 'Ctrl';
   const alt = isMac ? '⌥' : 'Alt';
   const shift = '⇧';
 
-  return [
-    { title: 'New tab', desc: 'Open a new tab', type: 'action', action: 'new-tab', emoji: true, emojiChar: '✨', keycheck: true, keys: [mod, 'T'] },
-    { title: 'Bookmark page', desc: 'Bookmark the current page', type: 'action', action: 'create-bookmark', emoji: true, emojiChar: '📕', keycheck: true, keys: [mod, 'D'] },
-    { title: 'Fullscreen', desc: 'Toggle fullscreen', type: 'action', action: 'fullscreen', emoji: true, emojiChar: '🖥', keycheck: true, keys: isMac ? [mod, 'Ctrl', 'F'] : ['F11'] },
-    { title: 'Reload', desc: 'Reload the page', type: 'action', action: 'reload', emoji: true, emojiChar: '♻️', keycheck: true, keys: isMac ? [mod, shift, 'R'] : ['F5'] },
-    { title: 'Compose email', desc: 'Compose a new email', type: 'action', action: 'email', emoji: true, emojiChar: '✉️', keycheck: true, keys: [alt, shift, 'C'] },
-    { title: 'Print page', desc: 'Print the current page', type: 'action', action: 'print', emoji: true, emojiChar: '🖨️', keycheck: true, keys: [mod, 'P'] },
-    { title: 'Scroll to top', desc: 'Scroll to the top of the page', type: 'action', action: 'scroll-top', emoji: true, emojiChar: '👆', keycheck: true, keys: isMac ? [mod, '↑'] : ['Home'] },
-    { title: 'Scroll to bottom', desc: 'Scroll to the bottom of the page', type: 'action', action: 'scroll-bottom', emoji: true, emojiChar: '👇', keycheck: true, keys: isMac ? [mod, '↓'] : ['End'] },
-    { title: 'Go back', desc: 'Go back in history', type: 'action', action: 'go-back', emoji: true, emojiChar: '👈', keycheck: true, keys: isMac ? [mod, '←'] : ['Alt', '←'] },
-    { title: 'Go forward', desc: 'Go forward in history', type: 'action', action: 'go-forward', emoji: true, emojiChar: '👉', keycheck: true, keys: isMac ? [mod, '→'] : ['Alt', '→'] },
-    { title: 'Duplicate tab', desc: 'Duplicate the current tab', type: 'action', action: 'duplicate-tab', emoji: true, emojiChar: '📋', keycheck: true, keys: [alt, shift, 'D'] },
-    { title: 'Close tab', desc: 'Close the current tab', type: 'action', action: 'close-tab', emoji: true, emojiChar: '🗑', keycheck: true, keys: [mod, 'W'] },
-    { title: 'Close window', desc: 'Close the current window', type: 'action', action: 'close-window', emoji: true, emojiChar: '💥', keycheck: true, keys: [mod, shift, 'W'] },
-    { title: 'Incognito mode', desc: 'Open an incognito window', type: 'action', action: 'incognito', emoji: true, emojiChar: '🕵️', keycheck: true, keys: [mod, shift, 'N'] },
-    { title: 'Browsing history', desc: 'Open browsing history', type: 'action', action: 'history', emoji: true, emojiChar: '🗂', keycheck: true, keys: isMac ? [mod, 'Y'] : ['Ctrl', 'H'] },
-    { title: 'Downloads', desc: 'Browse your downloads', type: 'action', action: 'downloads', emoji: true, emojiChar: '📦', keycheck: true, keys: isMac ? [mod, shift, 'J'] : ['Ctrl', 'J'] },
-    { title: 'Extensions', desc: 'Manage extensions', type: 'action', action: 'extensions', emoji: true, emojiChar: '🧩', keycheck: false },
-    { title: 'Settings', desc: 'Open browser settings', type: 'action', action: 'settings', emoji: true, emojiChar: '⚙️', keycheck: false },
-    { title: 'Manage browsing data', desc: 'Clear browsing data', type: 'action', action: 'manage-data', emoji: true, emojiChar: '🔬', keycheck: false },
-    { title: 'Clear all browsing data', desc: 'Remove all browsing data', type: 'action', action: 'remove-all', emoji: true, emojiChar: '🧹', keycheck: false },
-    { title: 'Clear history', desc: 'Clear browsing history', type: 'action', action: 'remove-history', emoji: true, emojiChar: '🗂', keycheck: false },
-    { title: 'Clear cookies', desc: 'Clear all cookies', type: 'action', action: 'remove-cookies', emoji: true, emojiChar: '🍪', keycheck: false },
-    { title: 'Clear cache', desc: 'Clear the browser cache', type: 'action', action: 'remove-cache', emoji: true, emojiChar: '🗄', keycheck: false },
-    { title: 'Clear local storage', desc: 'Clear local storage', type: 'action', action: 'remove-local-storage', emoji: true, emojiChar: '📦', keycheck: false },
-    { title: 'Clear passwords', desc: 'Clear saved passwords', type: 'action', action: 'remove-passwords', emoji: true, emojiChar: '🔑', keycheck: false },
-    // — Quick-create URLs
-    { title: 'New Notion page', desc: 'Create a new Notion page', type: 'action', action: 'url', url: 'https://notion.new', emoji: true, emojiChar: '📓', keycheck: false },
-    { title: 'New Google Doc', desc: 'Create a new Google Doc', type: 'action', action: 'url', url: 'https://docs.new', emoji: true, emojiChar: '📄', keycheck: false },
-    { title: 'New Google Sheet', desc: 'Create a new spreadsheet', type: 'action', action: 'url', url: 'https://sheets.new', emoji: true, emojiChar: '📊', keycheck: false },
-    { title: 'New Google Slides', desc: 'Create a new presentation', type: 'action', action: 'url', url: 'https://slides.new', emoji: true, emojiChar: '📑', keycheck: false },
-    { title: 'New GitHub repo', desc: 'Create a new GitHub repository', type: 'action', action: 'url', url: 'https://github.new', emoji: true, emojiChar: '🐙', keycheck: false },
-    { title: 'New GitHub gist', desc: 'Create a new Gist', type: 'action', action: 'url', url: 'https://gist.new', emoji: true, emojiChar: '📝', keycheck: false },
-    { title: 'New CodePen pen', desc: 'Create a new CodePen pen', type: 'action', action: 'url', url: 'https://pen.new', emoji: true, emojiChar: '🖊', keycheck: false },
-    { title: 'New Figma file', desc: 'Create a new Figma file', type: 'action', action: 'url', url: 'https://figma.new', emoji: true, emojiChar: '🎨', keycheck: false },
-    { title: 'New Linear issue', desc: 'Create a new Linear issue', type: 'action', action: 'url', url: 'https://linear.new', emoji: true, emojiChar: '🔷', keycheck: false },
-    { title: 'New Google Meet', desc: 'Start a Google Meet meeting', type: 'action', action: 'url', url: 'https://meet.new', emoji: true, emojiChar: '📹', keycheck: false },
-    { title: 'New Google Calendar event', desc: 'Add a Google Calendar event', type: 'action', action: 'url', url: 'https://cal.new', emoji: true, emojiChar: '📅', keycheck: false },
-    { title: 'New note (Google Keep)', desc: 'Add a note to Google Keep', type: 'action', action: 'url', url: 'https://note.new', emoji: true, emojiChar: '🗒', keycheck: false },
-    { title: 'Convert to PDF', desc: 'Convert a file to PDF', type: 'action', action: 'url', url: 'https://pdf.new', emoji: true, emojiChar: '📄', keycheck: false },
-  ];
+  const selectedKeys = Array.isArray(keys) ? keys : keys?.[isMac ? 'mac' : 'default'];
+  if (!Array.isArray(selectedKeys)) return undefined;
+  return selectedKeys.map((key) => {
+    if (key === '$mod') return mod;
+    if (key === '$alt') return alt;
+    if (key === '$shift') return shift;
+    return key;
+  });
+}
+
+async function buildStaticActions(isMac) {
+  const templates = await loadStaticActionTemplates();
+  return templates.map((template) => {
+    const action = { ...template };
+    const keys = resolveActionKeys(template.keys, isMac);
+    if (keys) {
+      action.keys = keys;
+    } else {
+      delete action.keys;
+    }
+    return action;
+  });
 }
 
 async function ensureStaticActions() {
   if (staticActions) return;
-  const os = await getPlatformOs();
-  staticActions = buildStaticActions(os === 'mac');
+  if (!staticActionsPromise) {
+    staticActionsPromise = (async () => {
+      const os = await getPlatformOs();
+      staticActions = await buildStaticActions(os === 'mac');
+    })().finally(() => {
+      staticActionsPromise = null;
+    });
+  }
+  await staticActionsPromise;
 }
 
 function isValidOmniUrl(str) {
@@ -1014,14 +1022,34 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true; // keep port open for async response
 });
 
+globalThis.__midoriOmniBackground = {
+  collectOmniData,
+  ensureStaticActions,
+  ensureTabsCache,
+  pruneTabsCache,
+  getDebugState() {
+    return {
+      tabsCacheReady,
+      tabsCacheSize: tabsCache.size,
+      bookmarksCacheReady: Array.isArray(bookmarksCache),
+      staticActionsReady: Array.isArray(staticActions),
+      omniQueryCacheSize: omniQueryCache.size,
+    };
+  },
+  resetDebugState() {
+    tabsCache.clear();
+    tabsCacheReady = false;
+    tabsPrunePromise = null;
+    bookmarksCache = null;
+    staticActions = null;
+    staticActionsPromise = null;
+    omniQueryCache.clear();
+  },
+};
+
 // ─── Keyboard shortcut & toolbar click ──────────────────────────────────────
 async function openOmniInTab(tab) {
   if (!tab) return;
-  await Promise.all([
-    ensureTabsCache().catch(() => undefined),
-    ensureStaticActions().catch(() => undefined),
-  ]);
-
   const url = tab.url || '';
   // Can't send to privileged system pages
   if (isRestrictedOmniUrl(url)) {
