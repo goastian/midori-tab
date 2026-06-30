@@ -59,6 +59,11 @@ const FIREFOX_PRIVACY_ID = 'midori-protection@astian.org';
 
 const DEFAULT_MS_PER_BLOCK = 3_000;
 const DEFAULT_BYTES_PER_BLOCK = 45 * 1024;
+const FOLLOW_UP_REFRESH_MS = 2_500;
+const EVENT_REFRESH_DEBOUNCE_MS = 2_000;
+const VISIBLE_REFRESH_MS = 45_000;
+const RETRY_REFRESH_BASE_MS = 30_000;
+const RETRY_REFRESH_MAX_MS = 60_000;
 
 /**
  * Sends a cross-extension message to Midori Privacy.
@@ -108,7 +113,17 @@ export default {
       enabled: false,
       backgroundState: 'idle',
       grade: 'A+',
-      pollTimer: null,
+      refreshTimer: null,
+      followUpTimer: null,
+      observer: null,
+      isInViewport: true,
+      inFlight: false,
+      lastFetchAt: 0,
+      lastStatsSignature: '',
+      failureCount: 0,
+      visibilityListener: null,
+      focusListener: null,
+      privacyStatsListener: null,
     };
   },
 
@@ -166,34 +181,185 @@ export default {
       return String(n);
     },
 
-    /** Fetches stats from Midori Privacy extension. */
-    async fetchStats() {
-      const data = await sendToPrivacy({ action: 'get-stats-summary', days: 7 });
-      if (!data || data.error) {
-        this.available = false;
+    isForeground() {
+      return typeof document === 'undefined' || document.visibilityState !== 'hidden';
+    },
+
+    canRefresh() {
+      return this.isInViewport && this.isForeground();
+    },
+
+    clearRefreshTimer() {
+      if (this.refreshTimer) {
+        clearTimeout(this.refreshTimer);
+        this.refreshTimer = null;
+      }
+    },
+
+    clearFollowUpTimer() {
+      if (this.followUpTimer) {
+        clearTimeout(this.followUpTimer);
+        this.followUpTimer = null;
+      }
+    },
+
+    scheduleFollowUpRefresh() {
+      this.clearFollowUpTimer();
+      this.followUpTimer = setTimeout(() => {
+        this.followUpTimer = null;
+        if (!this.canRefresh()) return;
+        this.fetchStats({ force: true });
+      }, FOLLOW_UP_REFRESH_MS);
+    },
+
+    scheduleFallbackRefresh() {
+      this.clearRefreshTimer();
+      if (!this.canRefresh()) return;
+
+      const retryDelay = Math.min(
+        RETRY_REFRESH_MAX_MS,
+        RETRY_REFRESH_BASE_MS * Math.max(1, this.failureCount),
+      );
+      const delay = this.available ? VISIBLE_REFRESH_MS : retryDelay;
+
+      this.refreshTimer = setTimeout(() => {
+        this.refreshTimer = null;
+        this.fetchStats();
+      }, delay);
+    },
+
+    refreshFromEvent() {
+      if (!this.canRefresh()) {
+        this.clearRefreshTimer();
         return;
       }
+
+      const now = Date.now();
+      if (now - this.lastFetchAt < EVENT_REFRESH_DEBOUNCE_MS) {
+        this.scheduleFallbackRefresh();
+        return;
+      }
+
+      this.fetchStats({ force: true });
+    },
+
+    setupVisibilityObserver() {
+      const root = this.$el;
+      if (!root || typeof IntersectionObserver === 'undefined') {
+        this.isInViewport = true;
+        this.scheduleFallbackRefresh();
+        return;
+      }
+
+      this.observer = new IntersectionObserver((entries) => {
+        const entry = entries[0];
+        this.isInViewport = Boolean(entry?.isIntersecting);
+
+        if (this.canRefresh()) {
+          this.refreshFromEvent();
+          return;
+        }
+
+        this.clearRefreshTimer();
+      }, { threshold: 0.1 });
+      this.observer.observe(root);
+    },
+
+    applyStats(data) {
+      const nextStats = {
+        totalBlocked: Number(data.totalBlocked) || 0,
+        todayBlocked: Number(data.todayBlocked) || 0,
+        timeSavedMs: Number(data.timeSavedMs) || 0,
+        bandwidthSavedBytes: Number(data.bandwidthSavedBytes) || 0,
+        categories: data.categories || null,
+        enabled: Boolean(data.enabled),
+        backgroundState: String(data.state || '').toLowerCase(),
+        grade: data.privacyGrade || 'A+',
+      };
+      const nextSignature = JSON.stringify(nextStats);
+
       this.available = true;
-      this.totalBlocked = data.totalBlocked || 0;
-      this.todayBlocked = data.todayBlocked || 0;
-      this.timeSavedMs = data.timeSavedMs || 0;
-      this.bandwidthSavedBytes = data.bandwidthSavedBytes || 0;
-      this.categories = data.categories || null;
-      this.enabled = Boolean(data.enabled);
-      this.backgroundState = String(data.state || '').toLowerCase();
-      this.grade = data.privacyGrade || 'A+';
+      if (nextSignature === this.lastStatsSignature) return;
+
+      this.lastStatsSignature = nextSignature;
+      this.totalBlocked = nextStats.totalBlocked;
+      this.todayBlocked = nextStats.todayBlocked;
+      this.timeSavedMs = nextStats.timeSavedMs;
+      this.bandwidthSavedBytes = nextStats.bandwidthSavedBytes;
+      this.categories = nextStats.categories;
+      this.enabled = nextStats.enabled;
+      this.backgroundState = nextStats.backgroundState;
+      this.grade = nextStats.grade;
+    },
+
+    /** Fetches stats from Midori Privacy extension. */
+    async fetchStats(options = {}) {
+      if (this.inFlight) return;
+      if (!options.force && !this.canRefresh()) {
+        this.clearRefreshTimer();
+        return;
+      }
+
+      this.inFlight = true;
+      this.lastFetchAt = Date.now();
+
+      try {
+        const data = await sendToPrivacy({ action: 'get-stats-summary', days: 7 });
+        if (!data || data.error) {
+          this.failureCount += 1;
+          this.available = false;
+          this.scheduleFallbackRefresh();
+          return;
+        }
+
+        this.failureCount = 0;
+        this.applyStats(data);
+        this.scheduleFallbackRefresh();
+      } finally {
+        this.inFlight = false;
+      }
     },
   },
 
   mounted() {
-    this.fetchStats();
-    // Poll quickly so new-tab stats track the blocker as pages load.
-    this.pollTimer = setInterval(() => this.fetchStats(), 1_000);
+    this.visibilityListener = () => {
+      if (this.isForeground()) {
+        this.refreshFromEvent();
+        return;
+      }
+      this.clearRefreshTimer();
+      this.clearFollowUpTimer();
+    };
+    this.focusListener = () => this.refreshFromEvent();
+    this.privacyStatsListener = () => this.refreshFromEvent();
+
+    document.addEventListener('visibilitychange', this.visibilityListener);
+    window.addEventListener('focus', this.focusListener);
+    window.addEventListener('midori:privacy-stats-updated', this.privacyStatsListener);
+
+    this.fetchStats({ force: true });
+    this.scheduleFollowUpRefresh();
+    this.$nextTick(() => this.setupVisibilityObserver());
   },
 
   beforeUnmount() {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
+    this.clearRefreshTimer();
+    this.clearFollowUpTimer();
+    if (this.observer) {
+      this.observer.disconnect();
+      this.observer = null;
+    }
+    if (this.visibilityListener) {
+      document.removeEventListener('visibilitychange', this.visibilityListener);
+      this.visibilityListener = null;
+    }
+    if (this.focusListener) {
+      window.removeEventListener('focus', this.focusListener);
+      this.focusListener = null;
+    }
+    if (this.privacyStatsListener) {
+      window.removeEventListener('midori:privacy-stats-updated', this.privacyStatsListener);
+      this.privacyStatsListener = null;
     }
   },
 };
