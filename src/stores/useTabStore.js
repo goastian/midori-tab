@@ -11,6 +11,20 @@ if (typeof window !== 'undefined' && window.matchMedia) {
     .addEventListener('change', (e) => { _systemDarkMode = e.matches; });
 }
 
+function sanitizePersistedBackground(background) {
+  if (!background || typeof background !== 'object') return background;
+  const clean = { ...background };
+  delete clean.imageSrcSet;
+
+  for (const key of Object.keys(clean)) {
+    if (typeof clean[key] === 'string' && clean[key].startsWith('blob:')) {
+      delete clean[key];
+    }
+  }
+
+  return clean;
+}
+
 const useTabStore = defineStore('tabStore', {
   state: () => ({
     tabName: 'Midori Tab',
@@ -143,6 +157,15 @@ const useTabStore = defineStore('tabStore', {
     enable: true,
     storage: localStorage,
     paths: ['tabName', 'theme', 'density', 'background', 'openLink', 'autoTheme', 'showAds'],
+    serializer: {
+      serialize(state) {
+        return JSON.stringify({
+          ...state,
+          background: sanitizePersistedBackground(state.background),
+        });
+      },
+      deserialize: JSON.parse,
+    },
   }
 })
 

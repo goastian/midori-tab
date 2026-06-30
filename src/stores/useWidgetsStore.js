@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { getJson, setJsonDebounced } from '../services/StorageService.js';
 import { resolveBuiltinWidgetKey } from '../utils/marketplaceAssets.js';
 
 /** Default widget order */
@@ -20,9 +21,23 @@ const WIDGET_ALIASES = {
   task: 'todo',
   tasks: 'todo',
 };
+const WIDGETS_ASYNC_STATE_KEY = 'midori_widgets_async_state_v1';
 
 function normalizeWidgetKey(widget) {
   return WIDGET_ALIASES[widget] || widget;
+}
+
+function readLegacyWidgetsState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('widgetsStore') || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+function normalizeInstalledWidgets(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
 /**
@@ -80,6 +95,7 @@ const useWidgetsStore = defineStore('widgetsStore', {
         this.order.push(builtinWidgetKey);
       }
 
+      this.persistAsyncState();
       return builtinWidgetKey;
     },
 
@@ -92,18 +108,36 @@ const useWidgetsStore = defineStore('widgetsStore', {
         this.order.push(installedWidget.builtinWidgetKey);
       }
 
+      this.persistAsyncState();
       return true;
+    },
+
+    async hydrateAsyncState() {
+      const legacy = readLegacyWidgetsState();
+      const asyncState = await getJson(WIDGETS_ASYNC_STATE_KEY, null);
+      const installedMarketplaceWidgets = normalizeInstalledWidgets(
+        asyncState?.installedMarketplaceWidgets || legacy.installedMarketplaceWidgets,
+      );
+
+      this.installedMarketplaceWidgets = installedMarketplaceWidgets;
+      this.persistAsyncState();
+    },
+
+    persistAsyncState() {
+      setJsonDebounced(WIDGETS_ASYNC_STATE_KEY, {
+        installedMarketplaceWidgets: normalizeInstalledWidgets(this.installedMarketplaceWidgets),
+      }, { delayMs: 800, maxBytes: 120_000 });
     },
   },
 
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['enabled', 'order', 'installedMarketplaceWidgets'],
+    paths: ['enabled', 'order'],
     afterRestore(ctx) {
       const store = ctx.store;
       // Migrate from old flat format { search: true } to new { enabled: { search: true } }
-      const raw = JSON.parse(localStorage.getItem('widgetsStore') || '{}');
+      const raw = readLegacyWidgetsState();
       if ('search' in raw && !('enabled' in raw)) {
         store.enabled = {
           search: !!raw.search,
@@ -152,9 +186,7 @@ const useWidgetsStore = defineStore('widgetsStore', {
         }
       }
 
-      if (!store.installedMarketplaceWidgets || typeof store.installedMarketplaceWidgets !== 'object') {
-        store.installedMarketplaceWidgets = {};
-      }
+      store.installedMarketplaceWidgets = {};
     },
   },
 });

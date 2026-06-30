@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { getJson, setJsonDebounced } from '../services/StorageService.js';
 import { buildMarketplaceThemeDefinition } from '../utils/marketplaceAssets.js';
 
 /**
@@ -271,6 +272,24 @@ const PREDEFINED_THEMES = {
     },
   },
 };
+const THEME_ASYNC_STATE_KEY = 'midori_theme_async_state_v1';
+
+function readLegacyThemeState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('themeStore') || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+function clonePlain(value, fallback) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return fallback;
+  }
+}
 
 const useThemeStore = defineStore('themeStore', {
   state: () => ({
@@ -344,6 +363,7 @@ const useThemeStore = defineStore('themeStore', {
       if (!theme) return null;
 
       this.marketplaceThemes[theme.id] = theme;
+      this.persistAsyncState();
       return theme.id;
     },
 
@@ -386,6 +406,7 @@ const useThemeStore = defineStore('themeStore', {
       if (this.activeThemeId === 'custom') {
         this.applyTheme();
       }
+      this.persistAsyncState();
     },
 
     getThemeAutoAdapt() {
@@ -395,15 +416,35 @@ const useThemeStore = defineStore('themeStore', {
     setAutoAdapt(themeId, value) {
       if (themeId === 'custom') {
         this.customTheme.autoAdapt = value;
+        this.persistAsyncState();
       }
       // Predefined themes always have autoAdapt; controlled per-theme via this flag
+    },
+
+    async hydrateAsyncState() {
+      const legacy = readLegacyThemeState();
+      const asyncState = await getJson(THEME_ASYNC_STATE_KEY, null);
+      const marketplaceThemes = asyncState?.marketplaceThemes || legacy.marketplaceThemes || {};
+      const customTheme = asyncState?.customTheme || legacy.customTheme || this.customTheme;
+
+      this.marketplaceThemes = clonePlain(marketplaceThemes, {});
+      this.customTheme = clonePlain(customTheme, this.customTheme);
+      this.applyTheme();
+      this.persistAsyncState();
+    },
+
+    persistAsyncState() {
+      setJsonDebounced(THEME_ASYNC_STATE_KEY, {
+        marketplaceThemes: clonePlain(this.marketplaceThemes, {}),
+        customTheme: clonePlain(this.customTheme, this.customTheme),
+      }, { delayMs: 800, maxBytes: 250_000 });
     },
   },
 
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['activeThemeId', 'marketplaceThemes', 'customTheme'],
+    paths: ['activeThemeId'],
   },
 });
 

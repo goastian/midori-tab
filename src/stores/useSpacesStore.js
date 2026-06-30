@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { getJson, setJsonDebounced } from '../services/StorageService.js';
 import useTabStore from './useTabStore.js';
 
 const DEFAULT_SPACES = [
@@ -24,6 +25,31 @@ const DEFAULT_SPACES = [
     background: { type: 'Gradient', default: true, class: 'bg-purple' },
   },
 ];
+const SPACES_ASYNC_STATE_KEY = 'midori_spaces_async_state_v1';
+
+function sanitizeSpaces(spaces) {
+  if (!Array.isArray(spaces)) return DEFAULT_SPACES.map(s => ({ ...s }));
+  return spaces.map(space => {
+    if (!space?.background) return { ...space };
+    const bg = { ...space.background };
+    // Strip ephemeral blob: URLs — they become invalid between sessions.
+    for (const key of Object.keys(bg)) {
+      if (typeof bg[key] === 'string' && bg[key].startsWith('blob:')) {
+        delete bg[key];
+      }
+    }
+    return { ...space, background: bg };
+  });
+}
+
+function readLegacySpacesState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('spacesStore') || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
+}
 
 const useSpacesStore = defineStore('spacesStore', {
   state: () => ({
@@ -46,6 +72,7 @@ const useSpacesStore = defineStore('spacesStore', {
       this.saveCurrentToSpace(this.activeSpaceId);
       this.activeSpaceId = spaceId;
       this.applySpace(space);
+      this.persistAsyncState();
     },
 
     saveCurrentToSpace(spaceId) {
@@ -71,6 +98,7 @@ const useSpacesStore = defineStore('spacesStore', {
 
       activeSpace.background = { ...background };
       this.applySpace(activeSpace);
+      this.persistAsyncState();
     },
 
     addSpace(name, icon, color) {
@@ -82,6 +110,7 @@ const useSpacesStore = defineStore('spacesStore', {
         color: color || '#00b894',
         background: { type: 'Unsplash', default: true, class: 'bg-orange' },
       });
+      this.persistAsyncState();
       return id;
     },
 
@@ -93,12 +122,14 @@ const useSpacesStore = defineStore('spacesStore', {
         this.applySpace(this.spaces.find(s => s.id === this.activeSpaceId));
       }
       this.spaces = this.spaces.filter(s => s.id !== spaceId);
+      this.persistAsyncState();
     },
 
     updateSpace(spaceId, updates) {
       const space = this.spaces.find(s => s.id === spaceId);
       if (space) {
         Object.assign(space, updates);
+        this.persistAsyncState();
       }
     },
 
@@ -106,35 +137,35 @@ const useSpacesStore = defineStore('spacesStore', {
       this.spaces = DEFAULT_SPACES.map(s => ({ ...s }));
       this.activeSpaceId = 'personal';
       this.enabled = false;
+      this.persistAsyncState();
+    },
+
+    async hydrateAsyncState() {
+      const legacy = readLegacySpacesState();
+      const asyncState = await getJson(SPACES_ASYNC_STATE_KEY, null);
+      const spaces = sanitizeSpaces(asyncState?.spaces || legacy.spaces || this.spaces);
+
+      this.spaces = spaces.length ? spaces : DEFAULT_SPACES.map(s => ({ ...s }));
+      if (!this.spaces.some(space => space.id === this.activeSpaceId)) {
+        this.activeSpaceId = this.spaces[0]?.id || 'personal';
+      }
+      if (this.enabled) {
+        this.applySpace(this.activeSpace);
+      }
+      this.persistAsyncState();
+    },
+
+    persistAsyncState() {
+      setJsonDebounced(SPACES_ASYNC_STATE_KEY, {
+        spaces: sanitizeSpaces(this.spaces),
+      }, { delayMs: 800, maxBytes: 250_000 });
     },
   },
 
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['spaces', 'activeSpaceId', 'enabled'],
-    serializer: {
-      serialize(state) {
-        const cleaned = {
-          ...state,
-          spaces: Array.isArray(state.spaces)
-            ? state.spaces.map(space => {
-                if (!space?.background) return space;
-                const bg = { ...space.background };
-                // Strip ephemeral blob: URLs — they become invalid between sessions
-                for (const key of Object.keys(bg)) {
-                  if (typeof bg[key] === 'string' && bg[key].startsWith('blob:')) {
-                    delete bg[key];
-                  }
-                }
-                return { ...space, background: bg };
-              })
-            : state.spaces,
-        };
-        return JSON.stringify(cleaned);
-      },
-      deserialize: JSON.parse,
-    },
+    paths: ['activeSpaceId', 'enabled'],
   },
 });
 

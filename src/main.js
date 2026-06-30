@@ -11,6 +11,7 @@ import useI18nStore from './stores/useI18nStore.js'
 import useTabStore from './stores/useTabStore.js'
 import useThemeStore from './stores/useThemeStore.js'
 import { getBrowserInfo } from './utils/browserInfo.js'
+import { hydrateAsyncStores } from './bootstrap/hydrateAsyncStores.js'
 
 applyInitialTheme()
 
@@ -34,3 +35,4 @@ document.documentElement.setAttribute('data-theme', initialTheme)
 themeStore.applyTheme(initialTheme)
 
 app.mount('#app')
+hydrateAsyncStores(pinia)

@@ -29,6 +29,7 @@ function createEmptyTypeMap(factory) {
 
 const client = new MarketplaceApiClient();
 const CATALOG_CACHE_KEY = 'midori_marketplace_catalog_cache_v2';
+const INSTALLED_ASSETS_KEY = 'midori_marketplace_installed_assets_v1';
 const CATALOG_CACHE_TTL_MS = 15 * 60 * 1000;
 const CATALOG_CACHE_MAX_ITEMS_PER_TYPE = 24;
 
@@ -37,6 +38,15 @@ function toPlainObject(value, fallback) {
     return JSON.parse(JSON.stringify(value));
   } catch {
     return fallback;
+  }
+}
+
+function readLegacyCatalogState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('catalogStore') || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
   }
 }
 
@@ -227,6 +237,7 @@ const useCatalogStore = defineStore('catalogStore', {
       if (!installedRecord) return null;
 
       this.installedAssets[asset.slug] = installedRecord;
+      this.persistAsyncState();
       return installedRecord;
     },
 
@@ -261,12 +272,23 @@ const useCatalogStore = defineStore('catalogStore', {
 
       return installedRecord;
     },
-  },
 
-  persist: {
-    enable: true,
-    storage: localStorage,
-    paths: ['installedAssets'],
+    async hydrateAsyncState() {
+      const legacy = readLegacyCatalogState();
+      const installedAssets = await getJson(INSTALLED_ASSETS_KEY, null);
+      this.installedAssets = toPlainObject(
+        installedAssets || legacy.installedAssets || {},
+        {},
+      );
+      this.persistAsyncState();
+    },
+
+    persistAsyncState() {
+      setJsonDebounced(INSTALLED_ASSETS_KEY, toPlainObject(this.installedAssets, {}), {
+        delayMs: 800,
+        maxBytes: 250_000,
+      });
+    },
   },
 });
 
