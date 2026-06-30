@@ -1,10 +1,15 @@
 import { defineStore } from 'pinia';
-import { locales, availableLanguages } from '../i18n/index.js';
+import {
+  DEFAULT_LOCALE,
+  availableLanguages,
+  isLocaleSupported,
+  loadLocaleMessages,
+  locales,
+  normalizeLocale,
+} from '../i18n/index.js';
 
-function normalizeLocale(code) {
-  if (!code) return '';
-  return String(code).trim().toLowerCase().split('-')[0];
-}
+const loadedLocaleMessages = { ...locales };
+const pendingLocaleLoads = new Map();
 
 function getBrowserLocale() {
   try {
@@ -29,12 +34,13 @@ function syncLocaleToExtensionStorage(locale) {
 
 const useI18nStore = defineStore('i18nStore', {
   state: () => ({
-    locale: locales[getBrowserLocale()] ? getBrowserLocale() : 'en',
+    locale: isLocaleSupported(getBrowserLocale()) ? getBrowserLocale() : DEFAULT_LOCALE,
+    messages: { ...loadedLocaleMessages },
   }),
 
   getters: {
     t(state) {
-      return locales[state.locale] || locales.en;
+      return state.messages[state.locale] || state.messages[DEFAULT_LOCALE];
     },
 
     languages() {
@@ -49,22 +55,45 @@ const useI18nStore = defineStore('i18nStore', {
   actions: {
     setLocale(code) {
       const normalized = normalizeLocale(code);
-      this.locale = locales[normalized] ? normalized : 'en';
+      this.locale = isLocaleSupported(normalized) ? normalized : DEFAULT_LOCALE;
       try {
         document.documentElement.lang = this.locale;
       } catch (e) {
       }
       syncLocaleToExtensionStorage(this.locale);
+      this.loadLocale(this.locale);
     },
 
     ensureLocale() {
       const normalized = normalizeLocale(this.locale);
-      this.locale = locales[normalized] ? normalized : 'en';
+      this.locale = isLocaleSupported(normalized) ? normalized : DEFAULT_LOCALE;
       try {
         document.documentElement.lang = this.locale;
       } catch (e) {
       }
       syncLocaleToExtensionStorage(this.locale);
+      this.loadLocale(this.locale);
+    },
+
+    async loadLocale(code) {
+      const normalized = isLocaleSupported(code) ? normalizeLocale(code) : DEFAULT_LOCALE;
+      if (this.messages[normalized]) return this.messages[normalized];
+      if (pendingLocaleLoads.has(normalized)) return pendingLocaleLoads.get(normalized);
+
+      const request = loadLocaleMessages(normalized)
+        .then(({ code: loadedCode, messages }) => {
+          this.messages = {
+            ...this.messages,
+            [loadedCode]: messages,
+          };
+          return messages;
+        })
+        .finally(() => {
+          pendingLocaleLoads.delete(normalized);
+        });
+
+      pendingLocaleLoads.set(normalized, request);
+      return request;
     },
 
     /**
@@ -85,9 +114,9 @@ const useI18nStore = defineStore('i18nStore', {
         return obj;
       };
 
-      const current = resolveFrom(locales[this.locale] || locales.en);
+      const current = resolveFrom(this.messages[this.locale] || this.messages[DEFAULT_LOCALE]);
       if (typeof current === 'string' || typeof current === 'number') return current;
-      const fallback = resolveFrom(locales.en);
+      const fallback = resolveFrom(this.messages[DEFAULT_LOCALE]);
       if (typeof fallback === 'string' || typeof fallback === 'number') return fallback;
 
       for (const part of parts) {

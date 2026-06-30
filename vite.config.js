@@ -19,7 +19,7 @@ function classifyBundleFile(fileName) {
   if (fileName === 'omni-content.js') return 'content-script';
   if (fileName === 'index.js') return 'index';
   if (fileName === 'vendor.js' || /^assets\/vendor-.*\.js$/.test(fileName)) return 'vendor';
-  if (/^assets\/i18n-locales-.*\.js$/.test(fileName)) return 'i18n-locales';
+  if (/^assets\/i18n-[a-z]{2}-.*\.js$/.test(fileName)) return 'i18n-locale';
   if (/^assets\/omni-.*\.(js|css)$/.test(fileName)) return 'omni';
   if (/^assets\/marketplace-.*\.(js|css)$/.test(fileName)) return 'marketplace';
   if (fileName.endsWith('.css')) return 'css';
@@ -135,7 +135,8 @@ function manualChunks(id) {
   }
 
   if (id.includes('/src/i18n/locales/')) {
-    return 'i18n-locales';
+    const match = id.match(/\/src\/i18n\/locales\/([a-z]{2})\.js$/);
+    return match ? `i18n-${match[1]}` : undefined;
   }
 
   if (id.includes('/src/omni/')) {
