@@ -69,7 +69,7 @@
   import useThemeStore from './stores/useThemeStore.js';
 
   const MIDORI_DOWNLOAD_URL = 'https://astian.org/midori-browser/download';
-  const UPDATE_CHECK_INTERVAL_MS = 10 * 60 * 1000;
+  const UPDATE_CHECK_WINDOW_MS = 10 * 60 * 1000;
   const UPDATE_ERROR_RETRY_INTERVAL_MS = 2 * 60 * 1000;
   const UPDATE_FOREGROUND_DEBOUNCE_MS = 15 * 1000;
 
@@ -94,11 +94,12 @@
         marketplaceBlobUrl: '',
         localBlobUrl: '',
         autoTheme: null,
-        updateCheckIntervalId: null,
         updateForegroundListener: null,
         lastForegroundUpdateCheckAt: 0,
+        updateBrowserInfo: null,
+        updateCheckInFlight: false,
         updateService: markRaw(new MidoriUpdateService({
-          checkIntervalMs: UPDATE_CHECK_INTERVAL_MS,
+          checkIntervalMs: UPDATE_CHECK_WINDOW_MS,
           errorRetryIntervalMs: UPDATE_ERROR_RETRY_INTERVAL_MS,
         })),
         updateNotice: {
@@ -169,10 +170,6 @@
       // Detener auto theme
       if (this.autoTheme) {
         this.autoTheme.stop();
-      }
-      if (this.updateCheckIntervalId) {
-        clearInterval(this.updateCheckIntervalId);
-        this.updateCheckIntervalId = null;
       }
       if (this.updateForegroundListener) {
         window.removeEventListener('focus', this.updateForegroundListener);
@@ -398,8 +395,13 @@
       setupDeferredMounts() {
         const enable = async () => {
           this.renderSmartSuggestions = true;
-          await this.checkMidoriUpdate();
-          this.startMidoriUpdatePolling();
+          if (!this.getUpdateBrowserInfo().isMidori) {
+            return;
+          }
+          this.syncUpdateNoticeFromCache();
+          if (this.shouldRevalidateMidoriUpdate()) {
+            await this.checkMidoriUpdate();
+          }
         };
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
           window.requestIdleCallback(enable, { timeout: 1000 });
@@ -471,7 +473,13 @@
           }
 
           this.lastForegroundUpdateCheckAt = now;
-          this.checkMidoriUpdate();
+          if (!this.getUpdateBrowserInfo().isMidori) {
+            return;
+          }
+          this.syncUpdateNoticeFromCache(now);
+          if (this.shouldRevalidateMidoriUpdate(now)) {
+            this.checkMidoriUpdate({ now });
+          }
         };
 
         this.updateForegroundListener = listener;
@@ -479,37 +487,89 @@
         document.addEventListener('visibilitychange', listener);
       },
 
-      startMidoriUpdatePolling() {
-        if (this.updateCheckIntervalId) {
-          clearInterval(this.updateCheckIntervalId);
+      getUpdateBrowserInfo() {
+        if (!this.updateBrowserInfo) {
+          this.updateBrowserInfo = getBrowserInfo();
         }
-
-        this.updateCheckIntervalId = setInterval(() => {
-          this.checkMidoriUpdate();
-        }, UPDATE_CHECK_INTERVAL_MS);
+        return this.updateBrowserInfo;
       },
 
-      async checkMidoriUpdate() {
+      applyUpdateResult(result) {
+        if (result.eligible) {
+          this.updateNotice = {
+            visible: true,
+            latestVersion: result.latestVersion || '',
+          };
+          return;
+        }
+
+        if (!result.deferredToday) {
+          this.updateNotice = {
+            visible: false,
+            latestVersion: result.latestVersion || '',
+          };
+        }
+      },
+
+      syncUpdateNoticeFromCache(now = Date.now()) {
+        const browserInfo = this.getUpdateBrowserInfo();
+        if (!browserInfo.isMidori) {
+          return null;
+        }
+
+        const state = this.updateService.getCachedState();
+        const result = this.updateService.getEligibility({
+          browserInfo,
+          currentVersion: APP_VERSION,
+          state,
+          now,
+        });
+        this.applyUpdateResult(result);
+        return { state, result };
+      },
+
+      shouldRevalidateMidoriUpdate(now = Date.now()) {
+        const browserInfo = this.getUpdateBrowserInfo();
+        if (!browserInfo.isMidori) {
+          return false;
+        }
+
+        const state = this.updateService.getCachedState();
+        const lastCheckedAt = Number(state.lastCheckedAt) || 0;
+        if (!lastCheckedAt) {
+          return true;
+        }
+
+        const activeWindowMs = state.lastResult === 'error'
+          ? UPDATE_ERROR_RETRY_INTERVAL_MS
+          : UPDATE_CHECK_WINDOW_MS;
+        return now - lastCheckedAt >= activeWindowMs;
+      },
+
+      async checkMidoriUpdate(options = {}) {
+        if (this.updateCheckInFlight) {
+          return;
+        }
+
+        const browserInfo = this.getUpdateBrowserInfo();
+        if (!browserInfo.isMidori) {
+          return;
+        }
+
+        this.updateCheckInFlight = true;
         try {
-          const browserInfo = getBrowserInfo();
           const result = await this.updateService.checkForUpdate({
             browserInfo,
             currentVersion: APP_VERSION,
+            now: options.now,
+            force: options.force,
           });
 
-          if (result.eligible) {
-            this.updateNotice = {
-              visible: true,
-              latestVersion: result.latestVersion || '',
-            };
-          } else if (!result.deferredToday) {
-            this.updateNotice = {
-              visible: false,
-              latestVersion: result.latestVersion || '',
-            };
-          }
+          this.applyUpdateResult(result);
         } catch (error) {
           console.warn('Midori update check failed:', error);
+        } finally {
+          this.updateCheckInFlight = false;
         }
       },
 
