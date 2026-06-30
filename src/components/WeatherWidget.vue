@@ -39,8 +39,18 @@
 import useI18nStore from '../stores/useI18nStore.js';
 import weatherService from '../services/WeatherService.js';
 import { getJson, setJsonDebounced } from '../services/StorageService.js';
+import { WIDGET_COST, createWidgetRuntime } from '../composables/useWidgetRuntime.js';
 
 const SETTINGS_KEY = 'midori_weather_settings_v1';
+const WEATHER_TTL_MS = 10 * 60 * 1000;
+const WIDGET_POLICY = Object.freeze({
+  key: 'weather',
+  cost: WIDGET_COST.MEDIUM,
+  usesNetwork: true,
+  ttlMs: WEATHER_TTL_MS,
+  stale: true,
+  refresh: 'visible, foreground, manual, location-change',
+});
 
 function defaultSettings() {
   return {
@@ -74,6 +84,8 @@ export default {
       manualLocation: '',
       settings: defaultSettings(),
       requestController: null,
+      widgetPolicy: WIDGET_POLICY,
+      widgetRuntime: null,
     };
   },
 
@@ -92,14 +104,16 @@ export default {
 
   async mounted() {
     await this.restoreSettings();
-    if (!hasValidCoordinates(this.settings) || this.shouldReplaceLegacyDefault()) {
-      await this.useApproximateLocation();
-      if (hasValidCoordinates(this.settings)) return;
-    }
-    await this.refresh();
+    this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
+      onVisible: () => this.loadWhenVisible(),
+      onFocus: () => this.loadWhenVisible(),
+      onHidden: () => this.abortRequest(),
+    });
+    this.$nextTick(() => this.widgetRuntime?.mount());
   },
 
   beforeUnmount() {
+    this.widgetRuntime?.dispose();
     this.abortRequest();
   },
 
@@ -196,6 +210,16 @@ export default {
         this.requestController.abort();
         this.requestController = null;
       }
+    },
+
+    async loadWhenVisible() {
+      return this.widgetRuntime?.runWhenVisible(async () => {
+        if (!hasValidCoordinates(this.settings) || this.shouldReplaceLegacyDefault()) {
+          await this.useApproximateLocation();
+          return;
+        }
+        await this.refresh();
+      });
     },
 
     async refresh(forceRefresh = false) {

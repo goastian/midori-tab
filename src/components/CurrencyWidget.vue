@@ -40,8 +40,18 @@
 import useI18nStore from '../stores/useI18nStore.js';
 import currencyService from '../services/CurrencyService.js';
 import { getJson, setJsonDebounced } from '../services/StorageService.js';
+import { WIDGET_COST, createWidgetRuntime } from '../composables/useWidgetRuntime.js';
 
 const SETTINGS_KEY = 'midori_currency_settings_v1';
+const CURRENCY_TTL_MS = 45 * 60 * 1000;
+const WIDGET_POLICY = Object.freeze({
+  key: 'currency',
+  cost: WIDGET_COST.LOW,
+  usesNetwork: true,
+  ttlMs: CURRENCY_TTL_MS,
+  stale: true,
+  refresh: 'visible, foreground, manual, currency-change',
+});
 
 function getDefaultSettings() {
   return {
@@ -67,6 +77,8 @@ export default {
       amountInput: '1',
       currencyCodes: ['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'CAD', 'AUD', 'MXN', 'BRL', 'RUB', 'INR'],
       requestController: null,
+      widgetPolicy: WIDGET_POLICY,
+      widgetRuntime: null,
     };
   },
 
@@ -104,7 +116,7 @@ export default {
   watch: {
     from() {
       this.persistSettings();
-      this.refresh();
+      this.refreshWhenVisible({ force: true });
     },
     to() {
       this.persistSettings();
@@ -116,10 +128,16 @@ export default {
 
   async mounted() {
     await this.restoreSettings();
-    await this.refresh();
+    this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
+      onVisible: () => this.refreshWhenVisible(),
+      onFocus: () => this.refreshWhenVisible(),
+      onHidden: () => this.abortRequest(),
+    });
+    this.$nextTick(() => this.widgetRuntime?.mount());
   },
 
   beforeUnmount() {
+    this.widgetRuntime?.dispose();
     this.abortRequest();
   },
 
@@ -156,6 +174,12 @@ export default {
         this.requestController.abort();
         this.requestController = null;
       }
+    },
+
+    refreshWhenVisible(options = {}) {
+      if (!this.widgetRuntime) return false;
+      if (!this.widgetRuntime.canRun()) return false;
+      return this.widgetRuntime.runWhenVisible(() => this.refresh(Boolean(options.force)), options);
     },
 
     async refresh(forceRefresh = false) {

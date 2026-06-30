@@ -31,6 +31,17 @@
 
 <script>
 import { defineAsyncComponent } from 'vue';
+import { WIDGET_COST } from '../../composables/useWidgetRuntime.js';
+
+const MARKETPLACE_TTL_MS = 15 * 60 * 1000;
+const WIDGET_POLICY = Object.freeze({
+  key: 'marketplace-sheet',
+  cost: WIDGET_COST.HIGH,
+  usesNetwork: true,
+  ttlMs: MARKETPLACE_TTL_MS,
+  stale: true,
+  refresh: 'open-sheet, manual-install, catalog-change',
+});
 
 export default {
   name: 'MarketplaceSheet',
@@ -52,6 +63,11 @@ export default {
     },
   },
   emits: ['close'],
+  data() {
+    return {
+      widgetPolicy: WIDGET_POLICY,
+    };
+  },
 };
 </script>
 

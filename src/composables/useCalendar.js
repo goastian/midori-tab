@@ -1,9 +1,18 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
+import { WIDGET_COST } from './useWidgetRuntime.js';
 
 const STORAGE_KEY = 'midori_calendar_events';
 const CALENDAR_MAX_BYTES = 160_000;
 const MAX_REMINDER_TIMEOUT = 24 * 60 * 60 * 1000;
+export const CALENDAR_WIDGET_POLICY = Object.freeze({
+  key: 'calendar-reminders',
+  cost: WIDGET_COST.LOW,
+  usesNetwork: false,
+  ttlMs: 60 * 1000,
+  stale: true,
+  refresh: 'foreground-reminder-timer, event-change, visibilitychange',
+});
 
 function pad(value) {
   return String(value).padStart(2, '0');
@@ -411,6 +420,7 @@ export function useCalendar(i18n) {
   });
 
   return {
+    widgetPolicy: CALENDAR_WIDGET_POLICY,
     year,
     monthName,
     dayLabels,

@@ -52,9 +52,18 @@
 <script>
 import useAdsStore from '../stores/useAdsStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
+import { WIDGET_COST } from '../composables/useWidgetRuntime.js';
 
 const VISIBILITY_THRESHOLD = 0.5;
 const VISIBILITY_DWELL_MS = 1000;
+const WIDGET_POLICY = Object.freeze({
+  key: 'ads',
+  cost: WIDGET_COST.MEDIUM,
+  usesNetwork: true,
+  ttlMs: 0,
+  stale: false,
+  refresh: 'visible-with-dwell, manual-dismiss, campaign-change',
+});
 
 export default {
   name: 'VAdSlot',
@@ -68,6 +77,7 @@ export default {
       dwellTimer: null,
       imgFailed: false,
       requested: false,
+      widgetPolicy: WIDGET_POLICY,
     };
   },
 

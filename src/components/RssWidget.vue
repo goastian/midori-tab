@@ -82,6 +82,17 @@ import {
 } from '../services/RssWidgetService.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import { getWidgetCopy } from '../i18n/widget-copy.js';
+import { WIDGET_COST, createWidgetRuntime } from '../composables/useWidgetRuntime.js';
+
+const RSS_REFRESH_MS = 5 * 60 * 1000;
+const WIDGET_POLICY = Object.freeze({
+  key: 'rss',
+  cost: WIDGET_COST.MEDIUM,
+  usesNetwork: true,
+  ttlMs: RSS_REFRESH_MS,
+  stale: true,
+  refresh: 'visible, foreground, manual, feed-change, optional-auto-refresh',
+});
 
 export default {
   name: 'RssWidget',
@@ -98,40 +109,35 @@ export default {
       showFeedSelector: false,
       autoRefreshInterval: null,
       requestController: null,
-      visibilityListener: null,
-      observer: null,
-      isInViewport: true,
       autoRefreshEnabled: false,
+      widgetPolicy: WIDGET_POLICY,
+      widgetRuntime: null,
     }
   },
   
   mounted() {
     // Cerrar selector al hacer clic fuera
     document.addEventListener('click', this.handleClickOutside);
-    this.visibilityListener = () => {
-      if (document.visibilityState === 'hidden') {
+    this.updateFeedColor();
+    this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
+      onVisible: () => {
+        this.loadFeedWhenVisible();
+        this.syncAutoRefreshTimer();
+      },
+      onFocus: () => this.loadFeedWhenVisible(),
+      onHidden: () => {
         this.stopAutoRefreshTimer();
         this.abortRequest();
-        return;
-      }
-      if (this.isInViewport) {
-        this.loadFeed();
-        this.syncAutoRefreshTimer();
-      }
-    };
-    document.addEventListener('visibilitychange', this.visibilityListener);
-    this.updateFeedColor();
-    this.$nextTick(() => this.setupVisibilityObserver());
+      },
+    });
+    this.$nextTick(() => this.widgetRuntime?.mount());
   },
   
   beforeUnmount() {
     this.stopAutoRefreshTimer();
     this.abortRequest();
-    if (this.observer) this.observer.disconnect();
+    this.widgetRuntime?.dispose();
     document.removeEventListener('click', this.handleClickOutside);
-    if (this.visibilityListener) {
-      document.removeEventListener('visibilitychange', this.visibilityListener);
-    }
   },
   
   computed: {
@@ -145,12 +151,18 @@ export default {
   
   watch: {
     currentFeedIndex() {
-      this.loadFeed();
+      this.loadFeedWhenVisible({ force: true });
       this.updateFeedColor();
     }
   },
   
   methods: {
+    loadFeedWhenVisible(options = {}) {
+      if (!this.widgetRuntime) return false;
+      if (!this.widgetRuntime.canRun()) return false;
+      return this.widgetRuntime.runWhenVisible(() => this.loadFeed(Boolean(options.force)), options);
+    },
+
     async loadFeed(forceRefresh = false) {
       if (document.visibilityState === 'hidden') return;
       this.loading = true;
@@ -212,10 +224,10 @@ export default {
 
     syncAutoRefreshTimer() {
       this.stopAutoRefreshTimer();
-      if (!this.autoRefreshEnabled || !this.isInViewport || document.visibilityState === 'hidden') return;
+      if (!this.autoRefreshEnabled || !this.widgetRuntime?.canRun()) return;
       this.autoRefreshInterval = setInterval(() => {
-        this.loadFeed();
-      }, 300000); // 5 minutos
+        this.loadFeedWhenVisible();
+      }, RSS_REFRESH_MS);
     },
 
     stopAutoRefreshTimer() {
@@ -232,28 +244,6 @@ export default {
       }
     },
 
-    setupVisibilityObserver() {
-      const root = this.$el;
-      if (!root || typeof IntersectionObserver === 'undefined') {
-        this.isInViewport = true;
-        this.loadFeed();
-        this.syncAutoRefreshTimer();
-        return;
-      }
-      this.observer = new IntersectionObserver((entries) => {
-        const entry = entries[0];
-        this.isInViewport = Boolean(entry?.isIntersecting);
-        if (this.isInViewport && document.visibilityState !== 'hidden') {
-          this.loadFeed();
-          this.syncAutoRefreshTimer();
-          return;
-        }
-        this.stopAutoRefreshTimer();
-        this.abortRequest();
-      }, { threshold: 0.1 });
-      this.observer.observe(root);
-    },
-    
     handleClickOutside(event) {
       if (!this.$el.contains(event.target)) {
         this.showFeedSelector = false;

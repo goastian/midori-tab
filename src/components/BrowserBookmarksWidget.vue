@@ -36,11 +36,21 @@
 <script>
 import { getWidgetCopy } from '../i18n/widget-copy.js';
 import useI18nStore from '../stores/useI18nStore.js';
+import { WIDGET_COST, createWidgetRuntime } from '../composables/useWidgetRuntime.js';
 
 const DEFAULT_LIMIT = 12;
 const SEARCH_LIMIT = 250;
 const VIRTUAL_THRESHOLD = 100;
 const VIRTUAL_RENDER_LIMIT = 80;
+const BOOKMARKS_TTL_MS = 5 * 60 * 1000;
+const WIDGET_POLICY = Object.freeze({
+  key: 'browser-bookmarks',
+  cost: WIDGET_COST.LOW,
+  usesNetwork: false,
+  ttlMs: BOOKMARKS_TTL_MS,
+  stale: true,
+  refresh: 'visible, foreground, manual, search',
+});
 
 function extensionApi() {
   if (typeof browser !== 'undefined') return browser;
@@ -106,6 +116,8 @@ export default {
       items: [],
       _searchTimer: null,
       _searchToken: 0,
+      widgetPolicy: WIDGET_POLICY,
+      widgetRuntime: null,
     };
   },
 
@@ -124,10 +136,15 @@ export default {
   },
 
   mounted() {
-    this.loadBookmarks();
+    this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
+      onVisible: () => this.loadBookmarksWhenVisible(),
+      onFocus: () => this.loadBookmarksWhenVisible(),
+    });
+    this.$nextTick(() => this.widgetRuntime?.mount());
   },
 
   beforeUnmount() {
+    this.widgetRuntime?.dispose();
     clearTimeout(this._searchTimer);
     this._searchToken += 1;
   },
@@ -141,8 +158,14 @@ export default {
     onSearchInput() {
       clearTimeout(this._searchTimer);
       this._searchTimer = setTimeout(() => {
-        this.loadBookmarks();
+        this.loadBookmarksWhenVisible({ force: true });
       }, 220);
+    },
+
+    loadBookmarksWhenVisible(options = {}) {
+      if (!this.widgetRuntime) return false;
+      if (!this.widgetRuntime.canRun()) return false;
+      return this.widgetRuntime.runWhenVisible(() => this.loadBookmarks(), options);
     },
 
     async loadBookmarks() {

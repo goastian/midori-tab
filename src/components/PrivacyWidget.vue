@@ -47,6 +47,7 @@
 
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
+import { WIDGET_COST } from '../composables/useWidgetRuntime.js';
 
 /**
  * Privacy statistics widget.
@@ -64,6 +65,14 @@ const EVENT_REFRESH_DEBOUNCE_MS = 2_000;
 const VISIBLE_REFRESH_MS = 45_000;
 const RETRY_REFRESH_BASE_MS = 30_000;
 const RETRY_REFRESH_MAX_MS = 60_000;
+const WIDGET_POLICY = Object.freeze({
+  key: 'privacy',
+  cost: WIDGET_COST.LOW,
+  usesNetwork: false,
+  ttlMs: VISIBLE_REFRESH_MS,
+  stale: true,
+  refresh: 'initial, visible, foreground, privacy-stats-event, adaptive-visible-fallback',
+});
 
 /**
  * Sends a cross-extension message to Midori Privacy.
@@ -124,6 +133,7 @@ export default {
       visibilityListener: null,
       focusListener: null,
       privacyStatsListener: null,
+      widgetPolicy: WIDGET_POLICY,
     };
   },
 
