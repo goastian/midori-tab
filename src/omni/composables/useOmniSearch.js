@@ -1,3 +1,5 @@
+import { useOmniStore } from '../../stores/useOmniStore.js';
+
 function sendMessage(request) {
   return new Promise((resolve) => {
     try {

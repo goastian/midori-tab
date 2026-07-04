@@ -448,7 +448,7 @@
         };
 
         const runtimeMessageListener = (message) => {
-          if (message?.request === 'open-omni') {
+          if (message?.request === 'open-omni' || message?.request === 'open-omni-page') {
             void openOmni({ toggle: true });
           }
         };

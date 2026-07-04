@@ -37,7 +37,7 @@
     },
     "default_title": "Open Midori command menu"
   },
-  "web_accessible_resources": ["globe.svg", "icons/*", "assets/*"],
+  "web_accessible_resources": ["globe.svg", "icons/*"],
   "browser_specific_settings": {
     "gecko": {
       "id": "midoritabs@astian.org",

@@ -38,6 +38,7 @@
 
           <!-- ── Results list ── -->
           <ul
+            v-show="showBody"
             id="omni-listbox"
             ref="listRef"
             class="omni-list"
@@ -65,7 +66,7 @@
           </ul>
 
           <!-- ── Footer ── -->
-          <div class="omni-footer" aria-hidden="true">
+          <div v-show="showBody" class="omni-footer" aria-hidden="true">
             <span
               id="omni-count"
               role="status"
@@ -183,7 +184,9 @@ export default {
 
     // ── Derived ────────────────────────────────────────────────────────────
     const visibleResults = computed(() => omniStore.results.slice(0, maxVisible.value));
-    const showEmpty = computed(() => !visibleResults.value.length && query.value.trim().length > 0);
+    const hasQuery = computed(() => query.value.trim().length > 0);
+    const showBody = computed(() => visibleResults.value.length > 0 || hasQuery.value);
+    const showEmpty = computed(() => !visibleResults.value.length && hasQuery.value);
     const activeDescendantId = computed(() =>
       omniStore.results.length ? `omni-option-${omniStore.selectedIndex}` : undefined
     );
@@ -255,10 +258,11 @@ export default {
     function executeItem(item, newTab = false) {
       if (!item) return;
 
+      const messageItem = JSON.parse(JSON.stringify(item));
       const q = query.value;
       const qLower = q.toLowerCase();
       const isRemoveMode = qLower.startsWith('/remove');
-      const confirmed = confirmDestructiveAction(item, isRemoveMode);
+      const confirmed = confirmDestructiveAction(messageItem, isRemoveMode);
       if (confirmed === false) return;
 
       omniStore.close();
@@ -266,7 +270,7 @@ export default {
       chrome.runtime.sendMessage(
         {
           request: 'execute-omni-item',
-          item,
+          item: messageItem,
           query: q,
           newTab,
           removeMode: isRemoveMode,
@@ -329,7 +333,7 @@ export default {
 
     // ── Background message listener (for messages from the service worker) ─
     function onRuntimeMessage(message) {
-      if (message?.request === 'open-omni') {
+      if (message?.request === 'open-omni' || message?.request === 'open-omni-page') {
         omniStore.toggle();
       }
     }
@@ -437,6 +441,7 @@ export default {
       listRef,
       query,
       visibleResults,
+      showBody,
       showEmpty,
       activeDescendantId,
       itemKey,

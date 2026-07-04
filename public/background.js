@@ -157,6 +157,10 @@ function isRestrictedOmniUrl(url) {
   );
 }
 
+function isFirefoxNewTabOverrideUrl(url) {
+  return url === 'about:newtab' || url === 'about:home';
+}
+
 async function ensureOmniContentScript(tabId) {
   const ready = await safeCallChrome(
     chrome.tabs.sendMessage.bind(chrome.tabs),
@@ -1045,12 +1049,27 @@ globalThis.__midoriOmniBackground = {
     staticActionsPromise = null;
     omniQueryCache.clear();
   },
+  executeOmniItem,
 };
 
 // ─── Keyboard shortcut & toolbar click ──────────────────────────────────────
 async function openOmniInTab(tab) {
   if (!tab) return;
   const url = tab.url || '';
+
+  try {
+    await callChrome(chrome.tabs.sendMessage.bind(chrome.tabs), tab.id, { request: 'open-omni' });
+    return;
+  } catch (_) {
+    // Firefox reports extension new-tab overrides as about:newtab; those pages
+    // receive runtime messages, not tabs.sendMessage content-script messages.
+  }
+
+  if (isFirefoxNewTabOverrideUrl(url)) {
+    await safeCallChrome(chrome.runtime.sendMessage.bind(chrome.runtime), { request: 'open-omni-page' });
+    return;
+  }
+
   // Can't send to privileged system pages
   if (isRestrictedOmniUrl(url)) {
     // Fallback: open a new tab (the new tab IS the omni launcher)
@@ -1065,6 +1084,8 @@ async function openOmniInTab(tab) {
     chrome.tabs.create({});
   }
 }
+
+globalThis.__midoriOmniBackground.openOmniInTab = openOmniInTab;
 
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === 'open-omni') {

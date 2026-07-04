@@ -45,8 +45,7 @@
   },
   "web_accessible_resources": [
     "globe.svg",
-    "icons/*",
-    "assets/*"
+    "icons/*"
   ],
   "icons": {
     "16": "icons/16.png",
