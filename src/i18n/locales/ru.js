@@ -166,15 +166,21 @@ export default {
   privacy: {
     title: 'Midori Privacy',
     notAvailable: 'Midori Privacy не установлен или не отвечает.',
+    loading: 'Запуск',
     stats: {
       blocked: 'Заблокировано',
-      saved: 'Сэкономлено',
-      time: 'Время',
+      requests: 'Запросы',
+      blockRate: 'Доля блокировок',
+      page: 'Эта вкладка',
     },
     categories: {
-      trackers: 'Трекеры',
-      ads: 'Реклама',
-      fingerprinters: 'Отпечатки',
+      scripts: 'Скрипты',
+      frames: 'Фреймы',
+      xhr: 'Запросы данных',
+      images: 'Изображения',
+      media: 'Медиа',
+      fonts: 'Шрифты',
+      other: 'Другие',
     },
   },
   calendar: {

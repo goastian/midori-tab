@@ -166,15 +166,21 @@ export default {
   privacy: {
     title: 'Midori Privacy',
     notAvailable: 'Midori Privacy 未安装或无响应。',
+    loading: '正在启动',
     stats: {
       blocked: '已拦截',
-      saved: '已节省',
-      time: '时间',
+      requests: '请求',
+      blockRate: '拦截率',
+      page: '当前标签页',
     },
     categories: {
-      trackers: '追踪器',
-      ads: '广告',
-      fingerprinters: '指纹追踪',
+      scripts: '脚本',
+      frames: '框架',
+      xhr: '数据请求',
+      images: '图片',
+      media: '媒体',
+      fonts: '字体',
+      other: '其他',
     },
   },
   calendar: {

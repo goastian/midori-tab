@@ -166,15 +166,21 @@ export default {
   privacy: {
     title: 'Midori Privacy',
     notAvailable: 'Midori Privacy non è installato o non risponde.',
+    loading: 'Avvio',
     stats: {
       blocked: 'Bloccati',
-      saved: 'Risparmiato',
-      time: 'Tempo',
+      requests: 'Richieste',
+      blockRate: 'Tasso di blocco',
+      page: 'Questa scheda',
     },
     categories: {
-      trackers: 'Tracker',
-      ads: 'Annunci',
-      fingerprinters: 'Fingerprint',
+      scripts: 'Script',
+      frames: 'Frame',
+      xhr: 'Richieste dati',
+      images: 'Immagini',
+      media: 'Media',
+      fonts: 'Caratteri',
+      other: 'Altro',
     },
   },
   calendar: {

@@ -17,16 +17,16 @@
         <span class="pw-stat-label">{{ i18n.$t('privacy.stats.blocked') }}</span>
       </div>
       <div class="pw-stat">
-        <span class="pw-stat-value">{{ formattedBandwidth }}</span>
-        <span class="pw-stat-label">{{ i18n.$t('privacy.stats.saved') }}</span>
+        <span class="pw-stat-value">{{ formattedRequests }}</span>
+        <span class="pw-stat-label">{{ i18n.$t('privacy.stats.requests') }}</span>
       </div>
       <div class="pw-stat">
-        <span class="pw-stat-value">{{ formattedTime }}</span>
-        <span class="pw-stat-label">{{ i18n.$t('privacy.stats.time') }}</span>
+        <span class="pw-stat-value">{{ formattedBlockRate }}</span>
+        <span class="pw-stat-label">{{ i18n.$t('privacy.stats.blockRate') }}</span>
       </div>
       <div class="pw-stat">
-        <span class="pw-stat-value">{{ formattedToday }}</span>
-        <span class="pw-stat-label">{{ i18n.$t('privacy.stats.today') }}</span>
+        <span class="pw-stat-value">{{ formattedPageBlocked }}</span>
+        <span class="pw-stat-label">{{ i18n.$t('privacy.stats.page') }}</span>
       </div>
     </div>
 
@@ -48,64 +48,30 @@
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
 import { WIDGET_COST } from '../composables/useWidgetRuntime.js';
+import {
+  normalizePrivacyStats,
+  requestPrivacyStats,
+} from '../services/privacyStats.js';
 
 /**
  * Privacy statistics widget.
  * Communicates with the Midori Privacy extension via runtime.sendMessage
- * to fetch blocking stats (total blocked, bandwidth saved, time saved).
+ * to fetch real uBlock counters without storage reads or tab scans.
  */
 
-/** Firefox extension ID for Midori Privacy */
-const FIREFOX_PRIVACY_ID = 'midori-protection@astian.org';
-
-const DEFAULT_MS_PER_BLOCK = 3_000;
-const DEFAULT_BYTES_PER_BLOCK = 45 * 1024;
-const FOLLOW_UP_REFRESH_MS = 2_500;
 const EVENT_REFRESH_DEBOUNCE_MS = 2_000;
-const VISIBLE_REFRESH_MS = 45_000;
-const RETRY_REFRESH_BASE_MS = 30_000;
-const RETRY_REFRESH_MAX_MS = 60_000;
+const REFRESH_TTL_MS = 60_000;
+const RETRY_REFRESH_BASE_MS = 5_000;
+const RETRY_REFRESH_MAX_MS = 30_000;
+const MAX_AUTOMATIC_RETRIES = 3;
 const WIDGET_POLICY = Object.freeze({
   key: 'privacy',
   cost: WIDGET_COST.LOW,
   usesNetwork: false,
-  ttlMs: VISIBLE_REFRESH_MS,
+  ttlMs: REFRESH_TTL_MS,
   stale: true,
-  refresh: 'initial, visible, foreground, privacy-stats-event, adaptive-visible-fallback',
+  refresh: 'initial, visible-if-stale, foreground-if-stale, privacy-stats-event, bounded-startup-retry',
 });
-
-/**
- * Sends a cross-extension message to Midori Privacy.
- * Uses browser.runtime.sendMessage(extensionId, msg) for Firefox
- * and chrome.runtime.sendMessage(extensionId, msg) for Chrome.
- * @param {Object} msg - The message payload.
- * @returns {Promise<Object|null>} Response or null on failure.
- */
-function sendToPrivacy(msg) {
-  return new Promise((resolve) => {
-    try {
-      if (typeof browser !== 'undefined' && browser.runtime?.sendMessage) {
-        browser.runtime.sendMessage(FIREFOX_PRIVACY_ID, msg)
-          .then(resolve)
-          .catch(() => resolve(null));
-        return;
-      }
-      if (chrome?.runtime?.sendMessage) {
-        chrome.runtime.sendMessage(FIREFOX_PRIVACY_ID, msg, (response) => {
-          if (chrome.runtime.lastError) {
-            resolve(null);
-          } else {
-            resolve(response);
-          }
-        });
-        return;
-      }
-    } catch {
-      // Extension not available
-    }
-    resolve(null);
-  });
-}
 
 export default {
   name: 'PrivacyWidget',
@@ -115,15 +81,14 @@ export default {
       i18n: useI18nStore(),
       available: false,
       totalBlocked: 0,
-      todayBlocked: 0,
-      timeSavedMs: 0,
-      bandwidthSavedBytes: 0,
+      totalRequests: 0,
+      pageBlocked: 0,
+      pageRequests: 0,
+      blockRate: 0,
       categories: null,
       enabled: false,
       backgroundState: 'idle',
-      grade: 'A+',
       refreshTimer: null,
-      followUpTimer: null,
       observer: null,
       isInViewport: true,
       inFlight: false,
@@ -143,43 +108,39 @@ export default {
       return this.formatCompact(this.totalBlocked);
     },
 
-    formattedToday() {
-      return this.formatCompact(this.todayBlocked);
+    formattedRequests() {
+      return this.formatCompact(this.totalRequests);
     },
 
-    formattedBandwidth() {
-      const bytes = this.bandwidthSavedBytes || this.totalBlocked * DEFAULT_BYTES_PER_BLOCK;
-      if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB';
-      if (bytes >= 1_048_576) return (bytes / 1_048_576).toFixed(1) + ' MB';
-      if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
-      return bytes + ' B';
+    formattedBlockRate() {
+      if (this.blockRate >= 10) return Math.round(this.blockRate) + '%';
+      return this.blockRate.toFixed(1) + '%';
     },
 
-    formattedTime() {
-      const totalMs = this.timeSavedMs || this.totalBlocked * DEFAULT_MS_PER_BLOCK;
-      const totalSec = totalMs / 1000;
-      if (totalSec >= 3600) return (totalSec / 3600).toFixed(1) + 'h';
-      if (totalSec >= 60) return (totalSec / 60).toFixed(1) + 'min';
-      return totalSec.toFixed(0) + 's';
+    formattedPageBlocked() {
+      return this.formatCompact(this.pageBlocked);
     },
 
     statusLabel() {
       if (!this.enabled) return this.i18n.$t('common.off');
       if (this.backgroundState.includes('loading')) return this.i18n.$t('privacy.loading');
-      return this.grade;
+      return this.i18n.$t('common.on');
     },
 
     visibleCategories() {
       const categories = this.categories || {};
       return [
-        ['ads', this.i18n.$t('privacy.categories.ads')],
-        ['trackers', this.i18n.$t('privacy.categories.trackers')],
-        ['fingerprinters', this.i18n.$t('privacy.categories.fingerprinters')],
+        ['scripts', this.i18n.$t('privacy.categories.scripts')],
+        ['frames', this.i18n.$t('privacy.categories.frames')],
+        ['xhr', this.i18n.$t('privacy.categories.xhr')],
+        ['images', this.i18n.$t('privacy.categories.images')],
+        ['media', this.i18n.$t('privacy.categories.media')],
+        ['fonts', this.i18n.$t('privacy.categories.fonts')],
         ['other', this.i18n.$t('privacy.categories.other')],
       ]
         .map(([key, label]) => ({ key, label, count: Number(categories[key]) || 0 }))
         .filter((category) => category.count > 0)
-        .slice(0, 4);
+        .slice(0, 6);
     },
   },
 
@@ -206,58 +167,40 @@ export default {
       }
     },
 
-    clearFollowUpTimer() {
-      if (this.followUpTimer) {
-        clearTimeout(this.followUpTimer);
-        this.followUpTimer = null;
-      }
-    },
-
-    scheduleFollowUpRefresh() {
-      this.clearFollowUpTimer();
-      this.followUpTimer = setTimeout(() => {
-        this.followUpTimer = null;
-        if (!this.canRefresh()) return;
-        this.fetchStats({ force: true });
-      }, FOLLOW_UP_REFRESH_MS);
-    },
-
-    scheduleFallbackRefresh() {
+    scheduleStartupRetry() {
       this.clearRefreshTimer();
       if (!this.canRefresh()) return;
+      if (this.failureCount > MAX_AUTOMATIC_RETRIES) return;
 
       const retryDelay = Math.min(
         RETRY_REFRESH_MAX_MS,
-        RETRY_REFRESH_BASE_MS * Math.max(1, this.failureCount),
+        RETRY_REFRESH_BASE_MS * (2 ** Math.max(0, this.failureCount - 1)),
       );
-      const delay = this.available ? VISIBLE_REFRESH_MS : retryDelay;
 
       this.refreshTimer = setTimeout(() => {
         this.refreshTimer = null;
-        this.fetchStats();
-      }, delay);
+        this.fetchStats({ force: true });
+      }, retryDelay);
     },
 
-    refreshFromEvent() {
+    refreshFromEvent(options = {}) {
       if (!this.canRefresh()) {
         this.clearRefreshTimer();
         return;
       }
 
       const now = Date.now();
-      if (now - this.lastFetchAt < EVENT_REFRESH_DEBOUNCE_MS) {
-        this.scheduleFallbackRefresh();
-        return;
-      }
+      const minimumAge = options.force ? EVENT_REFRESH_DEBOUNCE_MS : REFRESH_TTL_MS;
+      if (now - this.lastFetchAt < minimumAge) return;
 
-      this.fetchStats({ force: true });
+      this.fetchStats({ force: Boolean(options.force) });
     },
 
     setupVisibilityObserver() {
       const root = this.$el;
       if (!root || typeof IntersectionObserver === 'undefined') {
         this.isInViewport = true;
-        this.scheduleFallbackRefresh();
+        this.refreshFromEvent();
         return;
       }
 
@@ -276,30 +219,23 @@ export default {
     },
 
     applyStats(data) {
-      const nextStats = {
-        totalBlocked: Number(data.totalBlocked) || 0,
-        todayBlocked: Number(data.todayBlocked) || 0,
-        timeSavedMs: Number(data.timeSavedMs) || 0,
-        bandwidthSavedBytes: Number(data.bandwidthSavedBytes) || 0,
-        categories: data.categories || null,
-        enabled: Boolean(data.enabled),
-        backgroundState: String(data.state || '').toLowerCase(),
-        grade: data.privacyGrade || 'A+',
-      };
+      const nextStats = normalizePrivacyStats(data);
+      if (!nextStats) return false;
       const nextSignature = JSON.stringify(nextStats);
 
       this.available = true;
-      if (nextSignature === this.lastStatsSignature) return;
+      if (nextSignature === this.lastStatsSignature) return true;
 
       this.lastStatsSignature = nextSignature;
       this.totalBlocked = nextStats.totalBlocked;
-      this.todayBlocked = nextStats.todayBlocked;
-      this.timeSavedMs = nextStats.timeSavedMs;
-      this.bandwidthSavedBytes = nextStats.bandwidthSavedBytes;
+      this.totalRequests = nextStats.totalRequests;
+      this.pageBlocked = nextStats.pageBlocked;
+      this.pageRequests = nextStats.pageRequests;
+      this.blockRate = nextStats.blockRate;
       this.categories = nextStats.categories;
       this.enabled = nextStats.enabled;
-      this.backgroundState = nextStats.backgroundState;
-      this.grade = nextStats.grade;
+      this.backgroundState = nextStats.state;
+      return true;
     },
 
     /** Fetches stats from Midori Privacy extension. */
@@ -314,17 +250,21 @@ export default {
       this.lastFetchAt = Date.now();
 
       try {
-        const data = await sendToPrivacy({ action: 'get-stats-summary', days: 7 });
-        if (!data || data.error) {
+        const data = await requestPrivacyStats();
+        if (!this.applyStats(data)) {
           this.failureCount += 1;
           this.available = false;
-          this.scheduleFallbackRefresh();
+          this.scheduleStartupRetry();
           return;
         }
 
-        this.failureCount = 0;
-        this.applyStats(data);
-        this.scheduleFallbackRefresh();
+        if (this.backgroundState === 'loading') {
+          this.failureCount += 1;
+          this.scheduleStartupRetry();
+        } else {
+          this.failureCount = 0;
+          this.clearRefreshTimer();
+        }
       } finally {
         this.inFlight = false;
       }
@@ -338,23 +278,20 @@ export default {
         return;
       }
       this.clearRefreshTimer();
-      this.clearFollowUpTimer();
     };
     this.focusListener = () => this.refreshFromEvent();
-    this.privacyStatsListener = () => this.refreshFromEvent();
+    this.privacyStatsListener = () => this.refreshFromEvent({ force: true });
 
     document.addEventListener('visibilitychange', this.visibilityListener);
     window.addEventListener('focus', this.focusListener);
     window.addEventListener('midori:privacy-stats-updated', this.privacyStatsListener);
 
     this.fetchStats({ force: true });
-    this.scheduleFollowUpRefresh();
     this.$nextTick(() => this.setupVisibilityObserver());
   },
 
   beforeUnmount() {
     this.clearRefreshTimer();
-    this.clearFollowUpTimer();
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;
@@ -495,11 +432,12 @@ export default {
   flex-shrink: 0;
 }
 
-.pw-cat-dot--trackers { background: #f59e0b; }
-.pw-cat-dot--ads { background: #ef4444; }
-.pw-cat-dot--fingerprinters { background: #8b5cf6; }
-.pw-cat-dot--cosmetics { background: #06b6d4; }
-.pw-cat-dot--pages { background: #22c55e; }
+.pw-cat-dot--scripts { background: #ef4444; }
+.pw-cat-dot--frames { background: #f59e0b; }
+.pw-cat-dot--xhr { background: #8b5cf6; }
+.pw-cat-dot--images { background: #06b6d4; }
+.pw-cat-dot--media { background: #22c55e; }
+.pw-cat-dot--fonts { background: #3b82f6; }
 .pw-cat-dot--other { background: #94a3b8; }
 
 .pw-cat-label {

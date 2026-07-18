@@ -166,15 +166,21 @@ export default {
   privacy: {
     title: 'Midori Privacy',
     notAvailable: 'Midori Privacy がインストールされていないか、応答していません。',
+    loading: '起動中',
     stats: {
       blocked: 'ブロック済み',
-      saved: '節約',
-      time: '時間',
+      requests: 'リクエスト',
+      blockRate: 'ブロック率',
+      page: 'このタブ',
     },
     categories: {
-      trackers: 'トラッカー',
-      ads: '広告',
-      fingerprinters: 'フィンガープリント',
+      scripts: 'スクリプト',
+      frames: 'フレーム',
+      xhr: 'データ通信',
+      images: '画像',
+      media: 'メディア',
+      fonts: 'フォント',
+      other: 'その他',
     },
   },
   calendar: {
