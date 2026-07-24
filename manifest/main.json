@@ -27,8 +27,6 @@
     "https://nominatim.openstreetmap.org/*",
     "https://duckduckgo.com/*",
     "https://ads.astian.org/*",
-    "http://localhost/*",
-    "http://127.0.0.1/*",
     "http://marketplace.astian.org/*"
   ],
   "background": {
