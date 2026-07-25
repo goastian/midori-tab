@@ -73,7 +73,7 @@ const useAdsStore = defineStore('adsStore', {
     lastFetchedAt: 0,
     loading: false,
     error: null,
-    /** 'fresh' | 'none' | 'dismissed' | null */
+    /** 'fresh' | 'none' | 'error' | 'dismissed' | null */
     source: null,
     impressionTracked: false,
     impressionTracking: false,
@@ -115,8 +115,12 @@ const useAdsStore = defineStore('adsStore', {
             this.impressionTracking = false;
           }
         } else {
+          const failed = result?.source === 'error';
           this.currentAd = null;
-          this.source = 'none';
+          this.source = failed ? 'error' : 'none';
+          this.error = failed
+            ? (result.error || 'Ads request failed')
+            : null;
           this.impressionTracked = false;
           this.impressionTracking = false;
         }
@@ -125,7 +129,7 @@ const useAdsStore = defineStore('adsStore', {
       } catch (err) {
         this.error = err && err.message ? err.message : 'Unknown ads error';
         this.currentAd = null;
-        this.source = 'none';
+        this.source = 'error';
         this.impressionTracked = false;
         this.impressionTracking = false;
       } finally {

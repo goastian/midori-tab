@@ -102,6 +102,11 @@ function storageRemove(storage, key) {
   });
 }
 
+function snapshotJsonValue(value) {
+  const serialized = JSON.stringify(value);
+  return serialized === undefined ? null : JSON.parse(serialized);
+}
+
 function wrapPayload(value, version = DEFAULT_VERSION) {
   return {
     __midoriStorageVersion: version,
@@ -176,13 +181,14 @@ export async function getJson(key, fallback = null) {
 export async function quotaSafeSet(key, value, options = {}) {
   const version = options.version || DEFAULT_VERSION;
   const maxBytes = Number(options.maxBytes) || 0;
-  const payload = wrapPayload(value, version);
+  const snapshot = snapshotJsonValue(value);
+  const payload = wrapPayload(snapshot, version);
 
   if (maxBytes > 0 && new Blob([JSON.stringify(payload)]).size > maxBytes) {
     throw new Error(`Storage payload for ${key} exceeds ${maxBytes} bytes.`);
   }
 
-  writeLocalStorage(key, value, version);
+  writeLocalStorage(key, snapshot, version);
 
   const storage = getExtensionStorage();
   if (storage?.set) {
@@ -198,14 +204,15 @@ export async function quotaSafeSet(key, value, options = {}) {
 
 export function setJsonDebounced(key, value, options = {}) {
   const delay = Number(options.delayMs) >= 0 ? Number(options.delayMs) : DEFAULT_DEBOUNCE_MS;
-  writeLocalStorage(key, value, options.version || DEFAULT_VERSION);
+  const snapshot = snapshotJsonValue(value);
+  writeLocalStorage(key, snapshot, options.version || DEFAULT_VERSION);
   const previous = timers.get(key);
   if (previous) clearTimeout(previous);
 
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       timers.delete(key);
-      quotaSafeSet(key, value, options).then(resolve, reject);
+      quotaSafeSet(key, snapshot, options).then(resolve, reject);
     }, delay);
     timers.set(key, timer);
   });

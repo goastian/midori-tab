@@ -238,7 +238,7 @@ export default class AdsService {
   /**
    * Fetch a New Tab ad. Returns { ad, source } where:
    *   - ad: object | null
-   *   - source: 'fresh' | 'none'
+   *   - source: 'fresh' | 'none' | 'error'
    */
   async fetchNewTabAds({ device_type = 'desktop', country = '', language = 'en' } = {}) {
     await this.#removeLegacyDecisionCache({ country, language });
@@ -252,10 +252,14 @@ export default class AdsService {
       return ad
         ? { ad, source: 'fresh' }
         : { ad: null, source: 'none' };
-    } catch (_err) {
-      // A paid lease cannot be reused when Ads is offline: showing no ad is
-      // safer than displaying an impression that cannot be reconciled.
-      return { ad: null, source: 'none' };
+    } catch (error) {
+      // Keep New Tab rendering non-blocking while preserving the distinction
+      // between expected no-fill and an operational Ads failure.
+      return {
+        ad: null,
+        source: 'error',
+        error: error instanceof Error ? error.message : 'Ads request failed',
+      };
     }
   }
 
@@ -336,7 +340,7 @@ export default class AdsService {
         signal: controller ? controller.signal : undefined,
       });
 
-      if (response.status === 404) return null;
+      if (response.status === 204 || response.status === 404) return null;
       if (!response.ok) throw new Error(`Ads request failed: ${response.status}`);
 
       const data = this.#normalizeContract(await response.json());
