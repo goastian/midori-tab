@@ -51,6 +51,56 @@
         </a>
       </div>
 
+      <!-- Paid inventory is a real shortcut, not a separate content card. -->
+      <div
+        v-if="showAds && (!adRequestComplete || adsStore.hasAd)"
+        ref="sponsoredCard"
+        class="card sponsored-card"
+        :class="{ 'sponsored-card--pending': !adsStore.hasAd }"
+        role="complementary"
+        :aria-label="sponsoredAriaLabel"
+        :aria-hidden="!adsStore.hasAd"
+      >
+        <template v-if="adsStore.hasAd">
+          <span class="sponsored-badge" :title="sponsoredBadge">{{ sponsoredBadge }}</span>
+          <button
+            type="button"
+            class="sponsored-dismiss"
+            :title="i18n.$t('ads.dismiss') || 'Dismiss ad'"
+            :aria-label="i18n.$t('ads.dismiss') || 'Dismiss ad'"
+            @click.prevent.stop="dismissSponsored"
+          >×</button>
+
+          <a
+            :href="ad.destination_url"
+            class="card-link sponsored-link"
+            target="_blank"
+            rel="noopener noreferrer nofollow sponsored"
+            @click.prevent="openSponsored"
+          >
+            <div
+              class="card-icon sponsored-icon"
+              :class="{ 'sponsored-icon--fallback': iconFailed }"
+              aria-hidden="true"
+            >
+              <img
+                v-if="!iconFailed"
+                :src="adIconUrl"
+                alt=""
+                width="38"
+                height="38"
+                loading="lazy"
+                decoding="async"
+                referrerpolicy="no-referrer"
+                @error="iconFailed = true"
+              />
+              <span v-else>{{ sponsoredInitial }}</span>
+            </div>
+            <span class="card-title" :title="ad.title">{{ ad.title }}</span>
+          </a>
+        </template>
+      </div>
+
       <!-- Add bookmark button -->
       <div v-if="currentBookmarks.length < 8" class="card card-add">
         <button class="card-link add-link" @click.prevent="addBookmark">
@@ -64,6 +114,11 @@
 
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
+import useAdsStore from '../stores/useAdsStore.js';
+import {
+  AD_VIEWABILITY_THRESHOLD,
+  createAdViewabilityTracker,
+} from '../services/AdViewability.js';
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
 import DashboardIcon from './icons/DashboardIcon.vue';
 
@@ -101,6 +156,8 @@ export default {
   props: {
     /** How links open: 'Self Tab' | 'New Tab' */
     openTarget: { type: String, default: 'Self Tab' },
+    /** Global user opt-out from the New Tab settings. */
+    showAds: { type: Boolean, default: true },
   },
 
   data() {
@@ -112,7 +169,13 @@ export default {
       activeTab: DEFAULT_CATEGORIES[0],
       faviconAttempts: {},
       i18n,
+      adsStore: useAdsStore(),
       isLoaded: false,
+      adRequested: false,
+      adRequestComplete: false,
+      adObserver: null,
+      adViewability: null,
+      iconFailed: false,
     };
   },
 
@@ -134,9 +197,142 @@ export default {
     currentBookmarks() {
       return this.bookmarks[this.activeTab] || [];
     },
+    ad() {
+      return this.adsStore.currentAd || {};
+    },
+    adIconUrl() {
+      return this.ad.icon_url || this.ad.image_url || '';
+    },
+    sponsoredBadge() {
+      return this.ad.sponsor_label || this.i18n.$t('ads.badge') || 'Ad';
+    },
+    sponsoredInitial() {
+      return String(this.ad.title || 'A').trim().charAt(0).toUpperCase() || 'A';
+    },
+    sponsoredAriaLabel() {
+      const label = this.i18n.$t('ads.label') || 'Sponsored content';
+      return this.adsStore.hasAd && this.ad.title ? `${label}: ${this.ad.title}` : label;
+    },
+  },
+
+  watch: {
+    showAds(enabled) {
+      if (!enabled) {
+        this.teardownAdObserver();
+        return;
+      }
+
+      if (!this.adsStore.hasAd) {
+        this.adRequested = false;
+        this.adRequestComplete = false;
+      }
+      this.$nextTick(() => this.setupAdObserver());
+    },
+
+    'adsStore.currentAd'(ad) {
+      this.iconFailed = false;
+      if (this.showAds && ad) {
+        this.$nextTick(() => this.setupAdObserver());
+      } else {
+        this.teardownAdObserver();
+      }
+    },
   },
 
   methods: {
+    setupAdObserver() {
+      this.teardownAdObserver();
+      if (!this.showAds) return;
+
+      const element = this.$refs.sponsoredCard;
+      if (!element) return;
+
+      if (this.adsStore.hasAd) {
+        this.adViewability = createAdViewabilityTracker({
+          onViewable: async () => {
+            if (!this.showAds || !this.adsStore.hasAd || this.adsStore.impressionTracked) return;
+            const trackedAd = this.adsStore.currentAd;
+            const accepted = await this.adsStore.trackImpression();
+            if (
+              accepted
+              && this.adsStore.currentAd?.decision_id === trackedAd?.decision_id
+            ) {
+              this.$emit('sponsored-impression', trackedAd);
+            }
+          },
+        });
+        this.adViewability.setPageVisible(
+          typeof document === 'undefined' || document.visibilityState === 'visible',
+        );
+      }
+
+      if (typeof IntersectionObserver === 'undefined') {
+        const visibleEntry = { isIntersecting: true, intersectionRatio: 1 };
+        if (this.adsStore.hasAd) {
+          this.adViewability?.update(visibleEntry);
+        } else {
+          this.loadAdWhenVisible();
+        }
+        return;
+      }
+
+      this.adObserver = new IntersectionObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+
+        const isVisible = entry.isIntersecting
+          && entry.intersectionRatio >= AD_VIEWABILITY_THRESHOLD;
+        if (!this.adsStore.hasAd) {
+          if (isVisible) this.loadAdWhenVisible();
+          return;
+        }
+
+        this.adViewability?.update(entry);
+      }, { threshold: [0, AD_VIEWABILITY_THRESHOLD, 1] });
+
+      this.adObserver.observe(element);
+    },
+
+    teardownAdObserver() {
+      if (this.adObserver) {
+        try { this.adObserver.disconnect(); } catch (_) { /* ignore */ }
+        this.adObserver = null;
+      }
+      if (this.adViewability) {
+        this.adViewability.dispose();
+        this.adViewability = null;
+      }
+    },
+
+    handleAdPageVisibility() {
+      this.adViewability?.setPageVisible(
+        typeof document === 'undefined' || document.visibilityState === 'visible',
+      );
+    },
+
+    async loadAdWhenVisible() {
+      if (!this.showAds || this.adRequested || this.adsStore.hasAd) return;
+      this.adRequested = true;
+      await this.adsStore.loadAd();
+      this.adRequestComplete = true;
+
+      if (!this.adsStore.hasAd) {
+        this.teardownAdObserver();
+      }
+    },
+
+    dismissSponsored() {
+      this.adsStore.dismiss();
+    },
+
+    openSponsored() {
+      const clickedAd = this.adsStore.currentAd;
+      if (!clickedAd) return;
+      if (this.adsStore.trackClick()) {
+        this.$emit('sponsored-click', clickedAd);
+      }
+    },
+
     async loadBookmarks() {
       const [savedBm, savedCats] = await Promise.all([
         getJson(STORAGE_KEY, null),
@@ -280,9 +476,17 @@ export default {
 
   mounted() {
     this.loadBookmarks();
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleAdPageVisibility);
+    }
+    this.$nextTick(() => this.setupAdObserver());
   },
 
   beforeUnmount() {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.handleAdPageVisibility);
+    }
+    this.teardownAdObserver();
     this.flushBookmarks();
   },
 };
@@ -381,6 +585,7 @@ export default {
 
 /* ── Grid ── */
 .grid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 0.55rem;
@@ -467,6 +672,79 @@ export default {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+
+/* Sponsored shortcut */
+.sponsored-card--pending {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sponsored-link {
+  position: relative;
+  padding-top: 1.25rem;
+  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
+}
+
+.sponsored-badge {
+  position: absolute;
+  top: 6px;
+  left: 7px;
+  z-index: 2;
+  max-width: calc(100% - 38px);
+  padding: 2px 5px;
+  overflow: hidden;
+  border-radius: 4px;
+  color: var(--color-text-muted, #5A9A82);
+  background: var(--surface-control, #1E2D3D);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.sponsored-dismiss {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 3;
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: var(--color-text-muted, #5A9A82);
+  background: var(--surface-control, #1E2D3D);
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sponsored-dismiss:hover,
+.sponsored-dismiss:focus-visible {
+  color: white;
+  background: var(--accent-danger, #e17055);
+}
+
+.sponsored-icon {
+  background: var(--surface-control, #1E2D3D);
+}
+
+.sponsored-icon--fallback {
+  color: white;
+  background: var(--color-primary, #04A469);
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
 /* Add card */

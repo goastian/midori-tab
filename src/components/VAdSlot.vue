@@ -141,10 +141,16 @@ export default {
 
     scheduleImpression() {
       if (!this.adsStore.hasAd || this.dwellTimer || this.adsStore.impressionTracked) return;
-      this.dwellTimer = setTimeout(() => {
+      this.dwellTimer = setTimeout(async () => {
         this.dwellTimer = null;
-        this.adsStore.trackImpression();
-        this.$emit('impression', this.adsStore.currentAd);
+        const trackedAd = this.adsStore.currentAd;
+        const accepted = await this.adsStore.trackImpression();
+        if (
+          accepted
+          && this.adsStore.currentAd?.decision_id === trackedAd?.decision_id
+        ) {
+          this.$emit('impression', trackedAd);
+        }
       }, VISIBILITY_DWELL_MS);
     },
 
@@ -167,8 +173,10 @@ export default {
     },
 
     onClick() {
-      this.$emit('click', this.adsStore.currentAd);
-      this.adsStore.trackClick();
+      const clickedAd = this.adsStore.currentAd;
+      if (clickedAd && this.adsStore.trackClick()) {
+        this.$emit('click', clickedAd);
+      }
     },
 
     onImgError() {

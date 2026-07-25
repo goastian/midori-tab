@@ -17,15 +17,15 @@
 
     <section v-if="widgetsStore.enabled.bookmarks" class="dash-bookmarks">
       <Suspense>
-        <BookmarkGrid ref="bookmarkGrid" :openTarget="tab.openLink" />
+        <BookmarkGrid
+          ref="bookmarkGrid"
+          :openTarget="tab.openLink"
+          :showAds="tab.showAds"
+        />
         <template #fallback>
           <div class="async-placeholder async-placeholder--bookmarks"></div>
         </template>
       </Suspense>
-    </section>
-
-    <section v-if="tab.showAds" class="dash-ad-slot">
-      <VAdSlot />
     </section>
 
     <section v-if="activeGridWidgets.length" class="dash-widgets">
@@ -119,7 +119,6 @@ export default {
     SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
     ShortcutDialog,
     TodoWidget: defineAsyncComponent(() => import('../components/TodoWidget.vue')),
-    VAdSlot: defineAsyncComponent(() => import('../components/VAdSlot.vue')),
     WeatherWidget: defineAsyncComponent(() => import('../components/WeatherWidget.vue')),
     WidgetPicker,
   },

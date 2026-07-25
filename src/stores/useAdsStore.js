@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import AdsService from '../services/AdsService.js';
+import AdsService, { isDecisionActive } from '../services/AdsService.js';
 
 /**
  * Detects basic device type from UA. Avoids fingerprinting; only coarse class.
@@ -73,9 +73,10 @@ const useAdsStore = defineStore('adsStore', {
     lastFetchedAt: 0,
     loading: false,
     error: null,
-    /** 'fresh' | 'cache' | 'stale' | 'none' | null */
+    /** 'fresh' | 'none' | 'dismissed' | null */
     source: null,
     impressionTracked: false,
+    impressionTracking: false,
   }),
 
   getters: {
@@ -105,14 +106,19 @@ const useAdsStore = defineStore('adsStore', {
           if (dismissed.has(String(result.ad.ad_id))) {
             this.currentAd = null;
             this.source = 'dismissed';
+            this.impressionTracked = false;
+            this.impressionTracking = false;
           } else {
             this.currentAd = result.ad;
             this.source = result.source;
             this.impressionTracked = false;
+            this.impressionTracking = false;
           }
         } else {
           this.currentAd = null;
           this.source = 'none';
+          this.impressionTracked = false;
+          this.impressionTracking = false;
         }
 
         this.lastFetchedAt = Date.now();
@@ -120,6 +126,8 @@ const useAdsStore = defineStore('adsStore', {
         this.error = err && err.message ? err.message : 'Unknown ads error';
         this.currentAd = null;
         this.source = 'none';
+        this.impressionTracked = false;
+        this.impressionTracking = false;
       } finally {
         this.loading = false;
       }
@@ -133,6 +141,8 @@ const useAdsStore = defineStore('adsStore', {
       writeDismissed(dismissed);
       this.currentAd = null;
       this.source = 'dismissed';
+      this.impressionTracked = false;
+      this.impressionTracking = false;
     },
 
     /**
@@ -140,31 +150,31 @@ const useAdsStore = defineStore('adsStore', {
      * includes an `impression_token`; we POST it to /api/v1/ads/impression.
      */
     async trackImpression() {
-      if (!this.currentAd || this.impressionTracked) return;
+      if (!this.currentAd || this.impressionTracked || this.impressionTracking) return false;
+      if (!isDecisionActive(this.currentAd)) return false;
       const token = this.currentAd.impression_token;
-      if (!token) return;
-      this.impressionTracked = true;
+      if (!token) return false;
+      this.impressionTracking = true;
 
       try {
         const service = getService();
-        const baseUrl = service.baseUrl;
-        const fetchFn = service.fetchFn;
-        if (!baseUrl || !fetchFn) return;
-
-        // Use keepalive so the request survives page unload.
-        await fetchFn(`${baseUrl}/api/v1/ads/impression`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          credentials: 'omit',
-          keepalive: true,
-          body: JSON.stringify({ impression_token: token }),
+        const accepted = await service.trackImpression(token, {
+          expiresAt: this.currentAd.expires_at,
         });
+        if (this.currentAd?.impression_token === token) {
+          this.impressionTracked = accepted;
+        }
+        return accepted;
       } catch (_) {
         // Silently swallow — impression tracking must never affect UX.
-        this.impressionTracked = false;
+        if (this.currentAd?.impression_token === token) {
+          this.impressionTracked = false;
+        }
+        return false;
+      } finally {
+        if (this.currentAd?.impression_token === token) {
+          this.impressionTracking = false;
+        }
       }
     },
 
@@ -174,18 +184,26 @@ const useAdsStore = defineStore('adsStore', {
      * the advertiser).
      */
     trackClick() {
-      if (!this.currentAd || !this.currentAd.destination_url) return;
+      if (!this.currentAd || !this.currentAd.destination_url) return false;
+      if (!isDecisionActive(this.currentAd)) return false;
+
+      const decisionId = String(this.currentAd.decision_id || '').trim();
+      if (!decisionId) return false;
+
       const url = this.currentAd.destination_url;
       try {
         const browserAPI = (typeof browser !== 'undefined') ? browser : (typeof chrome !== 'undefined' ? chrome : null);
         if (browserAPI && browserAPI.tabs && browserAPI.tabs.create) {
           browserAPI.tabs.create({ url, active: true });
-          return;
+          return true;
         }
       } catch (_) { /* fall through */ }
       try {
         window.open(url, '_blank', 'noopener,noreferrer');
-      } catch (_) { /* ignore */ }
+        return true;
+      } catch (_) {
+        return false;
+      }
     },
   },
 });
