@@ -77,6 +77,7 @@ import useI18nStore from '../stores/useI18nStore.js';
 import useThemeStore from '../stores/useThemeStore.js';
 import useSpacesStore from '../stores/useSpacesStore.js';
 import useWidgetsStore from '../stores/useWidgetsStore.js';
+import useAdsStore from '../stores/useAdsStore.js';
 import { useAutoTheme } from '../composables/useAutoTheme.js';
 import SettingsGeneralSection from './settings/SettingsGeneralSection.vue';
 import SettingsVisualSection from './settings/SettingsVisualSection.vue';
@@ -97,6 +98,7 @@ export default {
       settings: useTabStore(),
       spacesStore: useSpacesStore(),
       widgetsStore: useWidgetsStore(),
+      adsStore: useAdsStore(),
       i18n: useI18nStore(),
       background: {
         type: null,
@@ -175,6 +177,9 @@ export default {
     },
 
     toggleAds() {
+      if (this.settings.showAds) {
+        void this.adsStore.recordOptOut();
+      }
       this.settings.showAds = !this.settings.showAds;
     },
 

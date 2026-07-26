@@ -17,6 +17,14 @@ const DEFAULT_IMPRESSION_ATTEMPTS = 2;
 const DEFAULT_IMPRESSION_RETRY_DELAY_MS = 200;
 const MAX_IMPRESSION_RETRY_DELAY_MS = 5000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CLIENT_EVENT_TYPES = new Set([
+  'feedback_relevant',
+  'feedback_irrelevant',
+  'ad_dismissed',
+  'ad_opt_out',
+  'accidental_click_guard',
+  'client_performance',
+]);
 
 function normalizeBaseUrl(rawBaseUrl) {
   if (!rawBaseUrl) return '';
@@ -140,15 +148,20 @@ function buildLegacyCacheKey({ country, language }) {
 
 function createRandomUuid() {
   const cryptoAPI = (typeof globalThis !== 'undefined') ? globalThis.crypto : null;
-  if (!cryptoAPI) return null;
-
-  if (typeof cryptoAPI.randomUUID === 'function') {
+  if (typeof cryptoAPI?.randomUUID === 'function') {
     return cryptoAPI.randomUUID();
   }
 
-  if (typeof cryptoAPI.getRandomValues !== 'function') return null;
   const bytes = new Uint8Array(16);
-  cryptoAPI.getRandomValues(bytes);
+  if (typeof cryptoAPI?.getRandomValues === 'function') {
+    cryptoAPI.getRandomValues(bytes);
+  } else {
+    // Extension pages normally expose Web Crypto. Keep a UUID fallback so an
+    // unusual runtime can never issue an Ads request without visitor_id.
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
 
@@ -228,6 +241,7 @@ export default class AdsService {
     this.sleep = options.sleepFn || defaultSleep;
     this.random = options.randomFn || Math.random;
     this.visitorIdFactory = options.visitorIdFactory || createRandomUuid;
+    this.eventIdFactory = options.eventIdFactory || createRandomUuid;
     this.legacyCacheCleanupDone = false;
   }
 
@@ -242,16 +256,18 @@ export default class AdsService {
    */
   async fetchNewTabAds({ device_type = 'desktop', country = '', language = 'en' } = {}) {
     await this.#removeLegacyDecisionCache({ country, language });
+    const startedAt = Number(this.now());
 
     if (!this.isConfigured()) {
-      return { ad: null, source: 'none' };
+      return { ad: null, source: 'none', latency_ms: 0 };
     }
 
     try {
       const ad = await this.#requestAd({ device_type, country, language });
+      const latencyMs = Math.max(0, Math.round(Number(this.now()) - startedAt));
       return ad
-        ? { ad, source: 'fresh' }
-        : { ad: null, source: 'none' };
+        ? { ad, source: 'fresh', latency_ms: latencyMs }
+        : { ad: null, source: 'none', latency_ms: latencyMs };
     } catch (error) {
       // Keep New Tab rendering non-blocking while preserving the distinction
       // between expected no-fill and an operational Ads failure.
@@ -259,6 +275,7 @@ export default class AdsService {
         ad: null,
         source: 'error',
         error: error instanceof Error ? error.message : 'Ads request failed',
+        latency_ms: Math.max(0, Math.round(Number(this.now()) - startedAt)),
       };
     }
   }
@@ -319,13 +336,66 @@ export default class AdsService {
     return false;
   }
 
+  /**
+   * Record privacy-safe UX evidence tied to the signed decision. Arbitrary
+   * metadata is intentionally unsupported; only bounded numeric guardrails
+   * cross the extension boundary.
+   */
+  async trackClientEvent(eventType, impressionToken, options = {}) {
+    if (
+      !this.isConfigured()
+      || !CLIENT_EVENT_TYPES.has(eventType)
+      || typeof impressionToken !== 'string'
+      || !impressionToken.trim()
+      || !isDecisionActive({ expires_at: options.expiresAt }, this.now)
+    ) {
+      return false;
+    }
+
+    const eventId = this.eventIdFactory();
+    if (typeof eventId !== 'string' || !UUID_PATTERN.test(eventId)) return false;
+
+    const metrics = {};
+    for (const key of [
+      'request_latency_ms',
+      'layout_shift_micros',
+      'interaction_latency_ms',
+    ]) {
+      const value = Number(options.metrics?.[key]);
+      if (Number.isSafeInteger(value) && value >= 0) metrics[key] = value;
+    }
+
+    try {
+      const response = await this.fetchFn(`${this.baseUrl}/api/v1/ads/client-event`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        credentials: 'omit',
+        keepalive: true,
+        body: JSON.stringify({
+          event_id: eventId.toLowerCase(),
+          event_type: eventType,
+          impression_token: impressionToken,
+          metrics,
+        }),
+      });
+      return response.ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
   async #requestAd({ device_type, country, language }) {
     const url = new URL(`${this.baseUrl}${this.path}`);
     if (device_type) url.searchParams.set('device_type', device_type);
     if (country) url.searchParams.set('country', country);
     url.searchParams.set('language', normalizeContractLanguage(language));
     const visitorId = await this.#resolveVisitorId();
-    if (visitorId) url.searchParams.set('visitor_id', visitorId);
+    // visitor_id is part of the deployed ads.astian.org contract. Never send
+    // the request without it and keep it in the query string for compatibility.
+    url.searchParams.set('visitor_id', visitorId);
 
     const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     const timeoutId = controller
@@ -379,23 +449,30 @@ export default class AdsService {
   }
 
   async #resolveVisitorId() {
+    let stored = null;
     try {
-      const stored = await this.storage.get(VISITOR_ID_KEY);
-      if (typeof stored === 'string' && UUID_PATTERN.test(stored)) {
-        return stored.toLowerCase();
-      }
+      stored = await this.storage.get(VISITOR_ID_KEY);
+    } catch (_) { /* generate a replacement below */ }
 
-      const generated = this.visitorIdFactory();
-      if (typeof generated !== 'string' || !UUID_PATTERN.test(generated)) {
-        return null;
-      }
-
-      const visitorId = generated.toLowerCase();
-      await this.storage.set(VISITOR_ID_KEY, visitorId);
-      return visitorId;
-    } catch (_) {
-      return null;
+    if (typeof stored === 'string' && UUID_PATTERN.test(stored)) {
+      return stored.toLowerCase();
     }
+
+    let generated = null;
+    try {
+      generated = this.visitorIdFactory();
+    } catch (_) { /* handled by the invariant below */ }
+
+    if (typeof generated !== 'string' || !UUID_PATTERN.test(generated)) {
+      throw new Error('Unable to create required Ads visitor ID');
+    }
+
+    const visitorId = generated.toLowerCase();
+    try {
+      await this.storage.set(VISITOR_ID_KEY, visitorId);
+    } catch (_) { /* this lease can still use the generated in-memory ID */ }
+
+    return visitorId;
   }
 
   #isDecisionValid(ad) {
@@ -405,10 +482,35 @@ export default class AdsService {
   #normalizeContract(data) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
     const iconUrl = data.icon_url || data.image_url || '';
+    const hasTransparency = Object.prototype.hasOwnProperty.call(data, 'transparency');
+    const transparency = data.transparency && typeof data.transparency === 'object'
+      && !Array.isArray(data.transparency)
+      ? data.transparency
+      : null;
     return {
       ...data,
       icon_url: iconUrl,
       image_url: data.image_url || iconUrl,
+      attribution_token: typeof data.attribution_token === 'string'
+        ? data.attribution_token.trim()
+        : '',
+      transparency: transparency
+        ? {
+          data_used: Array.isArray(transparency.data_used)
+            ? transparency.data_used.filter(value => typeof value === 'string')
+            : [],
+          frequency_cap_per_day: Number.isSafeInteger(transparency.frequency_cap_per_day)
+            ? Math.max(0, transparency.frequency_cap_per_day)
+            : 0,
+          feedback_enabled: transparency.feedback_enabled === true,
+          legacy: false,
+        }
+        : (hasTransparency ? null : {
+          data_used: [],
+          frequency_cap_per_day: 0,
+          feedback_enabled: false,
+          legacy: true,
+        }),
     };
   }
 
@@ -449,9 +551,23 @@ export default class AdsService {
       data.icon_url,
       data.destination_url,
       data.impression_token,
+      data.attribution_token,
     ];
     if (!validAdId || requiredStrings.some(value => typeof value !== 'string' || !value.trim())) return false;
     if (data.sponsor_label != null && typeof data.sponsor_label !== 'string') return false;
+    if (
+      !data.transparency
+      || !Array.isArray(data.transparency.data_used)
+      || !Number.isSafeInteger(data.transparency.frequency_cap_per_day)
+      || typeof data.transparency.feedback_enabled !== 'boolean'
+      || (
+        data.transparency.legacy !== true
+        && (
+          data.transparency.data_used.length === 0
+          || data.transparency.feedback_enabled !== true
+        )
+      )
+    ) return false;
     if (
       !this.#isAllowedAssetUrl(data.icon_url)
       || !this.#isAllowedAssetUrl(data.image_url)

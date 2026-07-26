@@ -15,15 +15,13 @@
       </Suspense>
     </section>
 
-    <section v-if="widgetsStore.enabled.bookmarks" class="dash-bookmarks">
+    <section v-if="tab.showAds" class="dash-sponsored">
       <Suspense>
         <BookmarkGrid
-          ref="bookmarkGrid"
-          :openTarget="tab.openLink"
           :showAds="tab.showAds"
         />
         <template #fallback>
-          <div class="async-placeholder async-placeholder--bookmarks"></div>
+          <div class="async-placeholder async-placeholder--sponsored"></div>
         </template>
       </Suspense>
     </section>
@@ -38,7 +36,6 @@
     <DashboardActions
       :i18n="i18n"
       :show-widget-sheet="showWidgetSheet"
-      @open-shortcut="showShortcutDialog = true"
       @toggle-widgets="showWidgetSheet = !showWidgetSheet"
       @open-marketplace="openMarketplace()"
     />
@@ -72,13 +69,6 @@
       @open-settings="openSettingsAndCloseQuick"
     />
 
-    <ShortcutDialog
-      :visible="showShortcutDialog"
-      :i18n="i18n"
-      @close="showShortcutDialog = false"
-      @submit-shortcut="submitShortcut"
-    />
-
     <AstianAppsMenu
       :visible="showAppsMenu"
       @close="showAppsMenu = false"
@@ -96,7 +86,6 @@ import DashboardActions from '../components/dashboard/DashboardActions.vue';
 import DashboardShell from '../components/dashboard/DashboardShell.vue';
 import MarketplaceSheet from '../components/dashboard/MarketplaceSheet.vue';
 import QuickSettingsPanel from '../components/dashboard/QuickSettingsPanel.vue';
-import ShortcutDialog from '../components/dashboard/ShortcutDialog.vue';
 import WidgetPicker from '../components/WidgetPicker.vue';
 import { useWidgetManagement } from '../composables/useWidgetManagement.js';
 
@@ -117,7 +106,6 @@ export default {
     QuickSettingsPanel,
     RssWidget: defineAsyncComponent(() => import('../components/RssWidget.vue')),
     SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
-    ShortcutDialog,
     TodoWidget: defineAsyncComponent(() => import('../components/TodoWidget.vue')),
     WeatherWidget: defineAsyncComponent(() => import('../components/WeatherWidget.vue')),
     WidgetPicker,
@@ -134,7 +122,6 @@ export default {
       showWidgetSheet: false,
       showMarketplaceSheet: false,
       activeMarketplaceType: 'wallpaper',
-      showShortcutDialog: false,
       showQuickSettings: false,
       showAppsMenu: false,
     };
@@ -196,19 +183,6 @@ export default {
       this.openMarketplace(requestedType);
     },
 
-    submitShortcut({ url, title }) {
-      if (!url || !url.trim()) return;
-      const finalTitle = title && title.trim() ? title.trim() : url;
-      let finalUrl = url.trim();
-      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
-        finalUrl = 'https://' + finalUrl;
-      }
-      const grid = this.$refs.bookmarkGrid;
-      if (grid && grid.addBookmarkExternal) {
-        grid.addBookmarkExternal(finalTitle, finalUrl);
-      }
-      this.showShortcutDialog = false;
-    },
   },
 };
 </script>
@@ -219,12 +193,12 @@ export default {
   max-width: 640px;
 }
 
-.dash-bookmarks {
+.dash-sponsored {
   width: 100%;
   max-width: 720px;
 }
 
-:global([data-density='compact']) .dash-bookmarks {
+:global([data-density='compact']) .dash-sponsored {
   max-width: 680px;
 }
 
@@ -293,8 +267,9 @@ export default {
   min-height: 54px;
 }
 
-.async-placeholder--bookmarks {
-  min-height: 138px;
+.async-placeholder--sponsored {
+  width: 120px;
+  min-height: 112px;
 }
 
 @keyframes placeholder-sheen {

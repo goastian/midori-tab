@@ -35,6 +35,14 @@ export default {
     label: 'Conteúdo patrocinado',
     dismiss: 'Fechar anúncio',
     cta: 'Saiba mais',
+    whyTitle: 'Por que estou vendo este anúncio?',
+    whyCopy: 'Ele foi selecionado usando apenas contexto geral do navegador, como idioma, região e tipo de dispositivo. Não usamos seu histórico nem buscas privadas.',
+    frequencyCap: 'Você pode ver esta campanha no máximo {count} vezes por dia.',
+    feedbackPrompt: 'Isto é relevante?',
+    relevant: 'Relevante',
+    notRelevant: 'Não relevante',
+    feedbackThanks: 'Obrigado pela sua opinião.',
+    feedbackError: 'Não foi possível enviar sua opinião. Tente novamente.',
   },
 
   visual: {

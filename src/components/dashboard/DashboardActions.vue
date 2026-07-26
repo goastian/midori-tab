@@ -1,9 +1,5 @@
 <template>
   <div class="bottom-actions">
-    <button class="action-btn" type="button" @click="$emit('open-shortcut')" :aria-label="i18n.$t('dashboard.actions.shortcut')">
-      <DashboardIcon name="plus" :size="14" aria-hidden="true" />
-      <span>{{ i18n.$t('dashboard.actions.shortcut') }}</span>
-    </button>
     <button class="action-btn" type="button" @click="$emit('toggle-widgets')" :aria-label="i18n.$t('dashboard.actions.widget')">
       <DashboardIcon :name="showWidgetSheet ? 'minus' : 'plus'" :size="14" aria-hidden="true" />
       <span>{{ i18n.$t('dashboard.actions.widget') }}</span>
@@ -33,7 +29,7 @@ export default {
       default: false,
     },
   },
-  emits: ['open-shortcut', 'toggle-widgets', 'open-marketplace'],
+  emits: ['toggle-widgets', 'open-marketplace'],
 };
 </script>
 

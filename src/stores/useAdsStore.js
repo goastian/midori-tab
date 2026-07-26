@@ -77,6 +77,7 @@ const useAdsStore = defineStore('adsStore', {
     source: null,
     impressionTracked: false,
     impressionTracking: false,
+    requestLatencyMs: 0,
   }),
 
   getters: {
@@ -100,6 +101,9 @@ const useAdsStore = defineStore('adsStore', {
           country: detectCountry(),
           language: detectLanguage(),
         });
+        this.requestLatencyMs = Number.isSafeInteger(result?.latency_ms)
+          ? result.latency_ms
+          : 0;
 
         if (result && result.ad) {
           const dismissed = readDismissed();
@@ -139,6 +143,8 @@ const useAdsStore = defineStore('adsStore', {
 
     dismiss() {
       if (!this.currentAd) return;
+      const dismissedAd = this.currentAd;
+      void this.trackClientEvent('ad_dismissed', {}, dismissedAd);
       const id = String(this.currentAd.ad_id);
       const dismissed = readDismissed();
       dismissed.add(id);
@@ -147,6 +153,30 @@ const useAdsStore = defineStore('adsStore', {
       this.source = 'dismissed';
       this.impressionTracked = false;
       this.impressionTracking = false;
+    },
+
+    async recordOptOut() {
+      if (!this.currentAd) return false;
+      return this.trackClientEvent('ad_opt_out');
+    },
+
+    async submitFeedback(relevant) {
+      if (!this.currentAd?.transparency?.feedback_enabled) return false;
+      return this.trackClientEvent(
+        relevant ? 'feedback_relevant' : 'feedback_irrelevant',
+      );
+    },
+
+    async trackClientEvent(eventType, metrics = {}, ad = this.currentAd) {
+      if (!ad || !isDecisionActive(ad) || !ad.impression_token) return false;
+      try {
+        return await getService().trackClientEvent(eventType, ad.impression_token, {
+          expiresAt: ad.expires_at,
+          metrics,
+        });
+      } catch (_) {
+        return false;
+      }
     },
 
     /**
@@ -187,14 +217,22 @@ const useAdsStore = defineStore('adsStore', {
      * ads.astian.org /click/{encrypted_id} tracking endpoint that 302s to
      * the advertiser).
      */
-    trackClick() {
+    trackClick(interactionLatencyMs = null) {
       if (!this.currentAd || !this.currentAd.destination_url) return false;
       if (!isDecisionActive(this.currentAd)) return false;
 
       const decisionId = String(this.currentAd.decision_id || '').trim();
       if (!decisionId) return false;
 
-      const url = this.currentAd.destination_url;
+      let url = this.currentAd.destination_url;
+      const latency = Number(interactionLatencyMs);
+      if (Number.isSafeInteger(latency) && latency >= 0) {
+        try {
+          const trackedUrl = new URL(url);
+          trackedUrl.searchParams.set('interaction_ms', String(Math.min(600000, latency)));
+          url = trackedUrl.toString();
+        } catch (_) { /* contract validation already rejects malformed URLs */ }
+      }
       try {
         const browserAPI = (typeof browser !== 'undefined') ? browser : (typeof chrome !== 'undefined' ? chrome : null);
         if (browserAPI && browserAPI.tabs && browserAPI.tabs.create) {

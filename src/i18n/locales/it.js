@@ -44,6 +44,14 @@ export default {
     label: 'Contenuto sponsorizzato',
     dismiss: 'Chiudi annuncio',
     cta: 'Scopri di più',
+    whyTitle: 'Perché vedo questo annuncio?',
+    whyCopy: 'È stato selezionato usando solo il contesto generale del browser, come lingua, area e tipo di dispositivo. Non usiamo cronologia o ricerche private.',
+    frequencyCap: 'Puoi vedere questa campagna al massimo {count} volte al giorno.',
+    feedbackPrompt: 'È pertinente?',
+    relevant: 'Pertinente',
+    notRelevant: 'Non pertinente',
+    feedbackThanks: 'Grazie per il feedback.',
+    feedbackError: 'Impossibile inviare il feedback. Riprova.',
   },
 
   visual: {

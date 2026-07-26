@@ -35,6 +35,14 @@ export default {
     label: 'スポンサーコンテンツ',
     dismiss: '広告を閉じる',
     cta: '詳細を見る',
+    whyTitle: 'この広告が表示される理由',
+    whyCopy: '言語、地域、端末の種類など、ブラウザーの一般的な情報だけを使って選ばれています。履歴や非公開の検索は使用しません。',
+    frequencyCap: 'このキャンペーンは1日に最大{count}回表示されます。',
+    feedbackPrompt: '関連性がありますか？',
+    relevant: '関連あり',
+    notRelevant: '関連なし',
+    feedbackThanks: 'ご意見ありがとうございます。',
+    feedbackError: '送信できませんでした。もう一度お試しください。',
   },
 
   visual: {

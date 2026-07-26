@@ -20,10 +20,6 @@
               <span class="quick-item-title">{{ i18n.$t('dashboard.quickSettings.search') }}</span>
               <span class="quick-item-value">{{ widgetsStore.enabled.search ? i18n.$t('common.on') : i18n.$t('common.off') }}</span>
             </button>
-            <button class="quick-item" type="button" @click="$emit('toggle-section', 'bookmarks')">
-              <span class="quick-item-title">{{ i18n.$t('dashboard.quickSettings.bookmarks') }}</span>
-              <span class="quick-item-value">{{ widgetsStore.enabled.bookmarks ? i18n.$t('common.on') : i18n.$t('common.off') }}</span>
-            </button>
             <button class="quick-item" type="button" @click="$emit('refresh-wallpaper')">
               <span class="quick-item-title">{{ i18n.$t('dashboard.quickSettings.wallpaper') }}</span>
               <span class="quick-item-value">{{ i18n.$t('dashboard.quickSettings.refresh') }}</span>

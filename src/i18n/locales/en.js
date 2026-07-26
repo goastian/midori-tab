@@ -41,6 +41,14 @@ export default {
     label: 'Sponsored content',
     dismiss: 'Dismiss ad',
     cta: 'Learn more',
+    whyTitle: 'Why am I seeing this ad?',
+    whyCopy: 'It was selected using only general browser context such as language, region and device type. We do not use your history or private searches.',
+    frequencyCap: 'You may see this campaign at most {count} times per day.',
+    feedbackPrompt: 'Is this relevant to you?',
+    relevant: 'Relevant',
+    notRelevant: 'Not relevant',
+    feedbackThanks: 'Thanks for your feedback.',
+    feedbackError: 'We could not send your feedback. Please try again.',
   },
 
   visual: {

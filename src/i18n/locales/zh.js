@@ -35,6 +35,14 @@ export default {
     label: '赞助内容',
     dismiss: '关闭广告',
     cta: '了解更多',
+    whyTitle: '为什么我会看到此广告？',
+    whyCopy: '它只使用语言、地区和设备类型等常规浏览器信息进行选择，不会使用你的历史记录或私密搜索。',
+    frequencyCap: '此广告系列每天最多显示 {count} 次。',
+    feedbackPrompt: '这与你相关吗？',
+    relevant: '相关',
+    notRelevant: '不相关',
+    feedbackThanks: '感谢你的反馈。',
+    feedbackError: '无法发送反馈，请重试。',
   },
 
   visual: {

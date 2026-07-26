@@ -44,6 +44,14 @@ export default {
     label: 'Contenu sponsorisé',
     dismiss: 'Fermer l\'annonce',
     cta: 'En savoir plus',
+    whyTitle: 'Pourquoi cette annonce ?',
+    whyCopy: 'Elle utilise uniquement le contexte général du navigateur, comme la langue, la région et le type d’appareil. Ni votre historique ni vos recherches privées ne sont utilisés.',
+    frequencyCap: 'Cette campagne peut apparaître au maximum {count} fois par jour.',
+    feedbackPrompt: 'Est-elle pertinente ?',
+    relevant: 'Pertinente',
+    notRelevant: 'Non pertinente',
+    feedbackThanks: 'Merci pour votre avis.',
+    feedbackError: 'Impossible d’envoyer votre avis. Réessayez.',
   },
 
   visual: {

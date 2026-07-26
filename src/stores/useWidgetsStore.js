@@ -3,10 +3,9 @@ import { getJson, setJsonDebounced } from '../services/StorageService.js';
 import { resolveBuiltinWidgetKey } from '../utils/marketplaceAssets.js';
 
 /** Default widget order */
-const DEFAULT_ORDER = ['search', 'bookmarks', 'weather', 'currency', 'browserBookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
+const DEFAULT_ORDER = ['search', 'weather', 'currency', 'browserBookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
 const DEFAULT_ENABLED = {
   search: true,
-  bookmarks: true,
   weather: false,
   currency: false,
   browserBookmarks: false,
@@ -141,7 +140,6 @@ const useWidgetsStore = defineStore('widgetsStore', {
       if ('search' in raw && !('enabled' in raw)) {
         store.enabled = {
           search: !!raw.search,
-          bookmarks: !!raw.bookmarks,
           weather: !!raw.weather,
           currency: !!raw.currency,
           browserBookmarks: !!raw.browserBookmarks,
