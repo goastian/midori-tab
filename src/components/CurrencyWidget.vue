@@ -1,7 +1,7 @@
 <template>
   <div class="currency-widget">
-    <header class="currency-header">
-      <h3 class="currency-title">{{ i18n.$t('currency.title') }}</h3>
+    <header class="currency-header" :class="{ 'currency-header--managed': managed }">
+      <h3 v-if="!managed" class="currency-title">{{ i18n.$t('currency.title') }}</h3>
       <button type="button" class="currency-refresh" @click="refresh(true)" :disabled="loading">↻</button>
     </header>
 
@@ -63,6 +63,10 @@ function getDefaultSettings() {
 
 export default {
   name: 'CurrencyWidget',
+
+  props: {
+    managed: { type: Boolean, default: false },
+  },
 
   data() {
     return {
@@ -223,6 +227,10 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.currency-header--managed {
+  justify-content: flex-end;
 }
 
 .currency-title {

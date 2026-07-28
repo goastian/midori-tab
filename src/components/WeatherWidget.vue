@@ -1,8 +1,8 @@
 <template>
   <div class="weather-widget">
-    <header class="weather-header">
-      <div>
-        <h3 class="weather-title">{{ i18n.$t('weather.title') }}</h3>
+    <header class="weather-header" :class="{ 'weather-header--managed': managed }">
+      <div v-if="!managed || settings.locationLabel">
+        <h3 v-if="!managed" class="weather-title">{{ i18n.$t('weather.title') }}</h3>
         <p class="weather-location">{{ settings.locationLabel }}</p>
       </div>
       <div class="weather-actions">
@@ -74,6 +74,10 @@ function formatCoordinates(latitude, longitude) {
 
 export default {
   name: 'WeatherWidget',
+
+  props: {
+    managed: { type: Boolean, default: false },
+  },
 
   data() {
     return {
@@ -345,6 +349,10 @@ export default {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.weather-header--managed {
+  justify-content: flex-end;
 }
 
 .weather-title {

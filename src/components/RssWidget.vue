@@ -1,5 +1,5 @@
 <template>
-  <div class="rss-widget">
+  <div class="rss-widget" :class="{ 'rss-widget--managed': managed }">
     <div class="widget-header">
       <div class="feed-selector">
         <button @click="previousFeed" class="feed-nav-btn" :disabled="loading" :title="copy.previousFeed">
@@ -96,6 +96,9 @@ const WIDGET_POLICY = Object.freeze({
 
 export default {
   name: 'RssWidget',
+  props: {
+    managed: { type: Boolean, default: false },
+  },
   data() {
     return {
       i18n: useI18nStore(),
@@ -292,9 +295,8 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 12px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-  padding: 1rem;
+  border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  padding: 0.75rem;
 }
 
 .feed-selector {
@@ -383,10 +385,10 @@ export default {
 
 .feed-selector-dropdown {
   position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.95);
+  top: 3.5rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  background: var(--surface-overlay, #1E2D3D);
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   /* Eliminado backdrop-filter - ya está dentro de widget con blur */
@@ -517,19 +519,18 @@ export default {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 1rem;
+  gap: 8px;
+  padding: 0.75rem;
 }
 
 .news-item {
-  height: 100%;
-  min-height: 140px;
+  min-height: 112px;
   padding: 12px;
-  background: var(--bg-color);
+  background: var(--surface-sunken, #060A10);
   border-radius: 8px;
   border-left: 3px solid #4ecdc4;
   transition: all 0.3s ease;
-  overflow: auto;
+  position: relative;
 }
 
 .news-item::before {

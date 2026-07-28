@@ -1,14 +1,14 @@
 const GRID_KEYS = ['weather', 'currency', 'browserBookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
 
 const WIDGET_META = [
-  { key: 'weather', icon: '⛅', labelKey: 'widgets.weather' },
-  { key: 'currency', icon: '💹', labelKey: 'widgets.currency' },
-  { key: 'browserBookmarks', icon: '🔖', labelKey: 'dashboard.quickSettings.bookmarks' },
-  { key: 'privacy', icon: '🛡️', labelKey: 'widgets.privacy' },
-  { key: 'calendar', icon: '📅', labelKey: 'widgets.calendar' },
-  { key: 'notes', icon: '📝', labelKey: 'widgets.notes' },
-  { key: 'todo', icon: '✅', labelKey: 'widgets.todo' },
-  { key: 'rss', icon: '📰', labelKey: 'widgets.rss' },
+  { key: 'weather', icon: 'weather', labelKey: 'widgets.weather', layout: 'compact' },
+  { key: 'currency', icon: 'currency', labelKey: 'widgets.currency', layout: 'compact' },
+  { key: 'browserBookmarks', icon: 'bookmark', labelKey: 'dashboard.quickSettings.bookmarks', layout: 'wide' },
+  { key: 'privacy', icon: 'privacy', labelKey: 'widgets.privacy', layout: 'compact' },
+  { key: 'calendar', icon: 'calendar', labelKey: 'widgets.calendar', layout: 'wide-tall' },
+  { key: 'notes', icon: 'notes', labelKey: 'widgets.notes', layout: 'compact-tall' },
+  { key: 'todo', icon: 'todo', labelKey: 'widgets.todo', layout: 'compact-tall' },
+  { key: 'rss', icon: 'rss', labelKey: 'widgets.rss', layout: 'wide-tall' },
 ];
 
 const WIDGET_COMPONENT_MAP = {
@@ -40,6 +40,10 @@ export function useWidgetManagement({ widgetsStore, i18n }) {
     return WIDGET_COMPONENT_MAP;
   }
 
+  function getWidgetMetaMap() {
+    return Object.fromEntries(getAvailableWidgets().map(widget => [widget.key, widget]));
+  }
+
   function toggleWidget(key) {
     widgetsStore.toggle(key);
   }
@@ -48,6 +52,7 @@ export function useWidgetManagement({ widgetsStore, i18n }) {
     getActiveGridWidgets,
     getAvailableWidgets,
     getWidgetComponentMap,
+    getWidgetMetaMap,
     toggleWidget,
   };
 }

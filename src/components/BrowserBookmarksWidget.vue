@@ -1,7 +1,7 @@
 <template>
   <div class="browser-bookmarks-widget">
-    <div class="widget-header">
-      <h3 class="widget-title">🔖 {{ copy.title }}</h3>
+    <div class="widget-header" :class="{ 'widget-header--managed': managed }">
+      <h3 v-if="!managed" class="widget-title">🔖 {{ copy.title }}</h3>
       <button class="widget-refresh" type="button" @click="loadBookmarks" :disabled="loading">↻</button>
     </div>
 
@@ -105,6 +105,7 @@ export default {
 
   props: {
     openTarget: { type: String, default: 'Self Tab' },
+    managed: { type: Boolean, default: false },
   },
 
   data() {
@@ -272,6 +273,10 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 0.45rem;
+}
+
+.widget-header--managed {
+  justify-content: flex-end;
 }
 
 .widget-title {

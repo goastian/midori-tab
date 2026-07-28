@@ -1,5 +1,5 @@
 <template>
-  <div class="calendar-widget">
+  <div class="calendar-widget" :class="{ 'calendar-widget--managed': managed }">
     <div class="cal-header">
       <button class="cal-nav" type="button" @click="prevMonth">‹</button>
       <span class="cal-month">{{ monthName }} {{ year }}</span>
@@ -142,6 +142,9 @@ import useI18nStore from '../stores/useI18nStore.js';
 
 export default {
   name: 'CalendarWidget',
+  props: {
+    managed: { type: Boolean, default: false },
+  },
   setup() {
     const i18n = useI18nStore();
     return {
@@ -162,6 +165,25 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.calendar-widget--managed {
+  gap: 0.55rem;
+  padding: 0.7rem;
+}
+
+.calendar-widget--managed .cal-grid {
+  gap: 3px;
+}
+
+.calendar-widget--managed .cal-cell {
+  min-height: 34px;
+  padding: 0.25rem;
+}
+
+.calendar-widget--managed .cal-agenda {
+  padding: 0.55rem;
+  gap: 0.4rem;
 }
 
 .cal-header,

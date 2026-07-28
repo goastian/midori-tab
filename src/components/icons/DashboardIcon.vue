@@ -57,6 +57,76 @@
       <path d="M14 11v6" />
     </template>
 
+    <template v-else-if="name === 'grip'">
+      <circle cx="9" cy="5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="19" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="19" r="1" fill="currentColor" stroke="none" />
+    </template>
+
+    <template v-else-if="name === 'close'">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </template>
+
+    <template v-else-if="name === 'reset'">
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+    </template>
+
+    <template v-else-if="name === 'weather'">
+      <path d="M16 16.5a4.5 4.5 0 0 0-8.8-1.3A3.5 3.5 0 1 0 6.5 22H16a2.75 2.75 0 0 0 0-5.5Z" />
+      <path d="M13 3v2" />
+      <path d="m18.7 5.3-1.4 1.4" />
+      <path d="M21 11h-2" />
+      <path d="M7 11H5" />
+      <path d="m8.7 6.7-1.4-1.4" />
+      <path d="M17.5 13A4.5 4.5 0 0 0 9 9" />
+    </template>
+
+    <template v-else-if="name === 'currency'">
+      <path d="M7 7h11l-3-3" />
+      <path d="m18 7-3 3" />
+      <path d="M17 17H6l3 3" />
+      <path d="m6 17 3-3" />
+    </template>
+
+    <template v-else-if="name === 'bookmark'">
+      <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
+    </template>
+
+    <template v-else-if="name === 'privacy'">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+      <path d="m9 12 2 2 4-4" />
+    </template>
+
+    <template v-else-if="name === 'calendar'">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M16 3v4" />
+      <path d="M8 3v4" />
+      <path d="M3 10h18" />
+    </template>
+
+    <template v-else-if="name === 'notes'">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6" />
+      <path d="M8 13h8" />
+      <path d="M8 17h5" />
+    </template>
+
+    <template v-else-if="name === 'todo'">
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <path d="m8 12 2.5 2.5L16 9" />
+    </template>
+
+    <template v-else-if="name === 'rss'">
+      <circle cx="5" cy="19" r="1" fill="currentColor" stroke="none" />
+      <path d="M4 11a9 9 0 0 1 9 9" />
+      <path d="M4 4a16 16 0 0 1 16 16" />
+    </template>
+
     <template v-else>
       <path d="M5 12h14" />
       <path d="M12 5v14" />

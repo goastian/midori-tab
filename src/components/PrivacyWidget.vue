@@ -1,8 +1,8 @@
 <template>
   <div class="privacy-widget">
-    <div class="pw-header">
-      <span class="pw-icon">🛡️</span>
-      <span class="pw-title">{{ i18n.$t('privacy.title') }}</span>
+    <div class="pw-header" :class="{ 'pw-header--managed': managed }">
+      <span v-if="!managed" class="pw-icon">🛡️</span>
+      <span v-if="!managed" class="pw-title">{{ i18n.$t('privacy.title') }}</span>
       <span v-if="!available" class="pw-badge pw-badge--off">{{ i18n.$t('common.off') }}</span>
       <span v-else class="pw-badge pw-badge--on">{{ statusLabel }}</span>
     </div>
@@ -75,6 +75,10 @@ const WIDGET_POLICY = Object.freeze({
 
 export default {
   name: 'PrivacyWidget',
+
+  props: {
+    managed: { type: Boolean, default: false },
+  },
 
   data() {
     return {
@@ -329,6 +333,10 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.pw-header--managed {
+  justify-content: flex-end;
 }
 
 .pw-icon {

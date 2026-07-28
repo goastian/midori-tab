@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { getJson, setJsonDebounced } from '../services/StorageService.js';
 import { resolveBuiltinWidgetKey } from '../utils/marketplaceAssets.js';
+import { mergeWidgetSubset } from '../utils/widgetLayout.js';
 
 /** Default widget order */
 const DEFAULT_ORDER = ['search', 'weather', 'currency', 'browserBookmarks', 'privacy', 'rss', 'calendar', 'notes', 'todo'];
@@ -71,6 +72,11 @@ const useWidgetsStore = defineStore('widgetsStore', {
     reorder(fromIndex, toIndex) {
       const item = this.order.splice(fromIndex, 1)[0];
       this.order.splice(toIndex, 0, item);
+    },
+
+    /** Applies a new order to one widget subset while preserving hidden/system positions. */
+    setWidgetSubsetOrder(widgetKeys) {
+      this.order = mergeWidgetSubset(this.order, widgetKeys);
     },
 
     /** Resets order to default. */

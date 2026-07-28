@@ -1,7 +1,7 @@
 <template>
   <div class="notes-widget">
-    <div class="notes-header">
-      <span class="notes-title">📝 {{ copy.title }}</span>
+    <div class="notes-header" :class="{ 'notes-header--managed': managed }">
+      <span v-if="!managed" class="notes-title">📝 {{ copy.title }}</span>
       <span class="notes-count">{{ charCount }}</span>
     </div>
     <textarea
@@ -22,6 +22,10 @@ const STORAGE_KEY = 'midori_notes';
 
 export default {
   name: 'NotesWidget',
+
+  props: {
+    managed: { type: Boolean, default: false },
+  },
 
   data() {
     return {
@@ -94,6 +98,10 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.notes-header--managed {
+  justify-content: flex-end;
 }
 
 .notes-title {

@@ -1,7 +1,7 @@
 <template>
   <div class="todo-widget">
-    <div class="todo-header">
-      <span class="todo-title">✅ {{ copy.title }}</span>
+    <div class="todo-header" :class="{ 'todo-header--managed': managed }">
+      <span v-if="!managed" class="todo-title">✅ {{ copy.title }}</span>
       <span class="todo-count">{{ doneCount }}/{{ items.length }}</span>
     </div>
 
@@ -37,6 +37,10 @@ const STORAGE_KEY = 'midori_todos';
 
 export default {
   name: 'TodoWidget',
+
+  props: {
+    managed: { type: Boolean, default: false },
+  },
 
   data() {
     return {
@@ -114,6 +118,10 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.todo-header--managed {
+  justify-content: flex-end;
 }
 
 .todo-title {
