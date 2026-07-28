@@ -1,5 +1,11 @@
 <template>
-  <div class="rss-widget" :class="{ 'rss-widget--managed': managed }">
+  <div
+    class="rss-widget"
+    :class="{
+      'rss-widget--managed': managed,
+      'rss-widget--managed-populated': managed && feedItems.length > 0,
+    }"
+  >
     <div class="widget-header">
       <div class="feed-selector">
         <button @click="previousFeed" class="feed-nav-btn" :disabled="loading" :title="copy.previousFeed">
@@ -289,6 +295,15 @@ export default {
   display: flex;
   flex-direction: column;
   position: relative;
+}
+
+.rss-widget--managed {
+  height: auto;
+  min-height: 132px;
+}
+
+.rss-widget--managed-populated {
+  height: min(360px, 52vh);
 }
 
 .widget-header {

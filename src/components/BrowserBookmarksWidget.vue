@@ -1,5 +1,8 @@
 <template>
-  <div class="browser-bookmarks-widget">
+  <div
+    class="browser-bookmarks-widget"
+    :class="{ 'browser-bookmarks-widget--managed': managed }"
+  >
     <div class="widget-header" :class="{ 'widget-header--managed': managed }">
       <h3 v-if="!managed" class="widget-title">🔖 {{ copy.title }}</h3>
       <button class="widget-refresh" type="button" @click="loadBookmarks" :disabled="loading">↻</button>
@@ -314,6 +317,10 @@ export default {
   gap: 0.25rem;
   max-height: 270px;
   overflow-y: auto;
+}
+
+.browser-bookmarks-widget--managed .bookmarks-list {
+  max-height: 220px;
 }
 
 .bookmarks-list--virtual {

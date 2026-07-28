@@ -28,11 +28,15 @@
 
     <section
       v-if="activeGridWidgets.length"
-      :class="['widget-board', `widget-board--${widgetBoardMode}`]"
-      :aria-labelledby="activeGridWidgets.length > 1 ? 'widget-board-title' : undefined"
-      :aria-label="activeGridWidgets.length === 1 ? i18n.$t('dashboard.widgetBoard.title') : undefined"
+      :class="[
+        'widget-board',
+        `widget-board--${widgetBoardMode}`,
+      ]"
+      :aria-label="i18n.$t('dashboard.widgetBoard.title')"
     >
-
+      <p v-if="activeGridWidgets.length > 1" id="widget-board-hint" class="sr-only">
+        {{ widgetBoardHint }}
+      </p>
       <div
         class="dash-widgets"
         role="list"
@@ -49,6 +53,7 @@
               'is-drop-target': dropTargetKey === key,
               'is-drop-before': dropTargetKey === key && dropPlacement === 'before',
               'is-drop-after': dropTargetKey === key && dropPlacement === 'after',
+              'is-drop-vertical': dropTargetKey === key && dropAxis === 'vertical',
             },
           ]"
           :data-widget="key"
@@ -57,36 +62,38 @@
           @dragleave="handleDragLeave(key, $event)"
           @drop.prevent.stop="handleDrop(key, $event)"
         >
-          <header class="widget-card__toolbar">
-            <button
-              v-if="activeGridWidgets.length > 1"
-              class="widget-drag-handle"
-              type="button"
-              draggable="true"
-              :aria-label="dragHandleLabel(key)"
-              aria-describedby="widget-board-hint"
-              @dragstart="handleDragStart(key, $event)"
-              @dragend="finishWidgetDrag"
-              @keydown="handleReorderKey(key, $event)"
-            >
-              <DashboardIcon name="grip" :size="16" :stroke-width="1.8" aria-hidden="true" />
-            </button>
-            <span class="widget-card__icon" aria-hidden="true">
-              <DashboardIcon :name="widgetMetaMap[key]?.icon" :size="15" :stroke-width="1.7" />
-            </span>
-            <h2 class="widget-card__title">{{ widgetMetaMap[key]?.label || key }}</h2>
-            <button
-              class="widget-close"
-              type="button"
-              :title="closeWidgetLabel(key)"
-              :aria-label="closeWidgetLabel(key)"
-              @click="removeWidget(key)"
-            >
-              <DashboardIcon name="close" :size="15" :stroke-width="1.8" aria-hidden="true" />
-            </button>
-          </header>
-          <div class="widget-card__body">
-            <component :is="widgetComponentMap[key]" :managed="true" />
+          <div class="widget-card__surface">
+            <header class="widget-card__toolbar">
+              <button
+                v-if="activeGridWidgets.length > 1"
+                class="widget-drag-handle"
+                type="button"
+                draggable="true"
+                :aria-label="dragHandleLabel(key)"
+                aria-describedby="widget-board-hint"
+                @dragstart="handleDragStart(key, $event)"
+                @dragend="finishWidgetDrag"
+                @keydown="handleReorderKey(key, $event)"
+              >
+                <DashboardIcon name="grip" :size="16" :stroke-width="1.8" aria-hidden="true" />
+              </button>
+              <span class="widget-card__icon" aria-hidden="true">
+                <DashboardIcon :name="widgetMetaMap[key]?.icon" :size="15" :stroke-width="1.7" />
+              </span>
+              <h2 class="widget-card__title">{{ widgetMetaMap[key]?.label || key }}</h2>
+              <button
+                class="widget-close"
+                type="button"
+                :title="closeWidgetLabel(key)"
+                :aria-label="closeWidgetLabel(key)"
+                @click="removeWidget(key)"
+              >
+                <DashboardIcon name="close" :size="15" :stroke-width="1.8" aria-hidden="true" />
+              </button>
+            </header>
+            <div class="widget-card__body">
+              <component :is="widgetComponentMap[key]" :managed="true" />
+            </div>
           </div>
         </article>
       </div>
@@ -193,6 +200,7 @@ export default {
       draggedWidgetKey: '',
       dropTargetKey: '',
       dropPlacement: 'before',
+      dropAxis: 'horizontal',
       reorderAnnouncement: '',
     };
   },
@@ -308,9 +316,21 @@ export default {
       const stacked = window.matchMedia('(max-width: 700px)').matches;
       const sourceIndex = this.activeGridWidgets.indexOf(this.draggedWidgetKey);
       const targetIndex = this.activeGridWidgets.indexOf(key);
+      const sourceCard = [...event.currentTarget.parentElement.children]
+        .find(card => card.dataset.widget === this.draggedWidgetKey);
+      const sourceRect = sourceCard?.getBoundingClientRect();
+      const verticalOverlap = sourceRect
+        ? Math.min(sourceRect.bottom, rect.bottom) - Math.max(sourceRect.top, rect.top)
+        : 0;
+      const sameVisualRow = sourceRect
+        ? verticalOverlap >= Math.min(sourceRect.height, rect.height) * 0.4
+        : false;
+      this.dropAxis = stacked || (this.widgetBoardMode === 'grid' && !sameVisualRow)
+        ? 'vertical'
+        : 'horizontal';
       const after = this.widgetBoardMode === 'pair'
         ? sourceIndex < targetIndex
-        : stacked
+        : this.dropAxis === 'vertical'
           ? event.clientY >= rect.top + (rect.height / 2)
           : event.clientX >= rect.left + (rect.width / 2);
 
@@ -374,6 +394,7 @@ export default {
       this.draggedWidgetKey = '';
       this.dropTargetKey = '';
       this.dropPlacement = 'before';
+      this.dropAxis = 'horizontal';
     },
 
     openMarketplace(type = 'wallpaper') {
@@ -422,79 +443,14 @@ export default {
 }
 
 .widget-board--grid {
-  max-width: 1180px;
-}
-
-.widget-board__header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0 0.15rem;
-  color: var(--color-text, #1A2B26);
-}
-
-.widget-board__heading {
-  min-width: 0;
-}
-
-.widget-board__eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.8rem;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-
-.widget-board__count {
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0 0.35rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 5px;
-  background: var(--color-accent-bg, rgba(4, 164, 105, 0.08));
-  color: var(--color-primary, #04A469);
-  font-size: 0.68rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.widget-board__hint {
-  margin: 0.12rem 0 0;
-  color: var(--color-text-muted, #5A7B6D);
-  font-size: 0.7rem;
-  line-height: 1.35;
-}
-
-.widget-board__reset {
-  min-height: 30px;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.55rem;
-  border: 1px solid transparent;
-  border-radius: var(--nova-control-radius, 8px);
-  background: transparent;
-  color: var(--color-text-muted, #5A7B6D);
-  font: inherit;
-  font-size: 0.7rem;
-  font-weight: 550;
-  cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-
-.widget-board__reset:hover {
-  background: var(--surface-island, rgba(255, 255, 255, 0.9));
-  border-color: var(--color-border, rgba(0, 0, 0, 0.1));
-  color: var(--color-text, #1A2B26);
+  max-width: 1060px;
 }
 
 .dash-widgets {
   width: 100%;
   display: grid;
-  gap: 0.85rem;
+  column-gap: 0.85rem;
+  row-gap: 0.75rem;
 }
 
 .widget-board--single .dash-widgets {
@@ -507,11 +463,17 @@ export default {
 
 .widget-board--grid .dash-widgets {
   grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-flow: row;
   align-items: start;
 }
 
 .widget-card {
   position: relative;
+  min-width: 0;
+  align-self: start;
+}
+
+.widget-card__surface {
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -523,26 +485,6 @@ export default {
   transition: border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease, transform 160ms ease;
 }
 
-.widget-board--single .widget-card--compact {
-  height: 240px;
-}
-
-.widget-board--single .widget-card--compact-tall {
-  height: 330px;
-}
-
-.widget-board--single .widget-card--wide {
-  height: 390px;
-}
-
-.widget-board--single .widget-card--wide-tall {
-  height: 500px;
-}
-
-.widget-board--pair .widget-card {
-  height: clamp(300px, 42vh, 390px);
-}
-
 .widget-board--grid .widget-card--compact,
 .widget-board--grid .widget-card--compact-tall {
   grid-column: span 4;
@@ -550,37 +492,21 @@ export default {
 
 .widget-board--grid .widget-card--wide,
 .widget-board--grid .widget-card--wide-tall {
-  grid-column: span 8;
+  grid-column: span 12;
 }
 
-.widget-board--grid .widget-card--compact {
-  height: 230px;
-}
-
-.widget-board--grid .widget-card--compact-tall {
-  height: 310px;
-}
-
-.widget-board--grid .widget-card--wide {
-  height: 340px;
-}
-
-.widget-board--grid .widget-card--wide-tall {
-  height: 430px;
-}
-
-.widget-card:hover,
-.widget-card:focus-within {
+.widget-card:hover .widget-card__surface,
+.widget-card:focus-within .widget-card__surface {
   border-color: var(--color-border-hover, rgba(0, 0, 0, 0.18));
   box-shadow: 0 12px 34px rgba(8, 35, 26, 0.14), inset 0 1px rgba(255, 255, 255, 0.2);
 }
 
-.widget-card.is-dragging {
+.widget-card.is-dragging .widget-card__surface {
   opacity: 0.42;
   transform: scale(0.985);
 }
 
-.widget-card.is-drop-target {
+.widget-card.is-drop-target .widget-card__surface {
   border-color: var(--color-primary, #04A469);
   box-shadow: 0 0 0 3px var(--color-accent-border, rgba(4, 164, 105, 0.2));
 }
@@ -602,6 +528,23 @@ export default {
 
 .widget-card.is-drop-after::after {
   right: -1px;
+}
+
+.widget-card.is-drop-vertical::after {
+  left: 0.65rem;
+  right: 0.65rem;
+  width: auto;
+  height: 3px;
+}
+
+.widget-card.is-drop-vertical.is-drop-before::after {
+  top: -1px;
+  bottom: auto;
+}
+
+.widget-card.is-drop-vertical.is-drop-after::after {
+  top: auto;
+  bottom: -1px;
 }
 
 .widget-card__toolbar {
@@ -680,11 +623,28 @@ export default {
 .widget-card__body {
   min-width: 0;
   min-height: 0;
-  flex: 1;
+  flex: 0 1 auto;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-color: var(--color-border-hover, rgba(0, 0, 0, 0.18)) transparent;
   scrollbar-width: thin;
+}
+
+.widget-card[data-widget='browserBookmarks'] .widget-card__body {
+  max-height: 330px;
+}
+
+.widget-card[data-widget='calendar'] .widget-card__body {
+  max-height: 420px;
+}
+
+.widget-card[data-widget='rss'] .widget-card__body {
+  max-height: min(380px, 52vh);
+}
+
+.widget-card[data-widget='notes'] .widget-card__body,
+.widget-card[data-widget='todo'] .widget-card__body {
+  max-height: 260px;
 }
 
 .widget-card__body :deep(.weather-widget),
@@ -696,7 +656,7 @@ export default {
 .widget-card__body :deep(.notes-widget),
 .widget-card__body :deep(.todo-widget) {
   width: 100%;
-  min-height: 100%;
+  min-height: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -761,17 +721,10 @@ export default {
 }
 
 @media (max-width: 700px) {
-  .widget-board__header {
-    align-items: center;
-  }
-
-  .widget-board__reset span {
-    display: none;
-  }
-
   .widget-board--pair .dash-widgets,
   .widget-board--grid .dash-widgets {
     grid-template-columns: 1fr;
+    grid-auto-flow: row;
   }
 
   .widget-board--grid .widget-card--compact,
@@ -779,10 +732,7 @@ export default {
   .widget-board--grid .widget-card--wide,
   .widget-board--grid .widget-card--wide-tall {
     grid-column: 1;
-  }
-
-  .widget-board--pair .widget-card {
-    height: 330px;
+    grid-row: auto;
   }
 
   .widget-card.is-drop-target::after {
@@ -804,13 +754,6 @@ export default {
 }
 
 @media (max-width: 460px) {
-  .widget-board--grid .widget-card--compact,
-  .widget-board--grid .widget-card--compact-tall,
-  .widget-board--grid .widget-card--wide,
-  .widget-board--grid .widget-card--wide-tall {
-    height: min(360px, 58vh);
-  }
-
   .widget-card__toolbar {
     min-height: 38px;
   }
