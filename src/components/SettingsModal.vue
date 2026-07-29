@@ -1,84 +1,96 @@
 <template>
   <Teleport to="body">
-    <Transition name="panel-fade">
-      <div v-if="settings.state" class="panel-overlay" @click="closeSettings">
-        <Transition name="panel-slide">
-          <div v-if="settings.state" class="panel" @click.stop>
+    <Transition name="settings-dialog">
+      <div v-if="settings.state" class="panel-overlay" @click.self="closeSettings">
+          <section
+            ref="settingsDialog"
+            class="panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="start-page-settings-title"
+            tabindex="-1"
+            @click.stop
+          >
           <!-- Header -->
           <div class="panel-header">
             <div class="panel-heading">
-              <h2 class="panel-title">{{ i18n.t.settings.title }}</h2>
+              <span class="panel-eyebrow">Midori Tab</span>
+              <h2 id="start-page-settings-title" class="panel-title">{{ i18n.t.settings.title }}</h2>
               <p class="panel-subtitle">{{ navs[tab]?.description }}</p>
             </div>
-            <button @click="closeSettings" class="panel-close" aria-label="Close settings">
+            <button type="button" @click="closeSettings" class="panel-close" :aria-label="i18n.t.settings.close">
               <span>✕</span>
             </button>
           </div>
 
-          <!-- Tab navigation (horizontal) -->
-          <nav class="panel-tabs">
-            <button
-              v-for="(item, index) in navs"
-              :key="index"
-              @click="changeTab(index)"
-              :class="['panel-tab', { active: index === tab }]"
-            >
-              <span class="tab-icon">{{ item.emoji }}</span>
-              <span class="tab-copy">
-                <span class="tab-label">{{ item.title }}</span>
-                <span class="tab-desc">{{ item.description }}</span>
-              </span>
-            </button>
-          </nav>
+          <div class="panel-main">
+            <!-- Settings navigation -->
+            <nav class="panel-tabs" :aria-label="i18n.t.settings.title">
+              <button
+                v-for="(item, index) in navs"
+                :key="index"
+                type="button"
+                @click="changeTab(index)"
+                :class="['panel-tab', { active: index === tab }]"
+                :aria-current="index === tab ? 'page' : undefined"
+              >
+                <span class="tab-icon">{{ item.emoji }}</span>
+                <span class="tab-copy">
+                  <span class="tab-label">{{ item.title }}</span>
+                  <span class="tab-desc">{{ item.description }}</span>
+                </span>
+              </button>
+            </nav>
 
-          <!-- Scrollable content -->
-          <div class="panel-content">
-            <SettingsGeneralSection
-              v-if="tab === 0"
-              :i18n="i18n"
-              :settings="settings"
-              :spaces-store="spacesStore"
-              :open-links="openLinks"
-              :title="title"
-              @toggle-spaces="toggleSpaces"
-              @toggle-ads="toggleAds"
-              @update:title="title = $event"
-            />
+            <!-- Scrollable content -->
+            <main class="panel-content">
+              <SettingsGeneralSection
+                v-if="tab === 0"
+                :i18n="i18n"
+                :settings="settings"
+                :spaces-store="spacesStore"
+                :open-links="openLinks"
+                :title="title"
+                @toggle-spaces="toggleSpaces"
+                @toggle-ads="toggleAds"
+                @update:title="title = $event"
+              />
 
-            <SettingsStartPageSection
-              v-if="tab === 1"
-              :i18n="i18n"
-              :settings="settings"
-              :widgets-store="widgetsStore"
-            />
+              <SettingsStartPageSection
+                v-if="tab === 1"
+                :i18n="i18n"
+                :settings="settings"
+                :widgets-store="widgetsStore"
+              />
 
-            <SettingsVisualSection
-              v-if="tab === 2"
-              :i18n="i18n"
-              :settings="settings"
-              :background="background"
-              :backgrounds="backgrounds"
-              :gradients="gradients"
-              @change-background="changeBackground"
-              @toggle-auto-theme="toggleAutoTheme"
-              @open-marketplace="openMarketplace"
-            />
+              <SettingsVisualSection
+                v-if="tab === 2"
+                :i18n="i18n"
+                :settings="settings"
+                :background="background"
+                :backgrounds="backgrounds"
+                :gradients="gradients"
+                @change-background="changeBackground"
+                @toggle-auto-theme="toggleAutoTheme"
+                @open-marketplace="openMarketplace"
+              />
 
-            <SettingsLanguageSection v-if="tab === 3" />
+              <SettingsLanguageSection v-if="tab === 3" />
+            </main>
           </div>
 
           <!-- Footer -->
           <div class="panel-footer">
             <kbd>ESC</kbd> <span>{{ i18n.t.settings.close }}</span>
           </div>
-          </div>
-        </Transition>
+          </section>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <script>
+import { nextTick } from 'vue';
 import useTabStore from '../stores/useTabStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import useThemeStore from '../stores/useThemeStore.js';
@@ -137,8 +149,8 @@ export default {
 
   mounted() {
     this.loadSettings();
-    // Cerrar con ESC
     document.addEventListener('keydown', this.handleEscape);
+    nextTick(() => this.$refs.settingsDialog?.focus());
   },
 
   beforeUnmount() {
@@ -225,30 +237,36 @@ export default {
 
 <style scoped>
 /* ═══════════════════════════════════════
-   Settings Panel — Right-side slide-in
+   Full settings — centered workspace
    ═══════════════════════════════════════ */
 
 /* ── Overlay ── */
 .panel-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  padding: clamp(1rem, 3vw, 2.5rem);
+  background: rgba(4, 12, 10, 0.48);
+  backdrop-filter: blur(8px) saturate(0.9);
   z-index: 9999;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
 }
 
-/* ── Panel container ── */
+/* ── Dialog container ── */
 .panel {
-  width: 560px;
-  max-width: 96vw;
-  height: 100dvh;
+  width: min(1080px, calc(100vw - 3rem));
+  height: min(820px, calc(100dvh - 3rem));
+  max-width: 100%;
+  max-height: 100%;
   background: var(--surface-base, #080D14);
-  border-left: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  box-shadow: -14px 0 50px rgba(0, 0, 0, 0.42);
+  border: 1px solid var(--color-border, rgba(126,196,168,0.16));
+  border-radius: 18px;
+  box-shadow: 0 30px 90px rgba(2, 22, 15, 0.38), inset 0 1px rgba(255, 255, 255, 0.12);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  outline: none;
 }
 
 /* ── Header ── */
@@ -256,11 +274,11 @@ export default {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 1rem 1.1rem 0.9rem;
+  padding: 1rem 1.2rem 0.95rem;
   border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
   background:
-    linear-gradient(180deg, rgba(8, 20, 32, 0.96), rgba(8, 16, 28, 0.94)),
-    radial-gradient(circle at 12% -20%, rgba(4, 164, 105, 0.16), transparent 42%);
+    radial-gradient(circle at 8% -80%, color-mix(in srgb, var(--color-primary, #04a469) 14%, transparent), transparent 35%),
+    var(--surface-island, #101923);
   flex-shrink: 0;
 }
 
@@ -269,6 +287,15 @@ export default {
   flex-direction: column;
   gap: 0.22rem;
   min-width: 0;
+}
+
+.panel-eyebrow {
+  color: var(--color-primary, #04a469);
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .panel-title {
@@ -307,25 +334,33 @@ export default {
   color: var(--color-text, white);
 }
 
-/* ── Horizontal tab bar ── */
-.panel-tabs {
+/* ── Main workspace ── */
+.panel-main {
+  min-height: 0;
+  flex: 1 1 auto;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.4rem;
-  padding: 0.65rem 0.8rem;
-  border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+/* ── Vertical category navigation ── */
+.panel-tabs {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  padding: 1rem 0.72rem;
+  border-right: 1px solid var(--color-border, rgba(126,196,168,0.1));
   background: var(--surface-sunken, #060A10);
-  flex-shrink: 0;
 }
 
 .panel-tab {
   display: flex;
   align-items: flex-start;
   gap: 0.45rem;
-  padding: 0.5rem 0.58rem;
+  padding: 0.72rem 0.68rem;
   border: none;
   background: transparent;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: 9px;
   cursor: pointer;
   color: var(--color-text-muted, #5A9A82);
   font-size: 0.76rem;
@@ -341,12 +376,14 @@ export default {
 }
 
 .panel-tab.active {
-  background: var(--surface-overlay, #1E2D3D);
+  background: color-mix(in srgb, var(--color-primary, #04a469) 13%, var(--surface-overlay, #1E2D3D));
   color: var(--color-text, white);
+  box-shadow: inset 3px 0 var(--color-primary, #04a469);
 }
 
 .tab-icon {
-  font-size: 0.86rem;
+  width: 1.25rem;
+  font-size: 0.92rem;
   line-height: 1;
   margin-top: 0.08rem;
 }
@@ -359,7 +396,8 @@ export default {
 }
 
 .tab-label {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
+  font-weight: 650;
   line-height: 1.15;
 }
 
@@ -375,13 +413,17 @@ export default {
 
 /* ── Scrollable content area ── */
 .panel-content {
-  flex: 1;
+  min-width: 0;
+  min-height: 0;
   overflow-y: auto;
-  padding: 1rem 1rem 1.15rem;
+  padding: 1.5rem clamp(1.25rem, 3vw, 2.5rem) 2.5rem;
+  overscroll-behavior: contain;
 }
 
 /* ── Sections ── */
 :deep(.settings-section) {
+  width: min(100%, 760px);
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
@@ -571,48 +613,55 @@ export default {
   background: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
-/* ── Animations: slide from right ── */
-.panel-fade-enter-active {
-  transition: opacity 0.15s ease;
+/* ── Animations: focused dialog ── */
+.settings-dialog-enter-active,
+.settings-dialog-leave-active {
+  transition: opacity 180ms ease;
 }
 
-.panel-fade-leave-active {
-  transition: opacity 0.12s ease;
+.settings-dialog-enter-active .panel,
+.settings-dialog-leave-active .panel {
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.panel-fade-enter-from,
-.panel-fade-leave-to {
+.settings-dialog-enter-from,
+.settings-dialog-leave-to {
   opacity: 0;
 }
 
-.panel-slide-enter-active {
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.panel-slide-leave-active {
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.panel-slide-enter-from {
-  transform: translateX(100%);
-}
-
-.panel-slide-leave-to {
-  transform: translateX(100%);
+.settings-dialog-enter-from .panel,
+.settings-dialog-leave-to .panel {
+  opacity: 0;
+  transform: translateY(16px) scale(0.975);
 }
 
 /* ── Responsive ── */
-@media (max-width: 480px) {
+@media (max-width: 760px) {
+  .panel-overlay {
+    padding: 0;
+  }
+
   .panel {
     width: 100vw;
     max-width: 100vw;
-    border-left: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .panel-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .panel-tabs {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.32rem;
     padding: 0.45rem 0.55rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
   }
 
   :deep(.gradients-grid) {
@@ -626,6 +675,15 @@ export default {
 
   .panel-content {
     padding: 0.8rem 0.75rem 0.95rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-dialog-enter-active,
+  .settings-dialog-leave-active,
+  .settings-dialog-enter-active .panel,
+  .settings-dialog-leave-active .panel {
+    transition-duration: 1ms;
   }
 }
 </style>

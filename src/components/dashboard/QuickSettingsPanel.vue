@@ -1,12 +1,14 @@
 <template>
   <Teleport to="body">
-    <Transition name="dialog-fade">
+    <Transition name="quick-panel">
       <div v-if="visible" class="quick-overlay" @click="$emit('close')">
         <aside
+          ref="quickPanel"
           class="quick-panel"
           role="dialog"
           aria-modal="true"
           :aria-label="i18n.$t('dashboard.quickSettings.title')"
+          tabindex="-1"
           @click.stop
         >
           <header class="quick-header">
@@ -154,6 +156,7 @@
 </template>
 
 <script>
+import { nextTick } from 'vue';
 import DashboardIcon from '../icons/DashboardIcon.vue';
 import { SPEED_DIAL_SIZES, SPEED_DIAL_TITLE_MODES } from '../../utils/startPageSettings.js';
 
@@ -181,6 +184,26 @@ export default {
       widgetColumnOptions: [1, 2, 3, 4],
     };
   },
+  watch: {
+    visible(isVisible) {
+      if (isVisible) {
+        nextTick(() => this.$refs.quickPanel?.focus());
+      }
+    },
+  },
+  mounted() {
+    document.addEventListener('keydown', this.handleEscape);
+  },
+  beforeUnmount() {
+    document.removeEventListener('keydown', this.handleEscape);
+  },
+  methods: {
+    handleEscape(event) {
+      if (event.key === 'Escape' && this.visible) {
+        this.$emit('close');
+      }
+    },
+  },
 };
 </script>
 
@@ -190,17 +213,17 @@ export default {
   inset: 0;
   z-index: 8500;
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   justify-content: flex-end;
-  padding: 1rem;
-  background: rgba(4, 12, 10, 0.3);
-  backdrop-filter: blur(3px);
+  padding: 0.75rem;
+  background: transparent;
 }
 
 .quick-panel {
-  width: 370px;
+  width: 380px;
   max-width: calc(100vw - 1.5rem);
-  max-height: min(900px, calc(100dvh - 2rem));
+  height: calc(100dvh - 1.5rem);
+  max-height: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -209,6 +232,7 @@ export default {
   border: 1px solid var(--color-border, rgba(34, 75, 61, 0.16));
   border-radius: var(--nova-panel-radius, 14px);
   box-shadow: 0 24px 70px rgba(4, 28, 20, 0.24), inset 0 1px rgba(255, 255, 255, 0.2);
+  outline: none;
 }
 
 .quick-header {
@@ -412,10 +436,26 @@ export default {
   outline-offset: 2px;
 }
 
-.dialog-fade-enter-active { transition: opacity 180ms ease; }
-.dialog-fade-leave-active { transition: opacity 140ms ease; }
-.dialog-fade-enter-from,
-.dialog-fade-leave-to { opacity: 0; }
+.quick-panel-enter-active,
+.quick-panel-leave-active {
+  transition: opacity 160ms ease;
+}
+
+.quick-panel-enter-active .quick-panel,
+.quick-panel-leave-active .quick-panel {
+  transition: opacity 170ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.quick-panel-enter-from,
+.quick-panel-leave-to {
+  opacity: 0;
+}
+
+.quick-panel-enter-from .quick-panel,
+.quick-panel-leave-to .quick-panel {
+  opacity: 0;
+  transform: translateX(calc(100% + 1rem));
+}
 
 @media (max-width: 520px) {
   .quick-overlay {
@@ -426,8 +466,18 @@ export default {
   .quick-panel {
     width: 100%;
     max-width: none;
+    height: 100dvh;
     max-height: 100dvh;
     border-radius: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-panel-enter-active,
+  .quick-panel-leave-active,
+  .quick-panel-enter-active .quick-panel,
+  .quick-panel-leave-active .quick-panel {
+    transition-duration: 1ms;
   }
 }
 </style>

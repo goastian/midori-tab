@@ -21,23 +21,14 @@
         class="top-btn"
         type="button"
         @click="$emit('open-settings')"
+        :class="{ 'is-open': quickSettingsOpen }"
         :title="i18n.t.settings.title"
         :aria-label="i18n.t.settings.title"
+        :aria-expanded="quickSettingsOpen"
       >
         <DashboardIcon name="settings" :size="20" :stroke-width="1.5" aria-hidden="true" />
       </button>
     </div>
-
-    <!-- Bottom-right: Quick Settings button -->
-    <button
-      class="quick-fab"
-      type="button"
-      @click="$emit('toggle-quick-settings')"
-      :title="i18n.$t('dashboard.quickSettings.title')"
-      :aria-label="i18n.$t('dashboard.quickSettings.title')"
-    >
-      <DashboardIcon name="sliders" :size="18" :stroke-width="1.5" aria-hidden="true" />
-    </button>
 
     <header class="dash-header">
       <Logo />
@@ -63,6 +54,10 @@ export default {
       required: true,
     },
     appsMenuOpen: {
+      type: Boolean,
+      default: false,
+    },
+    quickSettingsOpen: {
       type: Boolean,
       default: false,
     },
@@ -121,6 +116,12 @@ export default {
   box-shadow: none;
 }
 
+.top-btn.is-open {
+  color: #ffffff;
+  background: var(--color-primary, #04A469);
+  border-color: var(--color-primary, #04A469);
+}
+
 /* Hamburger lines */
 .hamburger-icon {
   display: flex;
@@ -153,34 +154,6 @@ export default {
   transform: translateY(-6px) rotate(-45deg);
 }
 
-/* ── Quick Settings FAB (bottom-right) ─────────────────────── */
-.quick-fab {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1rem;
-  z-index: 80;
-  width: 42px;
-  height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface-island, rgba(255,255,255,0.9));
-  border: 1px solid var(--color-border, rgba(0,0,0,0.1));
-  border-radius: var(--nova-island-radius, 12px);
-  color: var(--color-text-muted, #5A7B6D);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
-}
-
-.quick-fab:hover {
-  background: var(--color-primary, #04A469);
-  color: #ffffff;
-  border-color: var(--color-primary, #04A469);
-  box-shadow: var(--shadow-floating, 0 8px 24px rgba(8,13,20,0.18));
-  transform: translateY(-1px);
-}
-
 /* ── Header ───────────────────────────────────────────────── */
 .dash-header {
   padding-top: 0.35rem;
@@ -196,11 +169,6 @@ export default {
 @media (max-height: 640px) {
   .dashboard {
     padding-bottom: 1.25rem;
-  }
-
-  .quick-fab {
-    bottom: 0.75rem;
-    right: 0.75rem;
   }
 }
 </style>

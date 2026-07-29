@@ -2,8 +2,9 @@
   <DashboardShell
     :i18n="i18n"
     :apps-menu-open="showAppsMenu"
-    @open-settings="openSettings"
-    @toggle-quick-settings="showQuickSettings = !showQuickSettings"
+    :quick-settings-open="showQuickSettings"
+    @open-settings="toggleQuickSettings"
+    @toggle-quick-settings="toggleQuickSettings"
     @toggle-apps-menu="showAppsMenu = !showAppsMenu"
   >
     <section v-if="widgetsStore.enabled.search" class="dash-search">
@@ -256,8 +257,13 @@ export default {
   },
 
   methods: {
-    openSettings() {
-      this.tab.openSettings('general');
+    toggleQuickSettings() {
+      this.showQuickSettings = !this.showQuickSettings;
+      if (this.showQuickSettings) {
+        this.showAppsMenu = false;
+        this.showWidgetSheet = false;
+        this.showMarketplaceSheet = false;
+      }
     },
 
     openStartPageSettingsAndCloseQuick() {
