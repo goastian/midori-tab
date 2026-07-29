@@ -44,13 +44,13 @@
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
 import { fetchSuggestions } from '../services/DuckDuckGoSuggestService.js';
+import { buildMidoriSearchUrl } from '../utils/searchUrl.js';
 import DashboardIcon from './icons/DashboardIcon.vue';
 
 const DEFAULT_ENGINE = {
   id: 'astiango',
   logo: 'https://astian.org/wp-content/uploads/2025/06/favicon-1.png',
   label: 'AstianGO',
-  url: 'https://astiango.com/?q=',
 };
 
 export default {
@@ -117,7 +117,7 @@ export default {
     search(q) {
       const term = (typeof q === 'string' ? q : this.query).trim();
       if (!term) return;
-      const url = `${DEFAULT_ENGINE.url}${encodeURIComponent(term)}`;
+      const url = buildMidoriSearchUrl(term);
       const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
       if (this.searchTarget === 'New Tab') {
         browserAPI.tabs.create({ url });
