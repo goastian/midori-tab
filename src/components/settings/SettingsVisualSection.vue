@@ -18,7 +18,11 @@
         <span class="setting-label">{{ i18n.t.visual.darkMode }}</span>
         <span class="setting-description">{{ i18n.t.visual.darkModeDesc }}</span>
       </div>
-      <Switch :state="settings.theme == 'dark'" @click="settings.setTheme()" />
+      <Switch
+        :state="settings.theme == 'dark'"
+        :label="i18n.t.visual.darkMode"
+        @click="settings.setTheme()"
+      />
     </div>
 
     <div class="setting-item">
@@ -26,21 +30,28 @@
         <span class="setting-label">{{ i18n.t.visual.autoTheme }}</span>
         <span class="setting-description">{{ i18n.t.visual.autoThemeDesc }}</span>
       </div>
-      <Switch :state="settings.autoTheme" @click="$emit('toggle-auto-theme')" />
+      <Switch
+        :state="settings.autoTheme"
+        :label="i18n.t.visual.autoTheme"
+        @click="$emit('toggle-auto-theme')"
+      />
     </div>
 
     <div v-if="background.type == 'Gradient'" class="gradients-section">
       <span class="section-label">{{ i18n.t.visual.availableGradients }}</span>
       <div class="gradients-grid">
-        <div
+        <button
           v-for="(item, index) in gradients"
           :key="index"
+          type="button"
           class="gradient-card"
           :class="[item, { active: background.class == item }]"
+          :aria-pressed="background.class == item"
+          :aria-label="`${i18n.t.visual.availableGradients} ${index + 1}`"
           @click="$emit('change-background', item)"
         >
           <span v-if="background.class == item" class="check-icon">✓</span>
-        </div>
+        </button>
       </div>
     </div>
 

@@ -27,6 +27,28 @@
       <line x1="16" x2="16" y1="18" y2="22" />
     </template>
 
+    <template v-else-if="name === 'grid'">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </template>
+
+    <template v-else-if="name === 'palette'">
+      <path d="M12 3a9 9 0 0 0 0 18h1.35a1.65 1.65 0 0 0 0-3.3h-.6a1.75 1.75 0 0 1 0-3.5H16a5 5 0 0 0 5-5C21 5.78 17.24 3 12 3Z" />
+      <circle cx="7.5" cy="10" r=".8" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="6.8" r=".8" fill="currentColor" stroke="none" />
+      <circle cx="14.2" cy="6.6" r=".8" fill="currentColor" stroke="none" />
+      <circle cx="17.1" cy="9.3" r=".8" fill="currentColor" stroke="none" />
+    </template>
+
+    <template v-else-if="name === 'globe'">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a14 14 0 0 1 0 18" />
+      <path d="M12 3a14 14 0 0 0 0 18" />
+    </template>
+
     <template v-else-if="name === 'store'">
       <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" />
       <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />

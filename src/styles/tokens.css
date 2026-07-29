@@ -1,6 +1,5 @@
 /* ============================================
-   MIDORI TAB — Design Tokens (Flat / Midnight Sage)
-   Sistema de diseño centralizado
+   MIDORI TAB — tokens aligned with Midori chrome
    ============================================ */
 
 :root {
@@ -105,34 +104,34 @@
 
 /* ── Light Theme Tokens ── */
 :root[data-theme='light'] {
-  --color-primary: var(--midori-600);
-  --color-primary-hover: var(--midori-700);
+  --color-primary: #0eae5b;
+  --color-primary-hover: #0a914c;
   --color-primary-subtle: var(--midori-50);
 
-  --color-bg: #E8EDEB;
-  --color-bg-secondary: #DDE4E0;
-  --color-bg-elevated: #F4F7F6;
+  --color-bg: #eff8f3;
+  --color-bg-secondary: #dff4e9;
+  --color-bg-elevated: #ffffff;
 
-  --surface-base: #E8EDEB;
-  --surface-raised: #F4F7F6;
-  --surface-overlay: #FFFFFF;
-  --surface-sunken: #DDE4E0;
-  --surface-island: rgba(244, 247, 246, 0.94);
-  --surface-control: rgba(255, 255, 255, 0.92);
+  --surface-base: #eff8f3;
+  --surface-raised: #ffffff;
+  --surface-overlay: #f7fbf8;
+  --surface-sunken: #e7f3ec;
+  --surface-island: rgba(247, 251, 248, 0.96);
+  --surface-control: rgba(255, 255, 255, 0.86);
   --surface-control-hover: #FFFFFF;
 
-  --color-text: #1A2B26;
-  --color-text-secondary: #3A5B4D;
-  --color-text-muted: #5A7B6D;
+  --color-text: #142a24;
+  --color-text-secondary: #31554b;
+  --color-text-muted: #617a72;
 
-  --color-border: #C0CFC8;
-  --color-border-hover: #99B3A8;
-  --color-border-strong: rgba(58, 91, 77, 0.32);
+  --color-border: rgba(20, 42, 36, 0.14);
+  --color-border-hover: rgba(20, 42, 36, 0.24);
+  --color-border-strong: rgba(20, 42, 36, 0.32);
 
-  --color-accent-bg: rgba(4, 164, 105, 0.08);
-  --color-accent-border: rgba(4, 164, 105, 0.2);
+  --color-accent-bg: rgba(14, 174, 91, 0.09);
+  --color-accent-border: rgba(14, 174, 91, 0.22);
 
-  --theme-accent: var(--midori-600);
+  --theme-accent: #0eae5b;
 
   --gradient-orange: linear-gradient(135deg, #ff7b7f, #ff595e, #e0484c);
   --gradient-green: linear-gradient(135deg, #8dc63f, #d4ff88);
@@ -142,36 +141,36 @@
   --gradient-midori: linear-gradient(135deg, var(--midori-400), var(--accent-teal));
 }
 
-/* ── Dark Theme Tokens (Midnight Sage) ── */
+/* ── Dark Theme Tokens (Midori Forest) ── */
 :root[data-theme='dark'] {
-  --color-primary: var(--ms-primary);
-  --color-primary-hover: var(--midori-300);
-  --color-primary-subtle: rgba(4, 164, 105, 0.1);
+  --color-primary: #29c58b;
+  --color-primary-hover: #48d4a1;
+  --color-primary-subtle: rgba(41, 197, 139, 0.1);
 
-  --color-bg: var(--ms-base);
-  --color-bg-secondary: var(--ms-chrome);
-  --color-bg-elevated: var(--ms-panel);
+  --color-bg: #07150d;
+  --color-bg-secondary: #101924;
+  --color-bg-elevated: #151d1a;
 
-  --surface-base: var(--ms-base);
-  --surface-raised: var(--ms-chrome);
-  --surface-overlay: var(--ms-panel);
-  --surface-sunken: #060A10;
-  --surface-island: rgba(15, 21, 32, 0.92);
-  --surface-control: rgba(30, 45, 61, 0.86);
-  --surface-control-hover: rgba(42, 62, 80, 0.92);
+  --surface-base: #07150d;
+  --surface-raised: #151d1a;
+  --surface-overlay: #16211d;
+  --surface-sunken: #0e1714;
+  --surface-island: rgba(14, 23, 20, 0.94);
+  --surface-control: rgba(255, 255, 255, 0.045);
+  --surface-control-hover: rgba(248, 248, 248, 0.1);
 
-  --color-text: var(--ms-text);
-  --color-text-secondary: var(--ms-sage);
-  --color-text-muted: #5A9A82;
+  --color-text: #eaf3f2;
+  --color-text-secondary: #a8c6bd;
+  --color-text-muted: #86a69c;
 
-  --color-border: rgba(126, 196, 168, 0.1);
-  --color-border-hover: rgba(126, 196, 168, 0.2);
-  --color-border-strong: rgba(126, 196, 168, 0.28);
+  --color-border: rgba(234, 243, 242, 0.11);
+  --color-border-hover: rgba(234, 243, 242, 0.2);
+  --color-border-strong: rgba(234, 243, 242, 0.28);
 
-  --color-accent-bg: rgba(4, 164, 105, 0.1);
-  --color-accent-border: rgba(4, 164, 105, 0.25);
+  --color-accent-bg: rgba(41, 197, 139, 0.11);
+  --color-accent-border: rgba(41, 197, 139, 0.26);
 
-  --theme-accent: var(--ms-primary);
+  --theme-accent: #29c58b;
 
   --gradient-orange: linear-gradient(135deg, #e0484c, #ff595e, #8b2c2f);
   --gradient-green: linear-gradient(135deg, #8dc63f, #3a5311);

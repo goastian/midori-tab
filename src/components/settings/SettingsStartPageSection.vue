@@ -7,7 +7,6 @@
 
     <section class="settings-group" :aria-labelledby="'start-page-speed-dials'">
       <header class="settings-group__header">
-        <span class="settings-group__index">01</span>
         <div>
           <h4 id="start-page-speed-dials">{{ i18n.$t('startPage.speedDials') }}</h4>
           <p>{{ i18n.$t('startPage.speedDialsDesc') }}</p>
@@ -103,7 +102,6 @@
 
     <section class="settings-group" :aria-labelledby="'start-page-layout'">
       <header class="settings-group__header">
-        <span class="settings-group__index">02</span>
         <div>
           <h4 id="start-page-layout">{{ i18n.$t('startPage.layout') }}</h4>
           <p>{{ i18n.$t('startPage.layoutDesc') }}</p>
@@ -153,7 +151,6 @@
 
     <section class="settings-group settings-group--reset" :aria-labelledby="'start-page-reset'">
       <header class="settings-group__header">
-        <span class="settings-group__index">03</span>
         <div>
           <h4 id="start-page-reset">{{ i18n.$t('startPage.resetTitle') }}</h4>
           <p>{{ i18n.$t('startPage.resetDesc') }}</p>
@@ -220,24 +217,13 @@ export default {
 .settings-group__header {
   display: flex;
   align-items: flex-start;
-  gap: 0.65rem;
   padding: 0 0.12rem 0.16rem;
-}
-
-.settings-group__index {
-  min-width: 1.75rem;
-  padding-top: 0.08rem;
-  color: var(--color-primary, #04a469);
-  font-size: 0.66rem;
-  font-weight: 750;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.08em;
 }
 
 .settings-group__header h4 {
   margin: 0;
   color: var(--color-text, #c4f0e0);
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   font-weight: 650;
 }
 
@@ -298,9 +284,9 @@ export default {
   gap: 0.45rem;
   padding: 0.82rem 0.9rem;
   color: var(--color-text, #c4f0e0);
-  background: var(--surface-raised, #0f1520);
-  border: 1px solid var(--color-border, rgba(126, 196, 168, 0.1));
-  border-radius: var(--radius-md, 10px);
+  background: var(--surface-overlay, #f7fbf8);
+  border: 1px solid var(--color-border, rgba(20, 42, 36, 0.12));
+  border-radius: 8px;
   font-size: 0.78rem;
   font-weight: 550;
 }
@@ -310,8 +296,8 @@ select {
   height: 35px;
   padding: 0 0.72rem;
   color: var(--color-text, #c4f0e0);
-  background: var(--surface-sunken, #060a10);
-  border: 1px solid var(--color-border, rgba(126, 196, 168, 0.14));
+  background: var(--surface-control, #fff);
+  border: 1px solid var(--color-border, rgba(20, 42, 36, 0.16));
   border-radius: var(--radius-sm, 7px);
   font: inherit;
   cursor: pointer;

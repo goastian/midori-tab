@@ -10,8 +10,10 @@
       <button
         v-for="theme in themeStore.allThemes"
         :key="theme.id"
+        type="button"
         class="theme-card"
         :class="{ active: theme.id === themeStore.activeThemeId }"
+        :aria-pressed="theme.id === themeStore.activeThemeId"
         @click="selectTheme(theme.id)"
       >
         <div class="theme-preview">
@@ -19,7 +21,6 @@
           <div class="preview-dark" :style="{ background: theme.preview.dark }"></div>
         </div>
         <div class="theme-card-info">
-          <span class="theme-card-icon">{{ theme.icon }}</span>
           <span class="theme-card-name">{{ theme.name }}</span>
         </div>
         <span v-if="theme.id === themeStore.activeThemeId" class="theme-check">✓</span>
@@ -42,39 +43,6 @@
       :types="['theme']"
       default-type="theme"
     />
-
-    <!-- Auto Adapt per theme -->
-    <div class="setting-item">
-      <div class="setting-info">
-        <span class="setting-label">{{ i18n.t.themes.adaptByTime }}</span>
-        <span class="setting-description">{{ i18n.t.themes.adaptByTimeDesc }}</span>
-      </div>
-      <button class="toggle-btn" :class="{ active: tabStore.autoTheme }" @click="toggleAutoAdapt">
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-      </button>
-    </div>
-
-    <!-- Active Theme Preview -->
-    <div class="active-preview">
-      <div class="preview-section">
-        <span class="preview-label">{{ copy.light }}</span>
-        <div class="preview-swatch-row">
-          <div class="swatch" :style="swatchStyle('light', '--color-bg')" :title="copy.background"></div>
-          <div class="swatch" :style="swatchStyle('light', '--color-primary')" :title="copy.primary"></div>
-          <div class="swatch" :style="swatchStyle('light', '--color-text')" :title="copy.text"></div>
-          <div class="swatch" :style="swatchStyle('light', '--theme-accent')" :title="copy.accent"></div>
-        </div>
-      </div>
-      <div class="preview-section">
-        <span class="preview-label">{{ copy.dark }}</span>
-        <div class="preview-swatch-row">
-          <div class="swatch" :style="swatchStyle('dark', '--color-bg')" :title="copy.background"></div>
-          <div class="swatch" :style="swatchStyle('dark', '--color-primary')" :title="copy.primary"></div>
-          <div class="swatch" :style="swatchStyle('dark', '--color-text')" :title="copy.text"></div>
-          <div class="swatch" :style="swatchStyle('dark', '--theme-accent')" :title="copy.accent"></div>
-        </div>
-      </div>
-    </div>
 
     <!-- Custom Theme Editor (only shown when custom is active) -->
     <template v-if="themeStore.activeThemeId === 'custom'">
@@ -112,9 +80,7 @@
 import { defineAsyncComponent } from 'vue';
 import { getWidgetCopy } from '../i18n/widget-copy.js';
 import useThemeStore from '../stores/useThemeStore.js';
-import useTabStore from '../stores/useTabStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
-import { useAutoTheme } from '../composables/useAutoTheme.js';
 
 export default {
   name: 'ThemePicker',
@@ -126,7 +92,6 @@ export default {
   data() {
     return {
       themeStore: useThemeStore(),
-      tabStore: useTabStore(),
       i18n: useI18nStore(),
       editVariant: 'dark',
       showMarketplace: false,
@@ -153,25 +118,6 @@ export default {
   methods: {
     selectTheme(id) {
       this.themeStore.setTheme(id);
-    },
-
-    toggleAutoAdapt() {
-      this.tabStore.autoTheme = !this.tabStore.autoTheme;
-      if (this.tabStore.autoTheme) {
-        const autoTheme = useAutoTheme();
-        autoTheme.start();
-      } else {
-        const autoTheme = useAutoTheme();
-        autoTheme.stop();
-        // Re-apply current manual theme
-        this.themeStore.applyTheme(this.tabStore.theme);
-      }
-    },
-
-    swatchStyle(variant, key) {
-      const theme = this.themeStore.activeTheme;
-      const vars = theme[variant] || {};
-      return { background: vars[key] || '#888' };
     },
 
     getCustomVar(key) {
@@ -215,18 +161,18 @@ export default {
 .themes-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 0.75rem;
+  gap: 0.55rem;
 }
 
 .theme-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.6rem;
-  background: var(--surface-raised, #0F1520);
-  border: 2px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
+  gap: 0.48rem;
+  padding: 0.52rem;
+  background: var(--surface-overlay, #f7fbf8);
+  border: 1px solid var(--color-border, rgba(20,42,36,0.14));
+  border-radius: 8px;
   cursor: pointer;
   transition: all var(--transition-fast, 0.1s ease);
   text-align: left;
@@ -234,17 +180,18 @@ export default {
 }
 
 .theme-card:hover {
-  background: var(--surface-overlay, #1E2D3D);
+  background: var(--surface-control-hover, #fff);
   border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .theme-card.active {
-  border-color: var(--color-primary, #04A469);
+  border-color: var(--color-primary, #0eae5b);
+  box-shadow: inset 0 0 0 1px var(--color-primary, #0eae5b);
 }
 
 .theme-preview {
   display: flex;
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
   height: 48px;
 }
@@ -258,8 +205,6 @@ export default {
   align-items: center;
   gap: 0.35rem;
 }
-
-.theme-card-icon { font-size: 1rem; }
 
 .theme-card-name {
   font-size: 0.8rem;
@@ -275,7 +220,7 @@ export default {
   right: 0.4rem;
   width: 20px;
   height: 20px;
-  background: var(--color-primary, #04A469);
+  background: var(--color-primary, #0eae5b);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -283,23 +228,6 @@ export default {
   font-size: 0.65rem;
   color: white;
   font-weight: 700;
-}
-
-/* Setting Item */
-.setting-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem;
-  background: var(--surface-raised, #0F1520);
-  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
-  transition: all var(--transition-fast, 0.1s ease);
-}
-
-.setting-item:hover {
-  background: var(--surface-overlay, #1E2D3D);
-  border-color: var(--color-border-hover, rgba(126,196,168,0.2));
 }
 
 .setting-info { display: flex; flex-direction: column; gap: 0.3rem; flex: 1; }
@@ -311,100 +239,36 @@ export default {
   gap: 0.8rem;
   align-items: center;
   justify-content: space-between;
-  padding: 0.95rem 1rem;
-  border-radius: var(--radius-md, 10px);
-  background: linear-gradient(135deg, rgba(4, 164, 105, 0.12), rgba(15, 21, 32, 0.84));
-  border: 1px solid rgba(4, 164, 105, 0.18);
+  padding: 0.9rem 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-border, rgba(20,42,36,0.12));
 }
 
 .marketplace-toggle-btn {
-  border: none;
-  background: var(--color-primary, #04A469);
-  color: #fff;
-  border-radius: 999px;
-  padding: 0.7rem 1rem;
+  min-height: 34px;
+  padding: 0.42rem 0.72rem;
+  color: var(--color-text, #142a24);
+  background: var(--surface-control, #fff);
+  border: 1px solid var(--color-border, rgba(20,42,36,0.16));
+  border-radius: 8px;
   cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
   font-weight: 600;
   white-space: nowrap;
 }
 
-/* Toggle */
-.toggle-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
+.marketplace-toggle-btn:hover {
+  color: var(--color-primary, #0eae5b);
+  background: var(--surface-control-hover, #fff);
+  border-color: var(--color-border-hover, rgba(20,42,36,0.24));
 }
 
-.toggle-track {
-  display: block;
-  width: 44px;
-  height: 24px;
-  background: var(--surface-overlay, #1E2D3D);
-  border-radius: 12px;
-  position: relative;
-  transition: background var(--transition-fast, 0.1s ease);
-}
-
-.toggle-btn.active .toggle-track {
-  background: var(--color-primary, #04A469);
-}
-
-.toggle-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: white;
-  transition: transform var(--transition-fast, 0.1s ease);
-}
-
-.toggle-btn.active .toggle-thumb {
-  transform: translateX(20px);
-}
-
-/* Active Preview */
-.active-preview {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--surface-sunken, #060A10);
-  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  border-radius: var(--radius-md, 10px);
-}
-
-.preview-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.preview-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-muted, #5A9A82);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.preview-swatch-row {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.swatch {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 2px solid var(--color-border, rgba(126,196,168,0.1));
-  transition: transform var(--transition-fast, 0.1s ease);
-}
-
-.swatch:hover {
-  transform: scale(1.15);
+.theme-card:focus-visible,
+.marketplace-toggle-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary, #0eae5b), transparent 28%);
+  outline-offset: 2px;
 }
 
 /* Custom Editor */
