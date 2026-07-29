@@ -2,6 +2,20 @@ export default {
   lang: 'Deutsch',
   langCode: 'de',
 
+  search: {
+    bangs: {
+      title: 'Direkt auf einer anderen Website suchen',
+      hint: 'Wählen Sie ein Kürzel und geben Sie dann Ihren Suchbegriff ein',
+      footer: 'Kürzel für die Suche auf Ihren Lieblingsseiten mit AstianGO',
+      explore: 'Alle !Bangs entdecken',
+      loading: 'Bang-Kürzel werden geladen…',
+      empty: 'Kein Bang passt zu diesem Kürzel. Tippen Sie weiter oder öffnen Sie den vollständigen Katalog.',
+      unavailable: 'Kürzel sind nicht verfügbar. Sie können weiterhin einen !Bang eingeben und suchen.',
+      available: '{count} Bang-Kürzel verfügbar',
+      selected: '{bang} für {site} ausgewählt. Suchbegriff eingeben und Enter drücken.',
+    },
+  },
+
   settings: {
     title: 'Einstellungen',
     close: 'Schließen',

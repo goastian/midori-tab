@@ -19,6 +19,7 @@
     "https://ipwho.is/*",
     "https://nominatim.openstreetmap.org/*",
     "https://duckduckgo.com/*",
+    "https://astiango.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
     "http://marketplace.astian.org/*",

@@ -2,6 +2,20 @@ export default {
   lang: 'Italiano',
   langCode: 'it',
 
+  search: {
+    bangs: {
+      title: 'Cerca direttamente in un altro sito',
+      hint: 'Scegli una scorciatoia e poi digita ciò che vuoi trovare',
+      footer: 'Scorciatoie per cercare nei tuoi siti preferiti da AstianGO',
+      explore: 'Esplora tutti i !Bang',
+      loading: 'Caricamento delle scorciatoie bang…',
+      empty: 'Nessun bang corrisponde a questa scorciatoia. Continua a digitare o esplora il catalogo completo.',
+      unavailable: 'Le scorciatoie non sono disponibili. Puoi comunque digitare un !Bang e cercare.',
+      available: '{count} scorciatoie bang disponibili',
+      selected: '{bang} selezionato per {site}. Digita la ricerca e premi Invio.',
+    },
+  },
+
   settings: {
   widgets: {
     weather: 'Meteo',

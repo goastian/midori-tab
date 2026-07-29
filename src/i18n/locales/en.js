@@ -2,6 +2,20 @@ export default {
   lang: 'English',
   langCode: 'en',
 
+  search: {
+    bangs: {
+      title: 'Search another site directly',
+      hint: 'Choose a shortcut, then type what you want to find',
+      footer: 'Shortcuts to search your favorite sites from AstianGO',
+      explore: 'Explore all !Bangs',
+      loading: 'Loading bang shortcuts…',
+      empty: 'No bang matches that shortcut. Keep typing or explore the full catalog.',
+      unavailable: 'Shortcuts are unavailable. You can still type a !bang and search.',
+      available: '{count} bang shortcuts available',
+      selected: '{bang} selected for {site}. Type your search and press Enter.',
+    },
+  },
+
   settings: {
     title: 'Settings',
     close: 'Close',

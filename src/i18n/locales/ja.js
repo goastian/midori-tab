@@ -2,6 +2,20 @@ export default {
   lang: '日本語',
   langCode: 'ja',
 
+  search: {
+    bangs: {
+      title: '別のサイトを直接検索',
+      hint: 'ショートカットを選び、検索したい内容を入力してください',
+      footer: 'AstianGOからお気に入りのサイトを検索するショートカット',
+      explore: 'すべての!Bangを見る',
+      loading: 'Bangショートカットを読み込み中…',
+      empty: 'このショートカットに一致するBangはありません。入力を続けるか、全カタログをご覧ください。',
+      unavailable: 'ショートカットを読み込めません。引き続き!Bangを入力して検索できます。',
+      available: '{count}件のBangショートカットが利用できます',
+      selected: '{site}の{bang}を選択しました。検索語を入力してEnterキーを押してください。',
+    },
+  },
+
   settings: {
     title: '設定',
     close: '閉じる',

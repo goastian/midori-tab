@@ -2,6 +2,20 @@ export default {
   lang: 'Português',
   langCode: 'pt',
 
+  search: {
+    bangs: {
+      title: 'Pesquise diretamente em outro site',
+      hint: 'Escolha um atalho e digite o que deseja encontrar',
+      footer: 'Atalhos para pesquisar nos seus sites favoritos a partir do AstianGO',
+      explore: 'Explorar todos os !Bangs',
+      loading: 'Carregando atalhos bang…',
+      empty: 'Nenhum bang corresponde a esse atalho. Continue digitando ou explore o catálogo completo.',
+      unavailable: 'Os atalhos não estão disponíveis. Você ainda pode digitar um !bang e pesquisar.',
+      available: '{count} atalhos bang disponíveis',
+      selected: '{bang} selecionado para {site}. Digite sua pesquisa e pressione Enter.',
+    },
+  },
+
   settings: {
     title: 'Configurações',
     close: 'Fechar',

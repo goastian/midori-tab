@@ -3,6 +3,20 @@ export default {
   lang: 'Español',
   langCode: 'es',
 
+  search: {
+    bangs: {
+      title: 'Busca directamente en otro sitio',
+      hint: 'Elige un atajo y luego escribe lo que quieres encontrar',
+      footer: 'Atajos para buscar en tus sitios favoritos desde AstianGO',
+      explore: 'Explorar todos los !Bangs',
+      loading: 'Cargando atajos bang…',
+      empty: 'Ningún bang coincide con ese atajo. Sigue escribiendo o explora el catálogo completo.',
+      unavailable: 'Los atajos no están disponibles. Aún puedes escribir un !bang y buscar.',
+      available: 'Hay {count} atajos bang disponibles',
+      selected: 'Seleccionaste {bang} para {site}. Escribe tu búsqueda y presiona Enter.',
+    },
+  },
+
   // Settings Modal
   settings: {
     title: 'Configuración',

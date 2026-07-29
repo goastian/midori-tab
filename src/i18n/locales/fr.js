@@ -2,6 +2,20 @@ export default {
   lang: 'Français',
   langCode: 'fr',
 
+  search: {
+    bangs: {
+      title: 'Rechercher directement sur un autre site',
+      hint: 'Choisissez un raccourci, puis saisissez ce que vous recherchez',
+      footer: 'Des raccourcis pour rechercher sur vos sites préférés depuis AstianGO',
+      explore: 'Explorer tous les !Bangs',
+      loading: 'Chargement des raccourcis bang…',
+      empty: 'Aucun bang ne correspond à ce raccourci. Continuez à écrire ou explorez le catalogue complet.',
+      unavailable: 'Les raccourcis sont indisponibles. Vous pouvez toujours saisir un !bang et lancer la recherche.',
+      available: '{count} raccourcis bang disponibles',
+      selected: '{bang} sélectionné pour {site}. Saisissez votre recherche et appuyez sur Entrée.',
+    },
+  },
+
   settings: {
   widgets: {
     weather: 'Meteo',

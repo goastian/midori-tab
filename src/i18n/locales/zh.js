@@ -2,6 +2,20 @@ export default {
   lang: '中文',
   langCode: 'zh',
 
+  search: {
+    bangs: {
+      title: '直接搜索其他网站',
+      hint: '选择快捷方式，然后输入要查找的内容',
+      footer: '从AstianGO搜索您常用网站的快捷方式',
+      explore: '浏览所有!Bang',
+      loading: '正在加载Bang快捷方式…',
+      empty: '没有与该快捷方式匹配的Bang。请继续输入或浏览完整目录。',
+      unavailable: '快捷方式暂不可用。您仍可以输入!Bang并搜索。',
+      available: '有{count}个Bang快捷方式可用',
+      selected: '已为{site}选择{bang}。请输入搜索内容并按Enter键。',
+    },
+  },
+
   settings: {
     title: '设置',
     close: '关闭',
