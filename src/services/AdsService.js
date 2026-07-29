@@ -482,6 +482,9 @@ export default class AdsService {
   #normalizeContract(data) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
     const iconUrl = data.icon_url || data.image_url || '';
+    const disclosureRequired = typeof data.disclosure_required === 'boolean'
+      ? data.disclosure_required
+      : data.billing?.funding_type === 'prepaid';
     const hasTransparency = Object.prototype.hasOwnProperty.call(data, 'transparency');
     const transparency = data.transparency && typeof data.transparency === 'object'
       && !Array.isArray(data.transparency)
@@ -491,10 +494,16 @@ export default class AdsService {
       ...data,
       icon_url: iconUrl,
       image_url: data.image_url || iconUrl,
+      disclosure_required: disclosureRequired,
+      sponsor_label: disclosureRequired && typeof data.sponsor_label === 'string'
+        ? data.sponsor_label.trim()
+        : null,
       attribution_token: typeof data.attribution_token === 'string'
         ? data.attribution_token.trim()
         : '',
-      transparency: transparency
+      transparency: !disclosureRequired
+        ? null
+        : (transparency
         ? {
           data_used: Array.isArray(transparency.data_used)
             ? transparency.data_used.filter(value => typeof value === 'string')
@@ -510,7 +519,7 @@ export default class AdsService {
           frequency_cap_per_day: 0,
           feedback_enabled: false,
           legacy: true,
-        }),
+        })),
     };
   }
 
@@ -554,9 +563,17 @@ export default class AdsService {
       data.attribution_token,
     ];
     if (!validAdId || requiredStrings.some(value => typeof value !== 'string' || !value.trim())) return false;
-    if (data.sponsor_label != null && typeof data.sponsor_label !== 'string') return false;
+    const fundingType = data.billing?.funding_type;
     if (
-      !data.transparency
+      typeof data.disclosure_required !== 'boolean'
+      || data.disclosure_required !== (fundingType === 'prepaid')
+    ) return false;
+    if (!data.disclosure_required) {
+      if (data.sponsor_label !== null || data.transparency !== null) return false;
+    } else if (
+      typeof data.sponsor_label !== 'string'
+      || !data.sponsor_label.trim()
+      || !data.transparency
       || !Array.isArray(data.transparency.data_used)
       || !Number.isSafeInteger(data.transparency.frequency_cap_per_day)
       || typeof data.transparency.feedback_enabled !== 'boolean'

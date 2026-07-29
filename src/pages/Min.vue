@@ -15,10 +15,18 @@
       </Suspense>
     </section>
 
-    <section v-if="tab.showAds" class="dash-sponsored">
+    <section v-if="tab.showSpeedDials || tab.showAds" class="dash-sponsored">
       <Suspense>
         <BookmarkGrid
+          :open-target="tab.openLink"
+          :show-speed-dials="tab.showSpeedDials"
           :showAds="tab.showAds"
+          :speed-dial-size="tab.speedDialSize"
+          :speed-dial-columns="tab.speedDialColumns"
+          :speed-dial-limit="tab.speedDialLimit"
+          :title-mode="tab.speedDialTitleMode"
+          :show-delete-button="tab.showSpeedDialDeleteButton"
+          :show-add-button="tab.showAddSpeedDialButton"
         />
         <template #fallback>
           <div class="async-placeholder async-placeholder--sponsored"></div>
@@ -27,7 +35,7 @@
     </section>
 
     <section
-      v-if="activeGridWidgets.length"
+      v-if="tab.widgetsEnabled && activeGridWidgets.length"
       :class="[
         'widget-board',
         `widget-board--${widgetBoardMode}`,
@@ -39,6 +47,7 @@
       </p>
       <div
         class="dash-widgets"
+        :style="widgetGridStyle"
         role="list"
         :aria-describedby="activeGridWidgets.length > 1 ? 'widget-board-hint' : undefined"
       >
@@ -57,6 +66,7 @@
             },
           ]"
           :data-widget="key"
+          :style="widgetCardStyle(key)"
           role="listitem"
           @dragover.prevent="handleDragOver(key, $event)"
           @dragleave="handleDragLeave(key, $event)"
@@ -133,10 +143,9 @@
       :widgets-store="widgetsStore"
       :i18n="i18n"
       @close="showQuickSettings = false"
-      @toggle-density="toggleDensity"
       @toggle-section="toggleSection"
       @refresh-wallpaper="refreshWallpaper"
-      @open-settings="openSettingsAndCloseQuick"
+      @open-start-page-settings="openStartPageSettingsAndCloseQuick"
     />
 
     <AstianAppsMenu
@@ -227,7 +236,16 @@ export default {
       return this.widgetManagement.getWidgetMetaMap();
     },
     widgetBoardMode() {
-      return resolveWidgetBoardMode(this.activeGridWidgets.length);
+      return resolveWidgetBoardMode(this.effectiveWidgetColumns);
+    },
+    effectiveWidgetColumns() {
+      return Math.max(1, Math.min(
+        Number(this.tab.widgetColumns) || 1,
+        this.activeGridWidgets.length || 1,
+      ));
+    },
+    widgetGridStyle() {
+      return { '--widget-columns': this.effectiveWidgetColumns };
     },
     widgetBoardHint() {
       const key = this.widgetBoardMode === 'pair'
@@ -239,16 +257,21 @@ export default {
 
   methods: {
     openSettings() {
-      this.tab.updateState();
+      this.tab.openSettings('general');
     },
 
-    openSettingsAndCloseQuick() {
+    openStartPageSettingsAndCloseQuick() {
       this.showQuickSettings = false;
-      this.openSettings();
+      this.tab.openSettings('start-page');
     },
 
-    toggleDensity() {
-      this.tab.setDensity(this.tab.density === 'compact' ? 'comfortable' : 'compact');
+    widgetCardStyle(key) {
+      const layout = this.widgetMetaMap[key]?.layout || 'compact';
+      const isWide = layout === 'wide' || layout === 'wide-tall';
+      const span = this.widgetBoardMode === 'grid' && isWide
+        ? this.effectiveWidgetColumns
+        : 1;
+      return { '--widget-span': span };
     },
 
     toggleSection(key) {
@@ -419,11 +442,11 @@ export default {
 
 .dash-sponsored {
   width: 100%;
-  max-width: 720px;
+  max-width: 1080px;
 }
 
 :global([data-density='compact']) .dash-sponsored {
-  max-width: 680px;
+  max-width: 1020px;
 }
 
 .widget-board {
@@ -453,16 +476,10 @@ export default {
   row-gap: 0.75rem;
 }
 
-.widget-board--single .dash-widgets {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.widget-board--pair .dash-widgets {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
+.widget-board--single .dash-widgets,
+.widget-board--pair .dash-widgets,
 .widget-board--grid .dash-widgets {
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--widget-columns, 1), minmax(0, 1fr));
   grid-auto-flow: row;
   align-items: start;
 }
@@ -487,12 +504,12 @@ export default {
 
 .widget-board--grid .widget-card--compact,
 .widget-board--grid .widget-card--compact-tall {
-  grid-column: span 4;
+  grid-column: span var(--widget-span, 1);
 }
 
 .widget-board--grid .widget-card--wide,
 .widget-board--grid .widget-card--wide-tall {
-  grid-column: span 12;
+  grid-column: span var(--widget-span, 1);
 }
 
 .widget-card:hover .widget-card__surface,
@@ -698,25 +715,13 @@ export default {
 }
 
 .async-placeholder--sponsored {
-  width: 120px;
-  min-height: 112px;
+  width: 104px;
+  min-height: 104px;
 }
 
 @keyframes placeholder-sheen {
   100% {
     transform: translateX(100%);
-  }
-}
-
-@media (max-width: 920px) {
-  .widget-board--grid .widget-card--compact,
-  .widget-board--grid .widget-card--compact-tall {
-    grid-column: span 6;
-  }
-
-  .widget-board--grid .widget-card--wide,
-  .widget-board--grid .widget-card--wide-tall {
-    grid-column: span 12;
   }
 }
 

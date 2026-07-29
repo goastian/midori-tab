@@ -45,8 +45,15 @@
               @update:title="title = $event"
             />
 
-            <SettingsVisualSection
+            <SettingsStartPageSection
               v-if="tab === 1"
+              :i18n="i18n"
+              :settings="settings"
+              :widgets-store="widgetsStore"
+            />
+
+            <SettingsVisualSection
+              v-if="tab === 2"
               :i18n="i18n"
               :settings="settings"
               :background="background"
@@ -57,7 +64,7 @@
               @open-marketplace="openMarketplace"
             />
 
-            <SettingsLanguageSection v-if="tab === 2" />
+            <SettingsLanguageSection v-if="tab === 3" />
           </div>
 
           <!-- Footer -->
@@ -80,6 +87,7 @@ import useWidgetsStore from '../stores/useWidgetsStore.js';
 import useAdsStore from '../stores/useAdsStore.js';
 import { useAutoTheme } from '../composables/useAutoTheme.js';
 import SettingsGeneralSection from './settings/SettingsGeneralSection.vue';
+import SettingsStartPageSection from './settings/SettingsStartPageSection.vue';
 import SettingsVisualSection from './settings/SettingsVisualSection.vue';
 import SettingsLanguageSection from './settings/SettingsLanguageSection.vue';
 
@@ -88,14 +96,22 @@ export default {
   
   components: {
     SettingsGeneralSection,
+    SettingsStartPageSection,
     SettingsVisualSection,
     SettingsLanguageSection,
   },
 
   data() {
+    const settings = useTabStore();
+    const sectionTabs = {
+      general: 0,
+      'start-page': 1,
+      visual: 2,
+      language: 3,
+    };
     return {
-      tab: 0,
-      settings: useTabStore(),
+      tab: sectionTabs[settings.settingsSection] ?? 0,
+      settings,
       spacesStore: useSpacesStore(),
       widgetsStore: useWidgetsStore(),
       adsStore: useAdsStore(),
@@ -109,6 +125,7 @@ export default {
       title: '',
       navKeys: [
         { emoji: '⚙️', titleKey: 'navGeneral', descKey: 'navGeneralDesc' },
+        { emoji: '▦', titleKey: 'navStartPage', descKey: 'navStartPageDesc' },
         { emoji: '🎨', titleKey: 'navVisual', descKey: 'navVisualDesc' },
         { emoji: '🌐', titleKey: 'navLanguage', descKey: 'navLanguageDesc' },
       ],
@@ -153,6 +170,7 @@ export default {
 
     changeTab(index) {
       this.tab = index;
+      this.settings.settingsSection = ['general', 'start-page', 'visual', 'language'][index] || 'general';
     },
 
     changeBackground(clas) {
@@ -163,7 +181,7 @@ export default {
     },
 
     closeSettings() {
-      this.settings.updateState();
+      this.settings.closeSettings();
     },
 
     handleEscape(e) {
@@ -222,9 +240,9 @@ export default {
 
 /* ── Panel container ── */
 .panel {
-  width: 420px;
-  max-width: 94vw;
-  height: 100vh;
+  width: 560px;
+  max-width: 96vw;
+  height: 100dvh;
   background: var(--surface-base, #080D14);
   border-left: 1px solid var(--color-border, rgba(126,196,168,0.1));
   box-shadow: -14px 0 50px rgba(0, 0, 0, 0.42);
@@ -292,7 +310,7 @@ export default {
 /* ── Horizontal tab bar ── */
 .panel-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.4rem;
   padding: 0.65rem 0.8rem;
   border-bottom: 1px solid var(--color-border, rgba(126,196,168,0.1));
@@ -592,7 +610,7 @@ export default {
   }
 
   .panel-tabs {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.32rem;
     padding: 0.45rem 0.55rem;
   }

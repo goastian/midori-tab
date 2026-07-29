@@ -1,5 +1,9 @@
 import { defineStore } from 'pinia';
 import useThemeStore from './useThemeStore.js';
+import {
+  normalizeStartPageSettings,
+  START_PAGE_DEFAULTS,
+} from '../utils/startPageSettings.js';
 
 // Cache system-level prefers-color-scheme to avoid calling matchMedia on every getter access
 let _systemDarkMode = (typeof window !== 'undefined' && window.matchMedia)
@@ -36,9 +40,11 @@ const useTabStore = defineStore('tabStore', {
       class: 'bg-orange',
     },
     state: false,
+    settingsSection: 'general',
     openLink: 'Self Tab',
     autoTheme: false,
     showAds: true,
+    ...START_PAGE_DEFAULTS,
   }),
 
   getters: {
@@ -67,6 +73,15 @@ const useTabStore = defineStore('tabStore', {
       this.state = !this.state;
     },
 
+    openSettings(section = 'general') {
+      this.settingsSection = section;
+      this.state = true;
+    },
+
+    closeSettings() {
+      this.state = false;
+    },
+
     setTheme() {
       this.theme = this.theme === 'light' ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', this.theme);
@@ -82,6 +97,17 @@ const useTabStore = defineStore('tabStore', {
     setTitle(title) {
         this.tabName = title;
         document.title = this.tabName;
+    },
+
+    applyStartPageSettings(settings = {}) {
+      Object.assign(this, normalizeStartPageSettings({
+        ...this.$state,
+        ...settings,
+      }));
+    },
+
+    resetStartPageSettings() {
+      Object.assign(this, START_PAGE_DEFAULTS);
     },
 
     changeBackground(background){
@@ -156,7 +182,27 @@ const useTabStore = defineStore('tabStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['tabName', 'theme', 'density', 'background', 'openLink', 'autoTheme', 'showAds'],
+    paths: [
+      'tabName',
+      'theme',
+      'density',
+      'background',
+      'openLink',
+      'autoTheme',
+      'showAds',
+      'showSpeedDials',
+      'speedDialSize',
+      'speedDialColumns',
+      'speedDialLimit',
+      'speedDialTitleMode',
+      'showSpeedDialDeleteButton',
+      'showAddSpeedDialButton',
+      'widgetsEnabled',
+      'widgetColumns',
+    ],
+    afterRestore(ctx) {
+      ctx.store.applyStartPageSettings(ctx.store.$state);
+    },
     serializer: {
       serialize(state) {
         return JSON.stringify({

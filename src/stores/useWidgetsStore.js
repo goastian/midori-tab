@@ -84,6 +84,12 @@ const useWidgetsStore = defineStore('widgetsStore', {
       this.order = [...DEFAULT_ORDER];
     },
 
+    /** Restores the built-in Start Page widget selection and order. */
+    resetToDefaults() {
+      this.enabled = { ...DEFAULT_ENABLED };
+      this.order = [...DEFAULT_ORDER];
+    },
+
     installMarketplaceWidget(asset) {
       const builtinWidgetKey = resolveBuiltinWidgetKey(asset);
 
