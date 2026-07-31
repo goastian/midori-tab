@@ -35,12 +35,28 @@
 
 html {
   font-size: 16px;
+  width: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+  overflow-x: clip;
 }
 
 body {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  min-height: 100dvh;
+  overflow-x: clip;
   background-color: var(--color-bg, #080D14);
   font-family: var(--font-sans);
   color: var(--color-text);
+}
+
+#app {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  min-height: 100dvh;
 }
 
 :where(a, button, input, textarea, select, [tabindex]):focus-visible {

@@ -169,7 +169,11 @@ import MarketplaceSheet from '../components/dashboard/MarketplaceSheet.vue';
 import QuickSettingsPanel from '../components/dashboard/QuickSettingsPanel.vue';
 import WidgetPicker from '../components/WidgetPicker.vue';
 import { useWidgetManagement } from '../composables/useWidgetManagement.js';
-import { moveWidget, resolveWidgetBoardMode } from '../utils/widgetLayout.js';
+import {
+  moveWidget,
+  resolveResponsiveWidgetColumns,
+  resolveWidgetBoardMode,
+} from '../utils/widgetLayout.js';
 
 export default {
   name: 'MinimalistDashboard',
@@ -212,15 +216,23 @@ export default {
       dropPlacement: 'before',
       dropAxis: 'horizontal',
       reorderAnnouncement: '',
+      viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
+      resizeFrame: null,
     };
   },
 
   mounted() {
     window.addEventListener('midori:open-marketplace', this.handleOpenMarketplace);
+    window.addEventListener('resize', this.handleViewportResize, { passive: true });
   },
 
   beforeUnmount() {
     window.removeEventListener('midori:open-marketplace', this.handleOpenMarketplace);
+    window.removeEventListener('resize', this.handleViewportResize);
+    if (this.resizeFrame) {
+      window.cancelAnimationFrame(this.resizeFrame);
+      this.resizeFrame = null;
+    }
   },
 
   computed: {
@@ -241,7 +253,10 @@ export default {
     },
     effectiveWidgetColumns() {
       return Math.max(1, Math.min(
-        Number(this.tab.widgetColumns) || 1,
+        resolveResponsiveWidgetColumns({
+          configuredColumns: this.tab.widgetColumns,
+          viewportWidth: this.viewportWidth,
+        }),
         this.activeGridWidgets.length || 1,
       ));
     },
@@ -257,6 +272,14 @@ export default {
   },
 
   methods: {
+    handleViewportResize() {
+      if (this.resizeFrame) return;
+      this.resizeFrame = window.requestAnimationFrame(() => {
+        this.resizeFrame = null;
+        this.viewportWidth = window.innerWidth;
+      });
+    },
+
     toggleQuickSettings() {
       this.showQuickSettings = !this.showQuickSettings;
       if (this.showQuickSettings) {
@@ -317,11 +340,6 @@ export default {
       this.widgetsStore.toggle(key);
       this.reorderAnnouncement = this.formatCopy('dashboard.widgetBoard.removed', { widget: label });
       this.finishWidgetDrag();
-    },
-
-    resetWidgetOrder() {
-      this.widgetsStore.resetOrder();
-      this.reorderAnnouncement = this.i18n.$t('dashboard.widgetBoard.resetDone');
     },
 
     handleDragStart(key, event) {

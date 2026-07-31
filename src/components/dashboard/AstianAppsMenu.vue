@@ -124,7 +124,11 @@ export default {
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  padding: 3.5rem 1rem 1rem;
+  padding:
+    max(3.5rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
 }
 
 .apps-panel {

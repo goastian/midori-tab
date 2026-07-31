@@ -22,7 +22,6 @@
           <div class="sheet-actions">
             <button class="sheet-reset" type="button" @click="$emit('reset-order')">
               <DashboardIcon name="reset" :size="15" :stroke-width="1.8" aria-hidden="true" />
-              <span>{{ i18n.$t('dashboard.widgetBoard.reset') }}</span>
             </button>
             <button class="sheet-close" type="button" :aria-label="i18n.$t('dashboard.widgetsSheet.close')" @click="$emit('close')">
               <DashboardIcon name="close" :size="16" :stroke-width="1.8" aria-hidden="true" />
@@ -123,12 +122,15 @@ export default {
   left: 0;
   right: 0;
   z-index: 8001;
-  max-height: min(620px, 76vh);
+  max-height: min(620px, 76dvh);
   overflow-y: auto;
   background: var(--surface-base, #080D14);
   border-top: 1px solid var(--color-border, rgba(126,196,168,0.1));
   border-radius: 18px 18px 0 0;
-  padding: 1.1rem clamp(1rem, 4vw, 3.5rem) 1.75rem;
+  padding:
+    1.1rem
+    clamp(1rem, 4vw, 3.5rem)
+    calc(1.25rem + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -18px 48px rgba(3, 12, 9, 0.22);
 }
 
@@ -323,7 +325,7 @@ export default {
 
 @media (max-width: 480px) {
   .widget-sheet {
-    max-height: 82vh;
+    max-height: 82dvh;
     padding-inline: 0.85rem;
   }
 

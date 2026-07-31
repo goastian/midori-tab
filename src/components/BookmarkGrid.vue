@@ -323,7 +323,7 @@ export default {
       categories: [...DEFAULT_CATEGORIES],
       activeTab: DEFAULT_CATEGORIES[0],
       failedFavicons: {},
-      viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
+      layoutWidth: typeof window === 'undefined' ? 1080 : Math.max(0, window.innerWidth - 40),
       editorMode: '',
       editingIndex: -1,
       editorError: '',
@@ -344,6 +344,7 @@ export default {
       performanceReportTimer: null,
       performanceReported: false,
       resizeFrame: null,
+      layoutObserver: null,
     };
   },
   computed: {
@@ -356,7 +357,7 @@ export default {
     effectiveColumns() {
       return resolveResponsiveSpeedDialColumns({
         configuredColumns: this.speedDialColumns,
-        viewportWidth: this.viewportWidth,
+        availableWidth: this.layoutWidth,
         size: this.speedDialSize,
       });
     },
@@ -461,6 +462,7 @@ export default {
       window.addEventListener('resize', this.handleResize, { passive: true });
     }
     this.$nextTick(() => {
+      this.setupLayoutObserver();
       this.setupPerformanceObserver();
       this.setupAdObserver();
     });
@@ -472,6 +474,10 @@ export default {
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', this.handleResize);
       if (this.resizeFrame) window.cancelAnimationFrame(this.resizeFrame);
+    }
+    if (this.layoutObserver) {
+      this.layoutObserver.disconnect();
+      this.layoutObserver = null;
     }
     this.reportPerformance();
     this.teardownAdObserver();
@@ -489,8 +495,27 @@ export default {
       if (this.resizeFrame || typeof window === 'undefined') return;
       this.resizeFrame = window.requestAnimationFrame(() => {
         this.resizeFrame = null;
-        this.viewportWidth = window.innerWidth;
+        this.measureLayoutWidth();
       });
+    },
+    measureLayoutWidth() {
+      const parentWidth = this.$el?.parentElement?.clientWidth;
+      this.layoutWidth = Math.max(
+        0,
+        Number(parentWidth) || (typeof window === 'undefined' ? 1080 : window.innerWidth - 40),
+      );
+    },
+    setupLayoutObserver() {
+      this.measureLayoutWidth();
+      if (typeof ResizeObserver === 'undefined') return;
+      const target = this.$el?.parentElement || this.$el;
+      if (!target) return;
+
+      this.layoutObserver = new ResizeObserver((entries) => {
+        const width = Number(entries[0]?.contentRect?.width) || 0;
+        if (width > 0) this.layoutWidth = width;
+      });
+      this.layoutObserver.observe(target);
     },
     bookmarkInitial(bookmark) {
       return String(bookmark?.title || '?').trim().charAt(0).toUpperCase() || '?';
@@ -764,6 +789,8 @@ export default {
 <style scoped>
 .bookmark-grid {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.72rem;
@@ -1334,6 +1361,22 @@ input:focus-visible {
 }
 
 @media (max-width: 600px) {
+  .bookmark-grid {
+    gap: 0.6rem;
+  }
+
+  .tabs-bar {
+    max-width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .tabs-bar::-webkit-scrollbar {
+    display: none;
+  }
+
   .speed-dial-grid { gap: 0.58rem; }
   .delete-confirmation { align-items: flex-start; flex-direction: column; }
   .transparency-panel {

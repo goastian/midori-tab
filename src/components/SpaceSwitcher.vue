@@ -39,18 +39,24 @@ export default {
 
 <style scoped>
 .space-switcher-bar {
-  position: fixed;
-  top: 0.75rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 900;
+  position: relative;
+  z-index: 20;
+  max-width: 100%;
+  min-width: 0;
   display: flex;
   gap: 0.25rem;
   padding: var(--nova-segment-padding, 4px);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
   background: var(--surface-island, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
   border-radius: var(--nova-island-radius, 12px);
   box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
+}
+
+.space-switcher-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .switcher-pill {
@@ -68,6 +74,7 @@ export default {
   font-weight: 500;
   transition: all var(--transition-fast, 0.1s ease);
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .switcher-pill:hover {
@@ -99,6 +106,20 @@ export default {
 }
 .slide-down-enter-from, .slide-down-leave-to {
   opacity: 0;
-  transform: translateX(-50%) translateY(-20px);
+  transform: translateY(-12px);
+}
+
+@media (max-width: 700px) {
+  .space-switcher-bar {
+    width: 100%;
+  }
+
+  .switcher-pill {
+    flex: 1 0 auto;
+    justify-content: center;
+    min-width: 5.25rem;
+    min-height: 34px;
+    padding-inline: 0.65rem;
+  }
 }
 </style>

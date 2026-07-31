@@ -390,6 +390,7 @@ export default {
 }
 
 .pw-stat {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -410,11 +411,15 @@ export default {
 }
 
 .pw-stat-label {
+  max-width: 100%;
   font-size: 0.62rem;
   font-weight: 500;
   color: var(--color-text-muted, #5A9A82);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 /* ── Categories breakdown ── */

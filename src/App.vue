@@ -14,13 +14,12 @@
         @load="imageReady = true"
       />
     </Transition>
+    <Minimalist />
     <div class="credits" v-if="showCredits">
-      <span class="credits__label">Photo</span> by 
-      <a :href="imageAuthorLink" target="_blank" rel="noopener noreferrer">{{ imageAuthor }}</a> 
+      <span class="credits__label">Photo</span> by
+      <a :href="imageAuthorLink" target="_blank" rel="noopener noreferrer">{{ imageAuthor }}</a>
       on <a :href="imageLink" target="_blank" rel="noopener noreferrer">{{ imageLabel }}</a>
     </div>
-    <SpaceSwitcher />
-    <Minimalist />
     <SettingsModal v-if="tabStore.state" />
     <SmartSuggestions v-if="renderSmartSuggestions" />
     <OmniLauncher
@@ -64,7 +63,6 @@
   import UnsService from './services/UnsService.js';
   import LocalWallpaperService from './services/LocalWallpaperService.js';
   import Minimalist from './pages/Min.vue';
-  import SpaceSwitcher from './components/SpaceSwitcher.vue';
   import { useAutoTheme } from './composables/useAutoTheme.js';
   import useThemeStore from './stores/useThemeStore.js';
 
@@ -112,7 +110,6 @@
     components: {
       Minimalist,
       SettingsModal: defineAsyncComponent(() => import('./components/SettingsModal.vue')),
-      SpaceSwitcher,
       SmartSuggestions: defineAsyncComponent(() => import('./components/SmartSuggestions.vue')),
       OmniLauncher: defineAsyncComponent(() => import('./omni/components/OmniLauncher.vue')),
     },
@@ -600,11 +597,12 @@
 <style scoped>
 .viewport {
   width: 100%;
-  height: 100%;
+  min-width: 0;
   min-height: 100vh;
-  display: flex;
+  min-height: 100dvh;
+  display: block;
   position: relative;
-  overflow-x: hidden;
+  overflow-x: clip;
   background: transparent;
 }
 
@@ -807,6 +805,20 @@
     left: 0.8rem;
     right: 0.8rem;
     width: auto;
+  }
+}
+
+@media (max-width: 1200px) {
+  .credits {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    display: table;
+    max-width: calc(100% - 1.5rem);
+    margin: 0 0.75rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 </style>

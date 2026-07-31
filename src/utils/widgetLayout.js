@@ -4,6 +4,24 @@ export const WIDGET_BOARD_MODE = Object.freeze({
   GRID: 'grid',
 });
 
+export function resolveResponsiveWidgetColumns({
+  configuredColumns,
+  viewportWidth,
+  horizontalPadding = 32,
+} = {}) {
+  const configured = Math.min(4, Math.max(1, Number(configuredColumns) || 1));
+  const width = Number(viewportWidth) || 0;
+  if (!width) return configured;
+
+  const availableWidth = Math.max(0, width - horizontalPadding);
+  let fittingColumns = 1;
+  if (availableWidth >= 680) fittingColumns = 2;
+  if (availableWidth >= 920) fittingColumns = 3;
+  if (availableWidth >= 1120) fittingColumns = 4;
+
+  return Math.min(configured, fittingColumns);
+}
+
 export function resolveWidgetBoardMode(widgetCount) {
   const count = Math.max(0, Number(widgetCount) || 0);
   if (count <= 1) return WIDGET_BOARD_MODE.SINGLE;

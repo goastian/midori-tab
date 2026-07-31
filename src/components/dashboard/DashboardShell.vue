@@ -1,33 +1,39 @@
 <template>
   <div class="dashboard">
-    <!-- Top-right: Hamburger (Astian Apps) + Settings gear -->
-    <div class="top-actions">
-      <button
-        class="top-btn hamburger-btn"
-        type="button"
-        @click="$emit('toggle-apps-menu')"
-        :class="{ 'is-open': appsMenuOpen }"
-        title="Astian Apps"
-        aria-label="Astian Apps"
-        :aria-expanded="appsMenuOpen"
-      >
-        <span class="hamburger-icon" aria-hidden="true">
-          <span></span>
-          <span></span>
-          <span></span>
-        </span>
-      </button>
-      <button
-        class="top-btn"
-        type="button"
-        @click="$emit('open-settings')"
-        :class="{ 'is-open': quickSettingsOpen }"
-        :title="i18n.t.settings.title"
-        :aria-label="i18n.t.settings.title"
-        :aria-expanded="quickSettingsOpen"
-      >
-        <DashboardIcon name="settings" :size="20" :stroke-width="1.5" aria-hidden="true" />
-      </button>
+    <div class="dashboard-toolbar">
+      <div class="dashboard-spaces">
+        <SpaceSwitcher />
+      </div>
+
+      <!-- Astian Apps + Settings share one reserved toolbar area. -->
+      <div class="top-actions">
+        <button
+          class="top-btn hamburger-btn"
+          type="button"
+          @click="$emit('toggle-apps-menu')"
+          :class="{ 'is-open': appsMenuOpen }"
+          title="Astian Apps"
+          aria-label="Astian Apps"
+          :aria-expanded="appsMenuOpen"
+        >
+          <span class="hamburger-icon" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+        </button>
+        <button
+          class="top-btn"
+          type="button"
+          @click="$emit('open-settings')"
+          :class="{ 'is-open': quickSettingsOpen }"
+          :title="i18n.t.settings.title"
+          :aria-label="i18n.t.settings.title"
+          :aria-expanded="quickSettingsOpen"
+        >
+          <DashboardIcon name="settings" :size="20" :stroke-width="1.5" aria-hidden="true" />
+        </button>
+      </div>
     </div>
 
     <header class="dash-header">
@@ -40,6 +46,7 @@
 
 <script>
 import Logo from '../Logo.vue';
+import SpaceSwitcher from '../SpaceSwitcher.vue';
 import DashboardIcon from '../icons/DashboardIcon.vue';
 
 export default {
@@ -47,6 +54,7 @@ export default {
   components: {
     DashboardIcon,
     Logo,
+    SpaceSwitcher,
   },
   props: {
     i18n: {
@@ -68,22 +76,45 @@ export default {
 
 <style scoped>
 .dashboard {
+  --dashboard-gutter: clamp(0.75rem, 3vw, 2rem);
   width: 100%;
+  min-width: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.25rem 2rem 5rem;
+  padding:
+    max(0.75rem, env(safe-area-inset-top, 0px))
+    var(--dashboard-gutter)
+    calc(1rem + env(safe-area-inset-bottom, 0px));
   gap: 1rem;
   font-size: 13px;
   box-sizing: border-box;
 }
 
+.dashboard-toolbar {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(44px, 1fr) minmax(0, auto) minmax(44px, 1fr);
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.dashboard-spaces {
+  grid-column: 2;
+  min-width: 0;
+  max-width: min(100%, 680px);
+  justify-self: center;
+}
+
 /* ── Top-right action cluster ─────────────────────────────── */
 .top-actions {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
+  position: static;
+  grid-column: 3;
+  justify-self: end;
   z-index: 50;
   display: flex;
   gap: 0.35rem;
@@ -156,19 +187,58 @@ export default {
 
 /* ── Header ───────────────────────────────────────────────── */
 .dash-header {
-  padding-top: 0.35rem;
+  width: 100%;
+  min-height: clamp(3.25rem, 7vw, 5.25rem);
   display: flex;
+  align-items: center;
   justify-content: center;
 }
 
 :global([data-density='compact']) .dashboard {
-  padding: 1rem 1.25rem 4.25rem;
+  --dashboard-gutter: clamp(0.75rem, 3vw, 1.25rem);
+  padding:
+    max(0.65rem, env(safe-area-inset-top, 0px))
+    var(--dashboard-gutter)
+    calc(0.85rem + env(safe-area-inset-bottom, 0px));
   gap: 0.9rem;
 }
 
 @media (max-height: 640px) {
   .dashboard {
     padding-bottom: 1.25rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboard {
+    --dashboard-gutter: clamp(0.75rem, 4vw, 1rem);
+    padding-bottom: 1rem;
+    gap: 0.75rem;
+  }
+
+  .dashboard-toolbar {
+    min-height: 0;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+
+  .dashboard-spaces {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .dashboard-spaces:empty {
+    display: none;
+  }
+
+  .top-actions {
+    align-self: flex-end;
+  }
+
+  .dash-header {
+    min-height: clamp(2.75rem, 14vw, 4rem);
   }
 }
 </style>

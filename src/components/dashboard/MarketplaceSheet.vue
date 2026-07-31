@@ -82,10 +82,10 @@ export default {
 .marketplace-sheet {
   position: fixed;
   left: 50%;
-  bottom: 1rem;
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   width: min(980px, calc(100vw - 1.5rem));
-  max-height: min(78vh, 780px);
+  max-height: min(78dvh, 780px);
   overflow: auto;
   z-index: 8001;
   background: color-mix(in srgb, var(--surface-base, #080D14) 92%, transparent);
@@ -168,8 +168,8 @@ export default {
 @media (max-width: 640px) {
   .marketplace-sheet {
     width: calc(100vw - 1rem);
-    bottom: 0.5rem;
-    max-height: 84vh;
+    bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+    max-height: 84dvh;
   }
 }
 </style>

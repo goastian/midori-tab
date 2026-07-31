@@ -81,6 +81,7 @@ export function getSpeedDialMetrics(size) {
 export function resolveResponsiveSpeedDialColumns({
   configuredColumns,
   viewportWidth,
+  availableWidth,
   size,
   horizontalPadding = 40,
   gap = 12,
@@ -92,9 +93,11 @@ export function resolveResponsiveSpeedDialColumns({
     START_PAGE_DEFAULTS.speedDialColumns,
   );
   const metrics = getSpeedDialMetrics(size);
-  const availableWidth = Math.max(0, Number(viewportWidth || 0) - horizontalPadding);
-  if (!availableWidth) return columns;
-  const fittingColumns = Math.max(1, Math.floor((availableWidth + gap) / (metrics.minWidth + gap)));
+  const resolvedWidth = availableWidth == null
+    ? Math.max(0, Number(viewportWidth || 0) - horizontalPadding)
+    : Math.max(0, Number(availableWidth) || 0);
+  if (!resolvedWidth) return columns;
+  const fittingColumns = Math.max(1, Math.floor((resolvedWidth + gap) / (metrics.minWidth + gap)));
   return Math.min(columns, fittingColumns);
 }
 

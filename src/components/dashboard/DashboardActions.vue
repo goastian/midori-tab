@@ -35,13 +35,13 @@ export default {
 
 <style scoped>
 .bottom-actions {
-  position: fixed;
-  bottom: 1.5rem;
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   z-index: 80;
+  width: fit-content;
+  max-width: 100%;
   display: flex;
   gap: 0.25rem;
+  margin: auto auto 0;
   padding: var(--nova-segment-padding, 4px);
   background: var(--surface-island, rgba(15,21,32,0.86));
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
@@ -71,17 +71,9 @@ export default {
   color: var(--color-text, #C4F0E0);
 }
 
-@media (max-height: 640px) {
-  .bottom-actions {
-    position: static;
-    transform: none;
-    margin-top: 0.25rem;
-  }
-}
-
 @media (max-width: 520px) {
   .bottom-actions {
-    max-width: calc(100vw - 1.5rem);
+    max-width: 100%;
     overflow-x: auto;
   }
 

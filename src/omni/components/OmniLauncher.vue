@@ -479,13 +479,17 @@ export default {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 12vh;
+  padding:
+    max(12dvh, env(safe-area-inset-top, 0px))
+    max(0.75rem, env(safe-area-inset-right, 0px))
+    max(0.75rem, env(safe-area-inset-bottom, 0px))
+    max(0.75rem, env(safe-area-inset-left, 0px));
 }
 
 /* ── Dialog ───────────────────────────────────────────────────────────────── */
 .omni-dialog {
-  width: min(700px, 96vw);
-  max-height: var(--omni-dialog-max-height, 560px);
+  width: min(700px, 100%);
+  max-height: min(var(--omni-dialog-max-height, 560px), 82dvh);
   background: var(--color-bg-elevated, #1e2128);
   border: 1px solid var(--color-border, #35373e);
   border-radius: 10px;
@@ -616,6 +620,24 @@ export default {
 }
 
 /* ── Reduced motion ───────────────────────────────────────────────────────── */
+@media (max-width: 620px) {
+  .omni-backdrop {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  }
+
+  .omni-dialog {
+    max-height: calc(
+      100dvh
+      - max(1.5rem, env(safe-area-inset-top, 0px))
+      - env(safe-area-inset-bottom, 0px)
+    );
+  }
+
+  .omni-hint {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .omni-anim-enter-active,
   .omni-anim-leave-active,
