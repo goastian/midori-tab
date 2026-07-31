@@ -466,11 +466,11 @@ export default {
 
 .dash-sponsored {
   width: 100%;
-  max-width: 1080px;
+  max-width: var(--dashboard-content-width, 45rem);
 }
 
 :global([data-density='compact']) .dash-sponsored {
-  max-width: 1020px;
+  max-width: var(--dashboard-content-width, 45rem);
 }
 
 .widget-board {
@@ -482,7 +482,7 @@ export default {
 }
 
 .widget-board--single {
-  max-width: 720px;
+  max-width: var(--dashboard-content-width, 45rem);
 }
 
 .widget-board--pair {

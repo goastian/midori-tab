@@ -18,8 +18,8 @@
 }
 
 .logo {
-  width: clamp(11rem, 32vw, 18.75rem);
-  max-width: 300px;
+  width: clamp(10.75rem, 12vw, 11.5rem);
+  max-width: 100%;
   height: auto;
   object-fit: contain;
   transition: transform var(--transition-normal, 0.15s ease);
@@ -31,7 +31,7 @@
 
 @media (max-width: 700px) {
   .logo {
-    width: min(58vw, 13.75rem);
+    width: min(48vw, 11rem);
   }
 }
 </style>

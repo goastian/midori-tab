@@ -77,6 +77,8 @@ export default {
 <style scoped>
 .dashboard {
   --dashboard-gutter: clamp(0.75rem, 3vw, 2rem);
+  --dashboard-content-width: 45rem;
+  position: relative;
   width: 100%;
   min-width: 0;
   min-height: 100vh;
@@ -85,7 +87,7 @@ export default {
   flex-direction: column;
   align-items: center;
   padding:
-    max(0.75rem, env(safe-area-inset-top, 0px))
+    max(1.25rem, env(safe-area-inset-top, 0px))
     var(--dashboard-gutter)
     calc(1rem + env(safe-area-inset-bottom, 0px));
   gap: 1rem;
@@ -94,7 +96,10 @@ export default {
 }
 
 .dashboard-toolbar {
-  width: 100%;
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top, 0px));
+  inset-inline: var(--dashboard-gutter);
+  width: auto;
   min-width: 0;
   min-height: 46px;
   display: grid;
@@ -108,6 +113,7 @@ export default {
   min-width: 0;
   max-width: min(100%, 680px);
   justify-self: center;
+  pointer-events: auto;
 }
 
 /* ── Top-right action cluster ─────────────────────────────── */
@@ -124,6 +130,7 @@ export default {
   border: 1px solid var(--color-border, rgba(0,0,0,0.1));
   border-radius: var(--nova-island-radius, 12px);
   box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
+  pointer-events: auto;
 }
 
 .top-btn {
@@ -188,7 +195,7 @@ export default {
 /* ── Header ───────────────────────────────────────────────── */
 .dash-header {
   width: 100%;
-  min-height: clamp(3.25rem, 7vw, 5.25rem);
+  min-height: 4.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -217,6 +224,9 @@ export default {
   }
 
   .dashboard-toolbar {
+    position: static;
+    inset: auto;
+    width: 100%;
     min-height: 0;
     display: flex;
     flex-direction: column-reverse;
