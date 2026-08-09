@@ -11,6 +11,27 @@ const WIDGET_META = [
   { key: 'rss', icon: 'rss', labelKey: 'widgets.rss', layout: 'wide-tall' },
 ];
 
+// PERF-202: altura real que reserva cada widget en su estado contenido, medida
+// sobre el CSS de cada tarjeta. El placeholder del dashboard la reutiliza para
+// minimizar el CLS cuando el widget asíncrono reemplaza al reservado.
+const WIDGET_PLACEHOLDER_HEIGHTS = {
+  weather: '235px',
+  currency: '215px',
+  browserBookmarks: '300px',
+  privacy: '205px',
+  calendar: '410px',
+  notes: '265px',
+  todo: '280px',
+  rss: '360px',
+};
+
+const LAYOUT_FALLBACK_HEIGHTS = {
+  'compact': '132px',
+  'compact-tall': '220px',
+  'wide': '150px',
+  'wide-tall': '320px',
+};
+
 const WIDGET_COMPONENT_MAP = {
   weather: 'WeatherWidget',
   currency: 'CurrencyWidget',
@@ -44,6 +65,12 @@ export function useWidgetManagement({ widgetsStore, i18n }) {
     return Object.fromEntries(getAvailableWidgets().map(widget => [widget.key, widget]));
   }
 
+  function getWidgetPlaceholderHeight(key) {
+    const widget = WIDGET_META.find(entry => entry.key === key);
+    if (!widget) return '132px';
+    return WIDGET_PLACEHOLDER_HEIGHTS[key] || LAYOUT_FALLBACK_HEIGHTS[widget.layout] || '132px';
+  }
+
   function toggleWidget(key) {
     widgetsStore.toggle(key);
   }
@@ -53,6 +80,7 @@ export function useWidgetManagement({ widgetsStore, i18n }) {
     getAvailableWidgets,
     getWidgetComponentMap,
     getWidgetMetaMap,
+    getWidgetPlaceholderHeight,
     toggleWidget,
   };
 }

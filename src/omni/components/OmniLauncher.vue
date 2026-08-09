@@ -92,6 +92,7 @@
 <script>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useOmniStore } from '../../stores/useOmniStore.js';
+import { subscribeViewportSize } from '../../composables/layoutResizeBus.js';
 import useI18nStore from '../../stores/useI18nStore.js';
 import { useOmniSearch } from '../composables/useOmniSearch.js';
 import OmniResultItem from './OmniResultItem.vue';
@@ -390,23 +391,20 @@ export default {
       );
     }
 
-    let configResizeRaf = null;
+    let unsubViewportSize = null;
 
     function onResize() {
       if (!omniStore.isOpen) return;
-      cancelAnimationFrame(configResizeRaf);
-      configResizeRaf = requestAnimationFrame(() => {
-        try {
-          loadOmniConfig();
-        } catch (_) { /* noop */ }
-      });
+      try {
+        loadOmniConfig();
+      } catch (_) { /* noop */ }
     }
 
     onMounted(() => {
       if (props.enableGlobalTriggers) {
         window.addEventListener('keydown', onGlobalKeydown);
       }
-      window.addEventListener('resize', onResize);
+      unsubViewportSize = subscribeViewportSize(onResize);
 
       try {
         loadOmniConfig();
@@ -423,9 +421,8 @@ export default {
       if (props.enableGlobalTriggers) {
         window.removeEventListener('keydown', onGlobalKeydown);
       }
-      window.removeEventListener('resize', onResize);
+      unsubViewportSize?.();
       cancelAnimationFrame(scrollRaf);
-      cancelAnimationFrame(configResizeRaf);
       try {
         if (props.enableGlobalTriggers) {
           chrome.runtime.onMessage.removeListener(onRuntimeMessage);

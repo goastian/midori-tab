@@ -169,6 +169,7 @@ import useI18nStore from '../stores/useI18nStore.js';
 import DashboardActions from '../components/dashboard/DashboardActions.vue';
 import DashboardShell from '../components/dashboard/DashboardShell.vue';
 import { useWidgetManagement } from '../composables/useWidgetManagement.js';
+import { subscribeViewportSize } from '../composables/layoutResizeBus.js';
 import {
   moveWidget,
   resolveResponsiveWidgetColumns,
@@ -217,14 +218,15 @@ export default {
       dropAxis: 'horizontal',
       reorderAnnouncement: '',
       viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
-      resizeFrame: null,
       renderGridWidgets: false,
     };
   },
 
   mounted() {
     window.addEventListener('midori:open-marketplace', this.handleOpenMarketplace);
-    window.addEventListener('resize', this.handleViewportResize, { passive: true });
+    this.unsubViewportSize = subscribeViewportSize(({ width }) => {
+      this.viewportWidth = width;
+    });
 
     this.deferGridWidgets();
 
@@ -239,11 +241,7 @@ export default {
 
   beforeUnmount() {
     window.removeEventListener('midori:open-marketplace', this.handleOpenMarketplace);
-    window.removeEventListener('resize', this.handleViewportResize);
-    if (this.resizeFrame) {
-      window.cancelAnimationFrame(this.resizeFrame);
-      this.resizeFrame = null;
-    }
+    this.unsubViewportSize?.();
     this.widgetBoardObserver?.disconnect();
     this.widgetBoardObserver = null;
   },
@@ -285,14 +283,6 @@ export default {
   },
 
   methods: {
-    handleViewportResize() {
-      if (this.resizeFrame) return;
-      this.resizeFrame = window.requestAnimationFrame(() => {
-        this.resizeFrame = null;
-        this.viewportWidth = window.innerWidth;
-      });
-    },
-
     deferGridWidgets() {
       // PERF-108: los widgets opcionales se montan después de que
       // search-ready haya ocurrido (Min.vue se monta después de SearchBox),
@@ -330,15 +320,9 @@ export default {
     },
 
     widgetPlaceholderStyle(key) {
-      const meta = this.widgetMetaMap[key];
-      if (!meta) return {};
-      const heights = {
-        'compact': '132px',
-        'compact-tall': '220px',
-        'wide': '150px',
-        'wide-tall': '320px',
-      };
-      return { minHeight: heights[meta.layout] || '132px' };
+      // PERF-202: reserva la altura real del widget en su estado contenido
+      // para que el montaje asíncrono no provoque layout shift.
+      return { minHeight: this.widgetManagement.getWidgetPlaceholderHeight(key) };
     },
 
     toggleQuickSettings() {

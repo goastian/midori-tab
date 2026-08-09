@@ -262,6 +262,7 @@ import {
   createAdViewabilityTracker,
 } from '../services/AdViewability.js';
 import { createAdInteractionGuard } from '../services/AdInteractionGuard.js';
+import { observeElementSize } from '../composables/layoutResizeBus.js';
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
 import {
   getSpeedDialMetrics,
@@ -324,6 +325,7 @@ export default {
       activeTab: DEFAULT_CATEGORIES[0],
       failedFavicons: {},
       layoutWidth: typeof window === 'undefined' ? 1080 : Math.max(0, window.innerWidth - 40),
+      unobserveLayout: null,
       editorMode: '',
       editingIndex: -1,
       editorError: '',
@@ -343,8 +345,6 @@ export default {
       layoutShift: 0,
       performanceReportTimer: null,
       performanceReported: false,
-      resizeFrame: null,
-      layoutObserver: null,
     };
   },
   computed: {
@@ -458,9 +458,6 @@ export default {
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.handleAdPageVisibility);
     }
-    if (typeof window !== 'undefined') {
-      window.addEventListener('resize', this.handleResize, { passive: true });
-    }
     this.$nextTick(() => {
       this.setupLayoutObserver();
       this.setupPerformanceObserver();
@@ -471,14 +468,7 @@ export default {
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.handleAdPageVisibility);
     }
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('resize', this.handleResize);
-      if (this.resizeFrame) window.cancelAnimationFrame(this.resizeFrame);
-    }
-    if (this.layoutObserver) {
-      this.layoutObserver.disconnect();
-      this.layoutObserver = null;
-    }
+    this.unobserveLayout?.();
     this.reportPerformance();
     this.teardownAdObserver();
     this.teardownPerformanceObserver();
@@ -491,13 +481,6 @@ export default {
         this.i18n.$t(key),
       );
     },
-    handleResize() {
-      if (this.resizeFrame || typeof window === 'undefined') return;
-      this.resizeFrame = window.requestAnimationFrame(() => {
-        this.resizeFrame = null;
-        this.measureLayoutWidth();
-      });
-    },
     measureLayoutWidth() {
       const parentWidth = this.$el?.parentElement?.clientWidth;
       this.layoutWidth = Math.max(
@@ -507,15 +490,11 @@ export default {
     },
     setupLayoutObserver() {
       this.measureLayoutWidth();
-      if (typeof ResizeObserver === 'undefined') return;
       const target = this.$el?.parentElement || this.$el;
       if (!target) return;
-
-      this.layoutObserver = new ResizeObserver((entries) => {
-        const width = Number(entries[0]?.contentRect?.width) || 0;
+      this.unobserveLayout = observeElementSize(target, ({ width }) => {
         if (width > 0) this.layoutWidth = width;
       });
-      this.layoutObserver.observe(target);
     },
     bookmarkInitial(bookmark) {
       return String(bookmark?.title || '?').trim().charAt(0).toUpperCase() || '?';
