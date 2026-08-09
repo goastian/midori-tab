@@ -49,6 +49,11 @@
 import useI18nStore from '../stores/useI18nStore.js';
 import { WIDGET_COST } from '../composables/useWidgetRuntime.js';
 import {
+  observeWidgetVisibility,
+  subscribeWidgetVisibility,
+  subscribeWidgetFocus,
+} from '../composables/widgetVisibilityBus.js';
+import {
   normalizePrivacyStats,
   requestPrivacyStats,
 } from '../services/privacyStats.js';
@@ -93,14 +98,14 @@ export default {
       enabled: false,
       backgroundState: 'idle',
       refreshTimer: null,
-      observer: null,
+      unobserveVisibility: null,
+      unsubscribeVisibility: null,
+      unsubscribeFocus: null,
       isInViewport: true,
       inFlight: false,
       lastFetchAt: 0,
       lastStatsSignature: '',
       failureCount: 0,
-      visibilityListener: null,
-      focusListener: null,
       privacyStatsListener: null,
       widgetPolicy: WIDGET_POLICY,
     };
@@ -208,7 +213,7 @@ export default {
         return;
       }
 
-      this.observer = new IntersectionObserver((entries) => {
+      this.unobserveVisibility = observeWidgetVisibility(root, (_target, entries) => {
         const entry = entries[0];
         this.isInViewport = Boolean(entry?.isIntersecting);
 
@@ -218,8 +223,7 @@ export default {
         }
 
         this.clearRefreshTimer();
-      }, { threshold: 0.1 });
-      this.observer.observe(root);
+      });
     },
 
     applyStats(data) {
@@ -276,18 +280,16 @@ export default {
   },
 
   mounted() {
-    this.visibilityListener = () => {
+    this.unsubscribeVisibility = subscribeWidgetVisibility(() => {
       if (this.isForeground()) {
         this.refreshFromEvent();
         return;
       }
       this.clearRefreshTimer();
-    };
-    this.focusListener = () => this.refreshFromEvent();
+    });
+    this.unsubscribeFocus = subscribeWidgetFocus(() => this.refreshFromEvent());
     this.privacyStatsListener = () => this.refreshFromEvent({ force: true });
 
-    document.addEventListener('visibilitychange', this.visibilityListener);
-    window.addEventListener('focus', this.focusListener);
     window.addEventListener('midori:privacy-stats-updated', this.privacyStatsListener);
 
     this.fetchStats({ force: true });
@@ -296,17 +298,17 @@ export default {
 
   beforeUnmount() {
     this.clearRefreshTimer();
-    if (this.observer) {
-      this.observer.disconnect();
-      this.observer = null;
+    if (this.unobserveVisibility) {
+      this.unobserveVisibility();
+      this.unobserveVisibility = null;
     }
-    if (this.visibilityListener) {
-      document.removeEventListener('visibilitychange', this.visibilityListener);
-      this.visibilityListener = null;
+    if (this.unsubscribeVisibility) {
+      this.unsubscribeVisibility();
+      this.unsubscribeVisibility = null;
     }
-    if (this.focusListener) {
-      window.removeEventListener('focus', this.focusListener);
-      this.focusListener = null;
+    if (this.unsubscribeFocus) {
+      this.unsubscribeFocus();
+      this.unsubscribeFocus = null;
     }
     if (this.privacyStatsListener) {
       window.removeEventListener('midori:privacy-stats-updated', this.privacyStatsListener);

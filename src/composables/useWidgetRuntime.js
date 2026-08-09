@@ -1,11 +1,14 @@
+import {
+  observeWidgetVisibility,
+  subscribeWidgetVisibility,
+  subscribeWidgetFocus,
+} from './widgetVisibilityBus.js';
+
 export const WIDGET_COST = Object.freeze({
   LOW: 'low',
   MEDIUM: 'medium',
   HIGH: 'high',
 });
-
-const DEFAULT_ROOT_MARGIN = '120px';
-const DEFAULT_THRESHOLD = 0.1;
 
 function isForegroundDocument() {
   return typeof document === 'undefined' || document.visibilityState !== 'hidden';
@@ -14,7 +17,9 @@ function isForegroundDocument() {
 function noop() {}
 
 export function createWidgetRuntime(component, policy = {}, hooks = {}) {
-  let observer = null;
+  let unobserve = null;
+  let unsubscribeVisibility = null;
+  let unsubscribeFocus = null;
   let refreshTimer = null;
   let visible = Boolean(policy.eager);
   let foreground = isForegroundDocument();
@@ -84,24 +89,16 @@ export function createWidgetRuntime(component, policy = {}, hooks = {}) {
   const mount = () => {
     foreground = isForegroundDocument();
 
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibility);
-    }
-    if (typeof window !== 'undefined') {
-      window.addEventListener('focus', handleFocus);
-    }
+    unsubscribeVisibility = subscribeWidgetVisibility(handleVisibility);
+    unsubscribeFocus = subscribeWidgetFocus(handleFocus);
 
     const root = getRoot();
     if (root && typeof IntersectionObserver !== 'undefined') {
-      observer = new IntersectionObserver((entries) => {
+      unobserve = observeWidgetVisibility(root, (_target, entries) => {
         const entry = entries[0];
         visible = Boolean(entry?.isIntersecting);
         syncActiveState();
-      }, {
-        rootMargin: policy.rootMargin || DEFAULT_ROOT_MARGIN,
-        threshold: policy.threshold ?? DEFAULT_THRESHOLD,
       });
-      observer.observe(root);
     } else {
       visible = true;
       syncActiveState();
@@ -110,15 +107,17 @@ export function createWidgetRuntime(component, policy = {}, hooks = {}) {
 
   const dispose = () => {
     clearRefreshTimer();
-    if (observer) {
-      observer.disconnect();
-      observer = null;
+    if (unobserve) {
+      unobserve();
+      unobserve = null;
     }
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', handleVisibility);
+    if (unsubscribeVisibility) {
+      unsubscribeVisibility();
+      unsubscribeVisibility = null;
     }
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('focus', handleFocus);
+    if (unsubscribeFocus) {
+      unsubscribeFocus();
+      unsubscribeFocus = null;
     }
   };
 
