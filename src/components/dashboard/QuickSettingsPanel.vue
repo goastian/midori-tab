@@ -185,10 +185,13 @@ export default {
     };
   },
   watch: {
-    visible(isVisible) {
-      if (isVisible) {
-        nextTick(() => this.$refs.quickPanel?.focus());
-      }
+    visible: {
+      immediate: true,
+      handler(isVisible) {
+        if (isVisible) {
+          nextTick(() => this.$refs.quickPanel?.focus());
+        }
+      },
     },
   },
   mounted() {

@@ -7,7 +7,6 @@ import useWidgetsStore from './useWidgetsStore.js';
 import useSpacesStore from './useSpacesStore.js';
 import {
   buildInstalledAssetRecord,
-  buildMarketplaceThemeDefinition,
   buildMarketplaceWallpaperBackground,
   normalizeMarketplaceAsset,
 } from '../utils/marketplaceAssets.js';
@@ -188,16 +187,15 @@ const useCatalogStore = defineStore('catalogStore', {
 
       if (asset.type === 'theme') {
         const themeStore = useThemeStore();
-        const installedTheme = buildMarketplaceThemeDefinition(asset);
-        if (!installedTheme) return null;
+        const localThemeId = await themeStore.installMarketplaceTheme(asset);
+        if (!localThemeId) return null;
 
-        themeStore.installMarketplaceTheme(asset);
         installedRecord = buildInstalledAssetRecord(asset, {
-          localId: installedTheme.id,
+          localId: localThemeId,
         });
 
         if (options.apply) {
-          themeStore.setTheme(installedTheme.id);
+          themeStore.setTheme(localThemeId);
         }
       }
 

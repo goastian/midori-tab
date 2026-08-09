@@ -520,6 +520,9 @@ export default {
 
   mounted() {
     document.addEventListener('mousedown', this.onClickOutside);
+    import('../bootstrap/perfMarks.js').then(({ default: perfMarks }) => {
+      perfMarks.mark('search-ready');
+    });
   },
 
   beforeUnmount() {

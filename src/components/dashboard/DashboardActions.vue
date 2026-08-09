@@ -12,12 +12,12 @@
 </template>
 
 <script>
-import DashboardIcon from '../icons/DashboardIcon.vue';
+import { defineAsyncComponent } from 'vue';
 
 export default {
   name: 'DashboardActions',
   components: {
-    DashboardIcon,
+    DashboardIcon: defineAsyncComponent(() => import('../icons/DashboardIcon.vue')),
   },
   props: {
     i18n: {

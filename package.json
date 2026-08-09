@@ -1,7 +1,7 @@
 {
   "name": "midori-newtab",
   "private": true,
-  "version": "1.0.42",
+  "version": "1.0.43",
   "type": "module",
   "scripts": {
     "dev:chrome": "npm run build:manifest:chrome:dev && vite build --watch",
@@ -20,7 +20,9 @@
     "preview": "vite preview",
     "validate:contracts": "node contracts/scripts/validate-examples.mjs",
     "test:contracts": "node --test contracts/tests/*.test.mjs",
-    "test:update": "node --test tests/**/*.test.mjs"
+    "test:update": "node --test tests/**/*.test.mjs",
+    "check:bundle": "node scripts/check-performance-budget.mjs",
+    "measure:newtab": "node scripts/measure-newtab.mjs"
   },
   "dependencies": {
     "@iconify/vue": "^5.0.0",

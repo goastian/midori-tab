@@ -57,6 +57,9 @@ function createBundleAnalyzerPlugin() {
           imports: item.type === 'chunk' ? item.imports : [],
           dynamicImports: item.type === 'chunk' ? item.dynamicImports : [],
           modules: item.type === 'chunk' ? Object.keys(item.modules) : [],
+          moduleBytes: item.type === 'chunk' ? Object.fromEntries(
+            Object.entries(item.modules).map(([modId, m]) => [modId.replace('/home/ponchale/Development/astian-ads/midori-tab/',''), m.renderedLength]),
+          ) : {},
           isEntry: item.type === 'chunk' ? item.isEntry : false,
         };
       });
@@ -139,18 +142,6 @@ function manualChunks(id) {
     return match ? `i18n-${match[1]}` : undefined;
   }
 
-  if (id.includes('/src/omni/')) {
-    return 'omni';
-  }
-
-  if (
-    id.includes('/src/components/MarketplaceBrowser.vue') ||
-    id.includes('/src/services/MarketplaceApiClient.js') ||
-    id.includes('/src/stores/useCatalogStore.js')
-  ) {
-    return 'marketplace';
-  }
-
   return undefined;
 }
 
@@ -185,6 +176,7 @@ export default defineConfig({
     terserOptions: {
       compress: {
         drop_debugger: true,
+        drop_console: true,
         passes: 2,
       },
     },

@@ -45,14 +45,14 @@
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue';
 import Logo from '../Logo.vue';
 import SpaceSwitcher from '../SpaceSwitcher.vue';
-import DashboardIcon from '../icons/DashboardIcon.vue';
 
 export default {
   name: 'DashboardShell',
   components: {
-    DashboardIcon,
+    DashboardIcon: defineAsyncComponent(() => import('../icons/DashboardIcon.vue')),
     Logo,
     SpaceSwitcher,
   },

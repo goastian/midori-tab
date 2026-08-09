@@ -42,6 +42,7 @@
         `widget-board--${widgetBoardMode}`,
       ]"
       :aria-label="i18n.$t('dashboard.widgetBoard.title')"
+      ref="widgetBoard"
     >
       <p v-if="activeGridWidgets.length > 1" id="widget-board-hint" class="sr-only">
         {{ widgetBoardHint }}
@@ -103,7 +104,8 @@
               </button>
             </header>
             <div class="widget-card__body">
-              <component :is="widgetComponentMap[key]" :managed="true" />
+              <div v-if="!renderGridWidgets" class="async-placeholder widget-card__placeholder" :style="widgetPlaceholderStyle(key)" role="presentation"></div>
+              <component :is="widgetComponentMap[key]" :managed="true" v-else />
             </div>
           </div>
         </article>
@@ -120,6 +122,7 @@
     />
 
     <WidgetPicker
+      v-if="showWidgetSheet"
       :visible="showWidgetSheet"
       :widgets="availableWidgets"
       :enabled="widgetsStore.enabled"
@@ -139,6 +142,7 @@
     />
 
     <QuickSettingsPanel
+      v-if="showQuickSettings"
       :visible="showQuickSettings"
       :tab="tab"
       :widgets-store="widgetsStore"
@@ -150,6 +154,7 @@
     />
 
     <AstianAppsMenu
+      v-if="showAppsMenu"
       :visible="showAppsMenu"
       @close="showAppsMenu = false"
     />
@@ -161,13 +166,8 @@ import { defineAsyncComponent } from 'vue';
 import useTabStore from '../stores/useTabStore';
 import useWidgetsStore from '../stores/useWidgetsStore';
 import useI18nStore from '../stores/useI18nStore.js';
-import AstianAppsMenu from '../components/dashboard/AstianAppsMenu.vue';
 import DashboardActions from '../components/dashboard/DashboardActions.vue';
-import DashboardIcon from '../components/icons/DashboardIcon.vue';
 import DashboardShell from '../components/dashboard/DashboardShell.vue';
-import MarketplaceSheet from '../components/dashboard/MarketplaceSheet.vue';
-import QuickSettingsPanel from '../components/dashboard/QuickSettingsPanel.vue';
-import WidgetPicker from '../components/WidgetPicker.vue';
 import { useWidgetManagement } from '../composables/useWidgetManagement.js';
 import {
   moveWidget,
@@ -179,23 +179,23 @@ export default {
   name: 'MinimalistDashboard',
 
   components: {
-    AstianAppsMenu,
+    AstianAppsMenu: defineAsyncComponent(() => import('../components/dashboard/AstianAppsMenu.vue')),
     BookmarkGrid: defineAsyncComponent(() => import('../components/BookmarkGrid.vue')),
     BrowserBookmarksWidget: defineAsyncComponent(() => import('../components/BrowserBookmarksWidget.vue')),
     CalendarWidget: defineAsyncComponent(() => import('../components/CalendarWidget.vue')),
     CurrencyWidget: defineAsyncComponent(() => import('../components/CurrencyWidget.vue')),
     DashboardActions,
-    DashboardIcon,
+    DashboardIcon: defineAsyncComponent(() => import('../components/icons/DashboardIcon.vue')),
     DashboardShell,
-    MarketplaceSheet,
+    MarketplaceSheet: defineAsyncComponent(() => import('../components/dashboard/MarketplaceSheet.vue')),
     NotesWidget: defineAsyncComponent(() => import('../components/NotesWidget.vue')),
     PrivacyWidget: defineAsyncComponent(() => import('../components/PrivacyWidget.vue')),
-    QuickSettingsPanel,
+    QuickSettingsPanel: defineAsyncComponent(() => import('../components/dashboard/QuickSettingsPanel.vue')),
     RssWidget: defineAsyncComponent(() => import('../components/RssWidget.vue')),
     SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
     TodoWidget: defineAsyncComponent(() => import('../components/TodoWidget.vue')),
     WeatherWidget: defineAsyncComponent(() => import('../components/WeatherWidget.vue')),
-    WidgetPicker,
+    WidgetPicker: defineAsyncComponent(() => import('../components/WidgetPicker.vue')),
   },
 
   data() {
@@ -218,12 +218,23 @@ export default {
       reorderAnnouncement: '',
       viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
       resizeFrame: null,
+      renderGridWidgets: false,
     };
   },
 
   mounted() {
     window.addEventListener('midori:open-marketplace', this.handleOpenMarketplace);
     window.addEventListener('resize', this.handleViewportResize, { passive: true });
+
+    this.deferGridWidgets();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        import('../bootstrap/perfMarks.js').then(({ default: perfMarks }) => {
+          perfMarks.mark('above-fold-stable');
+        });
+      });
+    });
   },
 
   beforeUnmount() {
@@ -233,6 +244,8 @@ export default {
       window.cancelAnimationFrame(this.resizeFrame);
       this.resizeFrame = null;
     }
+    this.widgetBoardObserver?.disconnect();
+    this.widgetBoardObserver = null;
   },
 
   computed: {
@@ -278,6 +291,54 @@ export default {
         this.resizeFrame = null;
         this.viewportWidth = window.innerWidth;
       });
+    },
+
+    deferGridWidgets() {
+      // PERF-108: los widgets opcionales se montan después de que
+      // search-ready haya ocurrido (Min.vue se monta después de SearchBox),
+      // o al acercarse al viewport, lo que ocurra primero. SearchBox y los
+      // speed dials ya arrancaron en el camino crítico.
+      const reveal = () => { this.renderGridWidgets = true; };
+
+      if (typeof window !== 'undefined' && 'IntersectionObserver' in window) {
+        this.widgetBoardObserver = new IntersectionObserver((entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            reveal();
+            this.widgetBoardObserver?.disconnect();
+            this.widgetBoardObserver = null;
+          }
+        }, { rootMargin: '320px 0px' });
+        this.$nextTick(() => {
+          if (this.$refs.widgetBoard) {
+            this.widgetBoardObserver?.observe(this.$refs.widgetBoard);
+          } else {
+            reveal();
+          }
+        });
+      }
+
+      // Fallback: si el board nunca se acerca al viewport, montarlo en idle.
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(() => {
+          if (!this.renderGridWidgets) reveal();
+        }, { timeout: 1500 });
+      } else {
+        setTimeout(() => {
+          if (!this.renderGridWidgets) reveal();
+        }, 600);
+      }
+    },
+
+    widgetPlaceholderStyle(key) {
+      const meta = this.widgetMetaMap[key];
+      if (!meta) return {};
+      const heights = {
+        'compact': '132px',
+        'compact-tall': '220px',
+        'wide': '150px',
+        'wide-tall': '320px',
+      };
+      return { minHeight: heights[meta.layout] || '132px' };
     },
 
     toggleQuickSettings() {
@@ -736,6 +797,16 @@ export default {
 
 .async-placeholder--search {
   min-height: 54px;
+}
+
+.widget-card__placeholder {
+  border: 0;
+  border-radius: 0;
+  min-height: 132px;
+}
+
+.widget-card__placeholder::after {
+  border-radius: 14px;
 }
 
 .async-placeholder--sponsored {

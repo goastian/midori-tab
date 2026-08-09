@@ -100,9 +100,12 @@ export default {
     },
   },
   watch: {
-    visible(isVisible) {
-      if (!isVisible) return;
-      nextTick(() => this.$refs.sheet?.focus());
+    visible: {
+      immediate: true,
+      handler(isVisible) {
+        if (!isVisible) return;
+        nextTick(() => this.$refs.sheet?.focus());
+      },
     },
   },
 };

@@ -1,4 +1,15 @@
+import { readBootSnapshot } from './bootSnapshot.js';
+
 function resolveInitialTheme() {
+  const snapshot = readBootSnapshot();
+  if (snapshot) {
+    let theme = snapshot.theme || 'light';
+    if (snapshot.autoTheme) {
+      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return { theme, density: snapshot.density || 'comfortable' };
+  }
+
   try {
     const raw = localStorage.getItem('tabStore');
     if (!raw) {
@@ -15,15 +26,16 @@ function resolveInitialTheme() {
       theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
 
-    return theme;
+    return { theme, density: state.density || 'comfortable' };
   } catch {
     return null;
   }
 }
 
 export default function applyInitialTheme() {
-  const theme = resolveInitialTheme();
-  if (theme) {
-    document.documentElement.setAttribute('data-theme', theme);
+  const resolved = resolveInitialTheme();
+  if (resolved) {
+    document.documentElement.setAttribute('data-theme', resolved.theme);
+    document.documentElement.setAttribute('data-density', resolved.density);
   }
 }

@@ -7,11 +7,15 @@ import './styles/tokens.css'
 import './styles/animations.css'
 import './style.css'
 import applyInitialTheme from './bootstrap/applyInitialTheme.js'
+import perfMarks from './bootstrap/perfMarks.js'
 import useI18nStore from './stores/useI18nStore.js'
 import useTabStore from './stores/useTabStore.js'
 import useThemeStore from './stores/useThemeStore.js'
 import { getBrowserInfo } from './utils/browserInfo.js'
 import { hydrateAsyncStores } from './bootstrap/hydrateAsyncStores.js'
+import { writeBootSnapshot } from './bootstrap/bootSnapshot.js'
+
+perfMarks.setup()
 
 applyInitialTheme()
 
@@ -29,6 +33,7 @@ const browserInfo = getBrowserInfo()
 document.documentElement.setAttribute('data-browser', browserInfo.id)
 
 const tabStore = useTabStore(pinia)
+tabStore.$subscribe((_mutation, state) => writeBootSnapshot(state), { detached: true })
 const themeStore = useThemeStore(pinia)
 const initialTheme = tabStore.resolveTheme()
 document.documentElement.setAttribute('data-theme', initialTheme)
@@ -36,3 +41,9 @@ themeStore.applyTheme(initialTheme)
 
 app.mount('#app')
 hydrateAsyncStores(pinia)
+
+window.requestAnimationFrame(() => {
+  window.requestAnimationFrame(() => {
+    perfMarks.mark('shell-visible')
+  })
+})

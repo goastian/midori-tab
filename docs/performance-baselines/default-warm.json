@@ -1,0 +1,127 @@
+{
+  "generatedAt": "2026-08-09T16:35:38.823Z",
+  "scenario": "default",
+  "reps": 30,
+  "environment": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+    "hardwareConcurrency": 20,
+    "deviceMemory": 32,
+    "saveData": false,
+    "effectiveType": "4g"
+  },
+  "marks": {
+    "boot-start": {
+      "n": 30,
+      "p50": 0,
+      "p75": 0,
+      "p95": 0,
+      "mean": 0,
+      "min": 0,
+      "max": 0
+    },
+    "shell-visible": {
+      "n": 30,
+      "p50": 30,
+      "p75": 32.4,
+      "p95": 46.3,
+      "mean": 33.18,
+      "min": 19.6,
+      "max": 112.6
+    },
+    "search-ready": {
+      "n": 30,
+      "p50": 53.5,
+      "p75": 58.4,
+      "p95": 74.7,
+      "mean": 57.53,
+      "min": 35.6,
+      "max": 171.7
+    },
+    "above-fold-stable": {
+      "n": 30,
+      "p50": 29.8,
+      "p75": 32.2,
+      "p95": 46.1,
+      "mean": 33.03,
+      "min": 19.6,
+      "max": 112.5
+    },
+    "idle-complete": {
+      "n": 30,
+      "p50": 66.6,
+      "p75": 69.8,
+      "p95": 88.6,
+      "mean": 76.38,
+      "min": 47.9,
+      "max": 417.5
+    }
+  },
+  "navigation": {
+    "domContentLoaded": {
+      "n": 30,
+      "p50": 52,
+      "p75": 58.10000000009313,
+      "p95": 71.89999999990687,
+      "mean": 54.73,
+      "min": 39.89999999990687,
+      "max": 120.60000000009313
+    },
+    "loadEvent": {
+      "n": 30,
+      "p50": 74.10000000009313,
+      "p75": 89.39999999990687,
+      "p95": 144.89999999990687,
+      "mean": 53.98,
+      "min": 0,
+      "max": 183
+    },
+    "firstPaintMs": {
+      "n": 0,
+      "p50": null,
+      "p75": null,
+      "p95": null,
+      "mean": null,
+      "min": null,
+      "max": null
+    },
+    "firstContentfulPaintMs": {
+      "n": 0,
+      "p50": null,
+      "p75": null,
+      "p95": null,
+      "mean": null,
+      "min": null,
+      "max": null
+    }
+  },
+  "longTasks": {
+    "n": 30,
+    "p50": 0,
+    "p75": 0,
+    "p95": 0,
+    "mean": 2.23,
+    "min": 0,
+    "max": 67
+  },
+  "cls": {
+    "n": 30,
+    "p50": 0.034,
+    "p75": 0.034,
+    "p95": 0.042,
+    "mean": 0.03,
+    "min": 0.034,
+    "max": 0.042
+  },
+  "nodes": {
+    "n": 30,
+    "p50": 77,
+    "p75": 77,
+    "p95": 198,
+    "mean": 84.67,
+    "min": 72,
+    "max": 199
+  },
+  "remoteRequestsBeforeSearchReady": 3,
+  "unexpectedRequestsBeforeSearchReady": 0,
+  "note": "Las marcas miden desde navigationStart de index.html. Ver plan §2 y §6."
+}

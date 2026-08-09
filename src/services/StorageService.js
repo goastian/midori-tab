@@ -156,14 +156,6 @@ function readLocalStoragePayload(key) {
   }
 }
 
-function writeLocalStorage(key, value, version = DEFAULT_VERSION) {
-  try {
-    localStorage.setItem(key, JSON.stringify(wrapPayload(value, version)));
-  } catch {
-    /* localStorage can be unavailable in restricted extension contexts. */
-  }
-}
-
 export async function getJson(key, fallback = null) {
   const localPayload = readLocalStoragePayload(key);
   const storage = getExtensionStorage();
@@ -180,42 +172,60 @@ export async function getJson(key, fallback = null) {
 
 export async function quotaSafeSet(key, value, options = {}) {
   const version = options.version || DEFAULT_VERSION;
-  const maxBytes = Number(options.maxBytes) || 0;
   const snapshot = snapshotJsonValue(value);
-  const payload = wrapPayload(snapshot, version);
+  return persistSnapshot(key, snapshot, version, options);
+}
 
-  if (maxBytes > 0 && new Blob([JSON.stringify(payload)]).size > maxBytes) {
-    throw new Error(`Storage payload for ${key} exceeds ${maxBytes} bytes.`);
+function persistSnapshot(key, snapshot, version, options = {}) {
+  const maxBytes = Number(options.maxBytes) || 0;
+  const payload = wrapPayload(snapshot, version);
+  const serialized = JSON.stringify(payload);
+
+  if (maxBytes > 0 && new Blob([serialized]).size > maxBytes) {
+    return Promise.reject(new Error(`Storage payload for ${key} exceeds ${maxBytes} bytes.`));
   }
 
-  writeLocalStorage(key, snapshot, version);
+  try {
+    localStorage.setItem(key, serialized);
+  } catch {
+    /* localStorage inaccesible en contextos restringidos */
+  }
 
   const storage = getExtensionStorage();
-  if (storage?.set) {
-    try {
-      await storageSet(storage, { [key]: payload });
-      return true;
-    } catch (error) {
+  if (!storage?.set) return Promise.resolve(true);
+
+  return storageSet(storage, { [key]: payload }).then(
+    () => true,
+    (error) => {
       console.warn(`[StorageService] chrome.storage write failed for ${key}:`, error);
-    }
-  }
-  return true;
+      return true;
+    },
+  );
 }
 
 export function setJsonDebounced(key, value, options = {}) {
   const delay = Number(options.delayMs) >= 0 ? Number(options.delayMs) : DEFAULT_DEBOUNCE_MS;
+  const version = options.version || DEFAULT_VERSION;
   const snapshot = snapshotJsonValue(value);
-  writeLocalStorage(key, snapshot, options.version || DEFAULT_VERSION);
+  persistLocalSnapshot(key, snapshot, version);
   const previous = timers.get(key);
   if (previous) clearTimeout(previous);
 
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       timers.delete(key);
-      quotaSafeSet(key, snapshot, options).then(resolve, reject);
+      persistSnapshot(key, snapshot, version, options).then(resolve, reject);
     }, delay);
     timers.set(key, timer);
   });
+}
+
+function persistLocalSnapshot(key, snapshot, version) {
+  try {
+    localStorage.setItem(key, JSON.stringify(wrapPayload(snapshot, version)));
+  } catch {
+    /* localStorage inaccesible en contextos restringidos */
+  }
 }
 
 export async function flushDebounced(key, value, options = {}) {
@@ -224,7 +234,7 @@ export async function flushDebounced(key, value, options = {}) {
     clearTimeout(previous);
     timers.delete(key);
   }
-  return quotaSafeSet(key, value, options);
+  return persistSnapshot(key, snapshotJsonValue(value), options.version || DEFAULT_VERSION, options);
 }
 
 export async function remove(key) {

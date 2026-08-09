@@ -57,13 +57,9 @@
   import { defineAsyncComponent, markRaw, nextTick } from 'vue';
   import { APP_VERSION } from './utils/appVersion.js';
   import { getBrowserInfo } from './utils/browserInfo.js';
-  import MidoriUpdateService from './services/MidoriUpdateService.js';
   import useI18nStore from './stores/useI18nStore.js';
   import useTabStore from './stores/useTabStore.js';
-  import UnsService from './services/UnsService.js';
-  import LocalWallpaperService from './services/LocalWallpaperService.js';
   import Minimalist from './pages/Min.vue';
-  import { useAutoTheme } from './composables/useAutoTheme.js';
   import useThemeStore from './stores/useThemeStore.js';
 
   const MIDORI_DOWNLOAD_URL = 'https://astian.org/midori-browser/download';
@@ -96,10 +92,8 @@
         lastForegroundUpdateCheckAt: 0,
         updateBrowserInfo: null,
         updateCheckInFlight: false,
-        updateService: markRaw(new MidoriUpdateService({
-          checkIntervalMs: UPDATE_CHECK_WINDOW_MS,
-          errorRetryIntervalMs: UPDATE_ERROR_RETRY_INTERVAL_MS,
-        })),
+        updateService: null,
+        updateServicePromise: null,
         updateNotice: {
           visible: false,
           latestVersion: '',
@@ -137,7 +131,7 @@
       },
     },
 
-    mounted() {
+    async mounted() {
       this.loadSettings();
       this.load();
       this.setupWallpaperRefresh();
@@ -151,7 +145,7 @@
 
       // Auto Theme
       if (this.tabStore.autoTheme) {
-        this.autoTheme = useAutoTheme();
+        this.autoTheme = (await import('./composables/useAutoTheme.js')).useAutoTheme();
         this.autoTheme.start();
       }
     },
@@ -221,6 +215,7 @@
         }
 
         try {
+          const { default: UnsService } = await import('./services/UnsService.js');
           const uns = new UnsService();
           await uns.setImagen();
           this.applyBackgroundImage(uns.getUrl(), uns.getSrcSet?.() || '');
@@ -268,6 +263,7 @@
 
         const previousBlobUrl = this.localBlobUrl;
         try {
+          const { default: LocalWallpaperService } = await import('./services/LocalWallpaperService.js');
           const service = new LocalWallpaperService();
           await service.setImagen();
           const url = service.getUrl();
@@ -395,8 +391,8 @@
           if (!this.getUpdateBrowserInfo().isMidori) {
             return;
           }
-          this.syncUpdateNoticeFromCache();
-          if (this.shouldRevalidateMidoriUpdate()) {
+          await this.syncUpdateNoticeFromCache();
+          if (await this.shouldRevalidateMidoriUpdate()) {
             await this.checkMidoriUpdate();
           }
         };
@@ -459,7 +455,7 @@
       },
 
       setupUpdateForegroundChecks() {
-        const listener = () => {
+        const listener = async () => {
           if (document.visibilityState === 'hidden') {
             return;
           }
@@ -473,9 +469,9 @@
           if (!this.getUpdateBrowserInfo().isMidori) {
             return;
           }
-          this.syncUpdateNoticeFromCache(now);
-          if (this.shouldRevalidateMidoriUpdate(now)) {
-            this.checkMidoriUpdate({ now });
+          await this.syncUpdateNoticeFromCache(now);
+          if (await this.shouldRevalidateMidoriUpdate(now)) {
+            await this.checkMidoriUpdate({ now });
           }
         };
 
@@ -489,6 +485,20 @@
           this.updateBrowserInfo = getBrowserInfo();
         }
         return this.updateBrowserInfo;
+      },
+
+      getUpdateService() {
+        if (!this.updateServicePromise) {
+          this.updateServicePromise = import('./services/MidoriUpdateService.js')
+            .then(({ default: MidoriUpdateService }) => {
+              this.updateService = markRaw(new MidoriUpdateService({
+                checkIntervalMs: UPDATE_CHECK_WINDOW_MS,
+                errorRetryIntervalMs: UPDATE_ERROR_RETRY_INTERVAL_MS,
+              }));
+              return this.updateService;
+            });
+        }
+        return this.updateServicePromise;
       },
 
       applyUpdateResult(result) {
@@ -508,14 +518,15 @@
         }
       },
 
-      syncUpdateNoticeFromCache(now = Date.now()) {
+      async syncUpdateNoticeFromCache(now = Date.now()) {
         const browserInfo = this.getUpdateBrowserInfo();
         if (!browserInfo.isMidori) {
           return null;
         }
 
-        const state = this.updateService.getCachedState();
-        const result = this.updateService.getEligibility({
+        const updateService = await this.getUpdateService();
+        const state = updateService.getCachedState();
+        const result = updateService.getEligibility({
           browserInfo,
           currentVersion: APP_VERSION,
           state,
@@ -525,13 +536,14 @@
         return { state, result };
       },
 
-      shouldRevalidateMidoriUpdate(now = Date.now()) {
+      async shouldRevalidateMidoriUpdate(now = Date.now()) {
         const browserInfo = this.getUpdateBrowserInfo();
         if (!browserInfo.isMidori) {
           return false;
         }
 
-        const state = this.updateService.getCachedState();
+        const updateService = await this.getUpdateService();
+        const state = updateService.getCachedState();
         const lastCheckedAt = Number(state.lastCheckedAt) || 0;
         if (!lastCheckedAt) {
           return true;
@@ -555,7 +567,8 @@
 
         this.updateCheckInFlight = true;
         try {
-          const result = await this.updateService.checkForUpdate({
+          const updateService = await this.getUpdateService();
+          const result = await updateService.checkForUpdate({
             browserInfo,
             currentVersion: APP_VERSION,
             now: options.now,
@@ -570,9 +583,10 @@
         }
       },
 
-      deferUpdateForToday() {
+      async deferUpdateForToday() {
         this.updateNotice.visible = false;
-        this.updateService.deferForToday();
+        const updateService = await this.getUpdateService();
+        updateService.deferForToday();
       },
 
       async handleDownloadUpdate() {
@@ -586,7 +600,7 @@
         } catch (error) {
           window.open(MIDORI_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
         } finally {
-          this.deferUpdateForToday();
+          await this.deferUpdateForToday();
         }
       },
 

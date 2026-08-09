@@ -114,48 +114,16 @@ class UnsplashService {
       }
 
       /**
-       * 🚀 first loading image
+       * 🚀 first loading image. Un solo request del batch provee la imagen
+       * actual y el cache para la próxima apertura, evitando que una
+       * primera pestaña en frío se quede sin fondo.
        */
-      const singleImage = await this.#fetchSingleImage();
-      if (singleImage) {
-        this.#setImage(singleImage);
+      const batch = await this.#fetchMetadataBatch();
+      if (batch && batch.length > 0) {
+        this.#setImage(batch[0]);
       }
-
-      /**
-       * 🧠 In the background: preload the rest of the images.
-       */
-      this.#refreshMetadataIfNeeded(true);
-
     } catch (error) {
       console.error('Error al establecer la imagen:', error);
-    }
-  }
-
-  async #fetchSingleImage() {
-    try {
-      const params = new URLSearchParams({
-        client_id: import.meta.env.VITE_UNSPLASH_API,
-        orientation: 'landscape',
-        query: 'landscape',
-      });
-      const res = await fetch(`https://api.unsplash.com/photos/random?${params}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-
-      // Optimizado: webp, calidad moderada y resolución adaptativa.
-      const baseUrl = data.urls.raw || data.urls.full || data.urls.regular;
-      const imageUrl = buildOptimizedImageUrl(baseUrl);
-
-      return {
-        url: imageUrl,
-        srcSet: buildSrcSet(baseUrl),
-        author: data.user.name,
-        authorLink: data.user.links.html,
-        imagePage: data.links.html,
-      };
-    } catch (error) {
-      console.error('Error al obtener una imagen aleatoria de Unsplash:', error);
-      return null;
     }
   }
 
@@ -208,7 +176,7 @@ class UnsplashService {
         query: 'landscape',
       });
       const res = await fetch(`https://api.unsplash.com/photos?${params}`);
-      if (!res.ok) return;
+      if (!res.ok) return null;
       const data = await res.json();
 
       const now = Date.now();
@@ -228,11 +196,15 @@ class UnsplashService {
         });
       }
 
+      if (newList.length === 0) return null;
+
       await quotaSafeSet(CACHE_KEY_LIST, newList.slice(0, this.#total), { maxBytes: 75_000 });
       localStorage.setItem(CACHE_INDEX, '1');
       localStorage.setItem(CACHE_EXPIRY, String(now + 24 * 60 * 60 * 1000)); // 24h
+      return newList;
     } catch (error) {
       console.error('Error en la precarga de imágenes:', error);
+      return null;
     }
   }
 

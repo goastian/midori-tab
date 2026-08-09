@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { getJson, setJsonDebounced } from '../services/StorageService.js';
-import { buildMarketplaceThemeDefinition } from '../utils/marketplaceAssets.js';
 
 /**
  * Each theme has a `light` and `dark` variant.
@@ -358,7 +357,8 @@ const useThemeStore = defineStore('themeStore', {
       this.applyTheme();
     },
 
-    installMarketplaceTheme(asset) {
+    async installMarketplaceTheme(asset) {
+      const { buildMarketplaceThemeDefinition } = await import('../utils/marketplaceAssets.js');
       const theme = buildMarketplaceThemeDefinition(asset);
       if (!theme) return null;
 

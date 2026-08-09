@@ -161,6 +161,10 @@ export default {
     },
   },
 
+  created() {
+    this.catalogStore.hydrateAsyncState();
+  },
+
   watch: {
     defaultType(nextType) {
       if (nextType) {

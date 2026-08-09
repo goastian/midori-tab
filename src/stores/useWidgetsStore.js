@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { getJson, setJsonDebounced } from '../services/StorageService.js';
-import { resolveBuiltinWidgetKey } from '../utils/marketplaceAssets.js';
 import { mergeWidgetSubset } from '../utils/widgetLayout.js';
 
 /** Default widget order */
@@ -90,7 +89,8 @@ const useWidgetsStore = defineStore('widgetsStore', {
       this.order = [...DEFAULT_ORDER];
     },
 
-    installMarketplaceWidget(asset) {
+    async installMarketplaceWidget(asset) {
+      const { resolveBuiltinWidgetKey } = await import('../utils/marketplaceAssets.js');
       const builtinWidgetKey = resolveBuiltinWidgetKey(asset);
 
       this.installedMarketplaceWidgets[asset.slug] = {
