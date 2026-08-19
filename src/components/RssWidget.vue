@@ -109,12 +109,12 @@
       <div class="news-layout">
         <article v-news-image="leadStory" class="news-story news-story--lead">
           <a
-            v-if="leadStory.url"
+            v-if="leadStory.url || leadStory.id"
             class="news-story__link"
-            :href="leadStory.url"
+            :href="leadStory.url || '#'"
             target="_blank"
             rel="noopener noreferrer"
-            @click.prevent="openArticle(leadStory.url)"
+            @click="handleArticleClick($event, leadStory)"
           >
             <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail, 'is-loading': leadStory.imageRequested && !leadStory.imageFailed && !leadStory.thumbnail, 'is-unavailable': leadStory.imageFailed && !leadStory.thumbnail }">
               <img v-if="leadStory.thumbnail" :src="leadStory.thumbnail" :alt="leadStory.title" loading="eager" fetchpriority="high" decoding="async" @error="clearArticleImage(leadStory)">
@@ -144,12 +144,12 @@
         <div class="news-supporting-stories">
           <article v-for="article in supportingStories" :key="article.id" v-news-image="article" class="news-story news-story--supporting">
             <a
-              v-if="article.url"
+              v-if="article.url || article.id"
               class="news-story__link"
-              :href="article.url"
+              :href="article.url || '#'"
               target="_blank"
               rel="noopener noreferrer"
-              @click.prevent="openArticle(article.url)"
+              @click="handleArticleClick($event, article)"
             >
               <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail, 'is-loading': article.imageRequested && !article.imageFailed && !article.thumbnail, 'is-unavailable': article.imageFailed && !article.thumbnail }">
                 <img v-if="article.thumbnail" :src="article.thumbnail" :alt="article.title" loading="lazy" decoding="async" @error="clearArticleImage(article)">
@@ -206,7 +206,6 @@ import {
   NEWS_LANGUAGES,
   NEWS_TOPICS,
   deriveTrendTopics,
-  isSafeHttpUrl,
 } from '../services/FreeNewsService.js';
 import freeNewsService from '../services/FreeNewsService.js';
 import useI18nStore from '../stores/useI18nStore.js';
@@ -425,13 +424,39 @@ export default {
       this.filters = { country: '', language: '', topic: '' };
       this.loadNewsWhenVisible({ force: true });
     },
-    openArticle(url) {
-      if (!isSafeHttpUrl(url)) return;
-      if (globalThis.chrome?.tabs?.create) {
-        globalThis.chrome.tabs.create({ url });
-        return;
+    async handleArticleClick(event, article) {
+      // Listing responses may omit original_url. Keep the card interactive and
+      // resolve the URL on demand instead of rendering a dead news item.
+      if (article?.url) return;
+      event.preventDefault();
+      if (!article?.id || article.opening) return;
+
+      article.opening = true;
+      try {
+        const detail = await freeNewsService.fetchArticleDetails(article.id);
+        if (!detail?.url) {
+          this.error = 'La fuente no proporcionó un enlace para esta noticia.';
+          return;
+        }
+        article.url = detail.url;
+        await this.openResolvedArticle(detail.url);
+      } catch (error) {
+        if (error?.name !== 'AbortError') this.error = 'No se pudo abrir esta noticia. Inténtalo de nuevo.';
+      } finally {
+        article.opening = false;
       }
-      globalThis.open(url, '_blank', 'noopener,noreferrer');
+    },
+    async openResolvedArticle(url) {
+      const tabs = globalThis.browser?.tabs || globalThis.chrome?.tabs;
+      if (typeof tabs?.create === 'function') {
+        try {
+          await tabs.create({ url });
+          return;
+        } catch (_) {
+          // Fall through to same-tab navigation when an extension API is unavailable.
+        }
+      }
+      globalThis.location.assign(url);
     },
     async loadArticleImage(article) {
       if (!article?.id || article.thumbnail || article.imageRequested) return;
@@ -440,6 +465,7 @@ export default {
       try {
         const detail = await freeNewsService.fetchArticleDetails(article.id);
         if (generation !== this.imageGeneration) return;
+        if (detail?.url) article.url = detail.url;
         if (detail?.thumbnail) article.thumbnail = detail.thumbnail;
         else article.imageFailed = true;
       } catch (_) {
