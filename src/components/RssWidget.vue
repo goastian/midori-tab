@@ -116,7 +116,7 @@
             rel="noopener noreferrer"
             @click.prevent="openArticle(leadStory.url)"
           >
-            <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail, 'is-loading': leadStory.imageRequested && !leadStory.imageFailed && !leadStory.thumbnail }">
+            <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail, 'is-loading': leadStory.imageRequested && !leadStory.imageFailed && !leadStory.thumbnail, 'is-unavailable': leadStory.imageFailed && !leadStory.thumbnail }">
               <img v-if="leadStory.thumbnail" :src="leadStory.thumbnail" :alt="leadStory.title" loading="eager" fetchpriority="high" decoding="async" @error="clearArticleImage(leadStory)">
               <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(leadStory)" /></span>
             </figure>
@@ -128,7 +128,7 @@
             </div>
           </a>
           <div v-else class="news-story__link news-story__link--static">
-            <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail, 'is-loading': leadStory.imageRequested && !leadStory.imageFailed && !leadStory.thumbnail }">
+            <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail, 'is-loading': leadStory.imageRequested && !leadStory.imageFailed && !leadStory.thumbnail, 'is-unavailable': leadStory.imageFailed && !leadStory.thumbnail }">
               <img v-if="leadStory.thumbnail" :src="leadStory.thumbnail" :alt="copy.noImage" loading="eager" fetchpriority="high" decoding="async" @error="clearArticleImage(leadStory)">
               <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(leadStory)" /></span>
             </figure>
@@ -151,7 +151,7 @@
               rel="noopener noreferrer"
               @click.prevent="openArticle(article.url)"
             >
-              <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail, 'is-loading': article.imageRequested && !article.imageFailed && !article.thumbnail }">
+              <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail, 'is-loading': article.imageRequested && !article.imageFailed && !article.thumbnail, 'is-unavailable': article.imageFailed && !article.thumbnail }">
                 <img v-if="article.thumbnail" :src="article.thumbnail" :alt="article.title" loading="lazy" decoding="async" @error="clearArticleImage(article)">
                 <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(article)" /></span>
               </figure>
@@ -162,7 +162,7 @@
               </div>
             </a>
             <div v-else class="news-story__link news-story__link--static">
-              <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail, 'is-loading': article.imageRequested && !article.imageFailed && !article.thumbnail }">
+              <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail, 'is-loading': article.imageRequested && !article.imageFailed && !article.thumbnail, 'is-unavailable': article.imageFailed && !article.thumbnail }">
                 <img v-if="article.thumbnail" :src="article.thumbnail" :alt="copy.noImage" loading="lazy" decoding="async" @error="clearArticleImage(article)">
                 <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(article)" /></span>
               </figure>
@@ -595,18 +595,19 @@ export default {
 .news-section-heading h4 { font-size: var(--font-size-sm); letter-spacing: -0.01em; }
 .news-section-heading span { color: var(--news-ink-muted); font-family: var(--font-news-meta); font-size: var(--font-size-xs); text-align: end; }
 
-.news-layout { display: grid; gap: var(--news-space-2); }
+.news-layout { display: grid; align-items: start; gap: var(--news-space-2); }
 .news-supporting-stories { display: grid; gap: var(--news-space-2); }
-.news-story { min-width: 0; border: 1px solid var(--news-rule); border-radius: var(--news-radius); background: var(--news-surface-strong); overflow: clip; }
-.news-story--supporting { content-visibility: auto; contain-intrinsic-size: auto 20rem; }
-.news-story__link { display: grid; min-width: 0; height: 100%; color: inherit; text-decoration: none; }
+.news-story { align-self: start; min-width: 0; border: 1px solid var(--news-rule); border-radius: var(--news-radius); background: var(--news-surface-strong); overflow: clip; }
+.news-story--supporting { content-visibility: visible; }
+.news-story__link { display: block; min-width: 0; height: auto; color: inherit; text-decoration: none; }
 .news-story__link--static { cursor: default; }
 .news-story__visual { display: grid; place-items: center; min-width: 0; aspect-ratio: 16 / 8; margin: 0; overflow: clip; background: var(--news-art); color: var(--news-accent-ink); }
+.news-story__visual.is-unavailable { block-size: 4.25rem; aspect-ratio: auto; background: var(--news-surface-muted); }
 .news-story__visual img { width: 100%; height: 100%; object-fit: cover; }
 .news-story__fallback { display: grid; place-items: center; inline-size: 2.5rem; block-size: 2.5rem; border: 1px solid var(--news-rule); border-radius: 50%; color: var(--news-ink-muted); }
 .news-story__fallback svg { inline-size: 1.25rem; block-size: 1.25rem; }
 .news-story__visual.is-loading .news-story__fallback { color: var(--news-accent); }
-.news-story__copy { min-width: 0; display: grid; gap: var(--news-space-2); padding: var(--news-space-3); }
+.news-story__copy { align-content: start; min-width: 0; display: grid; gap: var(--news-space-2); padding: var(--news-space-3); }
 .news-story__meta { justify-content: space-between; gap: var(--news-space-2); color: var(--news-ink-muted); font-family: var(--font-news-meta); font-size: var(--font-size-xs); }
 .news-story__meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .news-story__meta span:last-child { flex: 0 0 auto; }
@@ -653,9 +654,9 @@ export default {
 
 @media (min-width: 58rem) {
   .rss-widget--canvas { padding: var(--news-space-5); }
-  .rss-widget--canvas .news-layout { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .rss-widget--canvas .news-story--lead { grid-column: auto; grid-row: auto; }
+  .rss-widget--canvas .news-layout { display: block; column-count: 4; column-gap: var(--news-space-2); }
   .rss-widget--canvas .news-supporting-stories { display: contents; }
+  .rss-widget--canvas .news-story { display: inline-block; inline-size: 100%; break-inside: avoid-column; margin-block-end: var(--news-space-2); }
   .rss-widget--canvas .news-story--lead .news-story__visual { aspect-ratio: 16 / 9; }
   .rss-widget--canvas .news-story--supporting .news-story__visual { aspect-ratio: 16 / 9; }
   .rss-widget--canvas .news-story--supporting .news-story__copy { padding: var(--news-space-3); gap: var(--news-space-2); }
