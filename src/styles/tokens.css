@@ -111,6 +111,10 @@
   --news-space-5: 1.25rem;
   --news-radius: var(--radius-lg);
   --news-radius-sm: var(--radius-md);
+  --news-radius-control: var(--radius-lg);
+  --news-radius-card: var(--radius-xl);
+  --news-radius-widget: var(--radius-xl);
+  --news-shadow-rest: var(--shadow-sm);
   --news-dur-fast: 120ms;
   --news-dur-short: 180ms;
   --news-dur-medium: 280ms;
