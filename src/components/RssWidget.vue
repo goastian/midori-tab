@@ -56,6 +56,9 @@
         </label>
       </div>
       <p id="news-filters-help" class="news-controls__helper" :class="{ 'is-error': Boolean(error) }" aria-live="polite">{{ error }}</p>
+      <p v-if="filterFallback" class="news-filter-fallback" role="status">
+        <Icon icon="solar:info-circle-linear" aria-hidden="true" /> {{ copy.filterFallback }}
+      </p>
     </div>
 
     <div v-if="trendTopics.length" class="news-trends" :aria-label="copy.trending">
@@ -113,9 +116,9 @@
             rel="noopener noreferrer"
             @click.prevent="openArticle(leadStory.url)"
           >
-            <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail }">
-              <img v-if="leadStory.thumbnail" :src="leadStory.thumbnail" :alt="leadStory.title" loading="eager" fetchpriority="high" @error="clearArticleImage(leadStory)">
-              <span v-else class="news-story__fallback" aria-hidden="true">{{ storyInitial(leadStory) }}</span>
+            <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail, 'is-loading': leadStory.imageRequested && !leadStory.imageFailed && !leadStory.thumbnail }">
+              <img v-if="leadStory.thumbnail" :src="leadStory.thumbnail" :alt="leadStory.title" loading="eager" fetchpriority="high" decoding="async" @error="clearArticleImage(leadStory)">
+              <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(leadStory)" /></span>
             </figure>
             <div class="news-story__copy">
               <div class="news-story__meta"><span>{{ leadStory.publisher || '—' }}</span><span v-if="leadStory.publishedAt">{{ formatDate(leadStory.publishedAt) }}</span></div>
@@ -125,9 +128,9 @@
             </div>
           </a>
           <div v-else class="news-story__link news-story__link--static">
-            <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail }">
-              <img v-if="leadStory.thumbnail" :src="leadStory.thumbnail" :alt="copy.noImage" loading="eager" fetchpriority="high" @error="clearArticleImage(leadStory)">
-              <span v-else class="news-story__fallback" aria-hidden="true">{{ storyInitial(leadStory) }}</span>
+            <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail, 'is-loading': leadStory.imageRequested && !leadStory.imageFailed && !leadStory.thumbnail }">
+              <img v-if="leadStory.thumbnail" :src="leadStory.thumbnail" :alt="copy.noImage" loading="eager" fetchpriority="high" decoding="async" @error="clearArticleImage(leadStory)">
+              <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(leadStory)" /></span>
             </figure>
             <div class="news-story__copy">
               <div class="news-story__meta"><span>{{ leadStory.publisher || '—' }}</span><span v-if="leadStory.publishedAt">{{ formatDate(leadStory.publishedAt) }}</span></div>
@@ -148,9 +151,9 @@
               rel="noopener noreferrer"
               @click.prevent="openArticle(article.url)"
             >
-              <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail }">
-                <img v-if="article.thumbnail" :src="article.thumbnail" :alt="article.title" loading="lazy" @error="clearArticleImage(article)">
-                <span v-else class="news-story__fallback" aria-hidden="true">{{ storyInitial(article) }}</span>
+              <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail, 'is-loading': article.imageRequested && !article.imageFailed && !article.thumbnail }">
+                <img v-if="article.thumbnail" :src="article.thumbnail" :alt="article.title" loading="lazy" decoding="async" @error="clearArticleImage(article)">
+                <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(article)" /></span>
               </figure>
               <div class="news-story__copy">
                 <div class="news-story__meta"><span>{{ article.publisher || '—' }}</span><span v-if="article.publishedAt">{{ formatDate(article.publishedAt) }}</span></div>
@@ -159,9 +162,9 @@
               </div>
             </a>
             <div v-else class="news-story__link news-story__link--static">
-              <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail }">
-                <img v-if="article.thumbnail" :src="article.thumbnail" :alt="copy.noImage" loading="lazy" @error="clearArticleImage(article)">
-                <span v-else class="news-story__fallback" aria-hidden="true">{{ storyInitial(article) }}</span>
+              <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail, 'is-loading': article.imageRequested && !article.imageFailed && !article.thumbnail }">
+                <img v-if="article.thumbnail" :src="article.thumbnail" :alt="copy.noImage" loading="lazy" decoding="async" @error="clearArticleImage(article)">
+                <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(article)" /></span>
               </figure>
               <div class="news-story__copy">
                 <div class="news-story__meta"><span>{{ article.publisher || '—' }}</span><span v-if="article.publishedAt">{{ formatDate(article.publishedAt) }}</span></div>
@@ -211,6 +214,7 @@ import { getWidgetCopy } from '../i18n/widget-copy.js';
 import { WIDGET_COST, createWidgetRuntime } from '../composables/useWidgetRuntime.js';
 
 const NEWS_REFRESH_MS = 5 * 60 * 1000;
+const FILTER_DELAY_MS = 180;
 const WIDGET_POLICY = Object.freeze({
   key: 'rss',
   cost: WIDGET_COST.MEDIUM,
@@ -267,6 +271,7 @@ export default {
       loading: false,
       loadingMore: false,
       error: '',
+      filterFallback: false,
       isStale: false,
       lastUpdated: '',
       lastRequestSucceeded: false,
@@ -275,6 +280,8 @@ export default {
       widgetRuntime: null,
       loadMoreObserver: null,
       loadedCursors: new Set(),
+      filterTimer: null,
+      imageGeneration: 0,
       widgetPolicy: WIDGET_POLICY,
     };
   },
@@ -307,7 +314,9 @@ export default {
     this.$nextTick(() => this.setupLoadMoreObserver());
   },
   beforeUnmount() {
+    if (this.filterTimer) clearTimeout(this.filterTimer);
     this.abortRequest();
+    freeNewsService.cancelQueuedArticleDetails();
     this.widgetRuntime?.dispose();
     this.loadMoreObserver?.disconnect();
     this.loadMoreObserver = null;
@@ -320,7 +329,10 @@ export default {
       if (!this.widgetRuntime?.canRun()) return false;
       return this.widgetRuntime.runWhenVisible(
         () => this.loadNews({ force: Boolean(options.force) }),
-        options,
+        // A filter change must bypass the widget visibility TTL, but it does
+        // not need to bypass the FreeNews result cache. Keeping those two
+        // decisions separate makes switching back to a recent filter instant.
+        { force: Boolean(options.runtimeForce ?? options.force) },
       );
     },
     async loadNews({ force = false, append = false } = {}) {
@@ -328,13 +340,18 @@ export default {
       const cursor = append ? this.meta.nextCursor : '';
       if (append && (!cursor || this.loadedCursors.has(cursor))) return;
       if (append) this.loadedCursors.add(cursor);
-      else this.loadedCursors.clear();
+      else {
+        this.loadedCursors.clear();
+        this.imageGeneration += 1;
+        freeNewsService.cancelQueuedArticleDetails();
+      }
       const requestId = ++this.requestSequence;
       this.abortRequest();
       this.requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
       if (append) this.loadingMore = true;
       else this.loading = true;
       this.error = '';
+      if (!append) this.filterFallback = false;
 
       try {
         const result = await freeNewsService.fetchNews({
@@ -353,8 +370,10 @@ export default {
         this.trendTopics = deriveTrendTopics(nextArticles);
         this.meta = result.meta;
         this.isStale = result.isStale;
+        if (!append) this.filterFallback = Boolean(result.filterFallback);
         this.lastUpdated = new Date().toISOString();
         this.lastRequestSucceeded = true;
+        if (!append) this.loadArticleImage(nextArticles[0]);
         this.$nextTick(() => this.setupLoadMoreObserver());
       } catch (error) {
         if (append) this.loadedCursors.delete(cursor);
@@ -392,7 +411,11 @@ export default {
       this.loadMoreObserver.observe(this.$refs.loadMoreSentinel);
     },
     applyFilters() {
-      this.loadNewsWhenVisible({ force: true });
+      if (this.filterTimer) clearTimeout(this.filterTimer);
+      this.filterTimer = setTimeout(() => {
+        this.filterTimer = null;
+        this.loadNewsWhenVisible({ runtimeForce: true });
+      }, FILTER_DELAY_MS);
     },
     selectTrend(topic) {
       this.filters.topic = this.filters.topic === topic ? '' : topic;
@@ -413,15 +436,21 @@ export default {
     async loadArticleImage(article) {
       if (!article?.id || article.thumbnail || article.imageRequested) return;
       article.imageRequested = true;
+      const generation = this.imageGeneration;
       try {
         const detail = await freeNewsService.fetchArticleDetails(article.id);
+        if (generation !== this.imageGeneration) return;
         if (detail?.thumbnail) article.thumbnail = detail.thumbnail;
+        else article.imageFailed = true;
       } catch (_) {
         // A missing image must not prevent the article itself from rendering.
+        if (generation === this.imageGeneration) article.imageFailed = true;
       }
     },
     clearArticleImage(article) {
-      if (article) article.thumbnail = '';
+      if (!article) return;
+      article.thumbnail = '';
+      article.imageFailed = true;
     },
     countryName(country) {
       try {
@@ -440,8 +469,10 @@ export default {
     topicName(topic) {
       return String(topic || '').replace(/-/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
     },
-    storyInitial(article) {
-      return String(article?.publisher || article?.title || '?').slice(0, 1);
+    imageStateIcon(article) {
+      return article?.imageRequested && !article?.imageFailed
+        ? 'svg-spinners:90-ring-with-bg'
+        : 'solar:gallery-remove-linear';
     },
     formatDate(value) {
       const date = new Date(value);
@@ -470,7 +501,7 @@ export default {
 
 .rss-widget--managed { min-height: 0; }
 .rss-widget--canvas { max-width: none; margin-inline: auto; }
-.news-widget--ready { min-height: 33rem; }
+.news-widget--ready { min-height: 0; }
 
 .news-widget__header,
 .news-widget__identity,
@@ -557,6 +588,7 @@ export default {
 .news-trend.is-active { border-color: var(--news-accent); background: var(--news-accent-soft); color: var(--news-accent-ink); }
 
 .news-notice,
+.news-filter-fallback,
 .news-inline-error { display: flex; align-items: center; gap: var(--news-space-1); margin: var(--news-space-2) 0 0; color: var(--news-ink-muted); font-size: var(--font-size-xs); }
 .news-inline-error { color: var(--news-danger); }
 .news-section-heading { justify-content: space-between; gap: var(--news-space-2); margin-block: var(--news-space-4) var(--news-space-2); }
@@ -566,11 +598,14 @@ export default {
 .news-layout { display: grid; gap: var(--news-space-2); }
 .news-supporting-stories { display: grid; gap: var(--news-space-2); }
 .news-story { min-width: 0; border: 1px solid var(--news-rule); border-radius: var(--news-radius); background: var(--news-surface-strong); overflow: clip; }
+.news-story--supporting { content-visibility: auto; contain-intrinsic-size: auto 20rem; }
 .news-story__link { display: grid; min-width: 0; height: 100%; color: inherit; text-decoration: none; }
 .news-story__link--static { cursor: default; }
 .news-story__visual { display: grid; place-items: center; min-width: 0; aspect-ratio: 16 / 8; margin: 0; overflow: clip; background: var(--news-art); color: var(--news-accent-ink); }
 .news-story__visual img { width: 100%; height: 100%; object-fit: cover; }
-.news-story__fallback { font-family: var(--font-news-meta); font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); }
+.news-story__fallback { display: grid; place-items: center; inline-size: 2.5rem; block-size: 2.5rem; border: 1px solid var(--news-rule); border-radius: 50%; color: var(--news-ink-muted); }
+.news-story__fallback svg { inline-size: 1.25rem; block-size: 1.25rem; }
+.news-story__visual.is-loading .news-story__fallback { color: var(--news-accent); }
 .news-story__copy { min-width: 0; display: grid; gap: var(--news-space-2); padding: var(--news-space-3); }
 .news-story__meta { justify-content: space-between; gap: var(--news-space-2); color: var(--news-ink-muted); font-family: var(--font-news-meta); font-size: var(--font-size-xs); }
 .news-story__meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -592,7 +627,7 @@ export default {
 .news-skeleton__lead { min-height: 16rem; }
 .news-skeleton__stack { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--news-space-2); }
 .news-skeleton__stack i { min-height: 5.5rem; }
-.news-empty { min-height: 16rem; display: grid; place-content: center; justify-items: center; gap: var(--news-space-2); padding: var(--news-space-5); color: var(--news-ink-muted); text-align: center; }
+.news-empty { min-height: 9rem; display: grid; place-content: center; justify-items: center; gap: var(--news-space-2); padding: var(--news-space-4); color: var(--news-ink-muted); text-align: center; }
 .news-empty strong { color: var(--news-ink); }
 .news-empty p { max-width: 38ch; margin: 0; font-size: var(--font-size-sm); }
 .news-empty--error { color: var(--news-danger); }
@@ -619,8 +654,9 @@ export default {
 @media (min-width: 58rem) {
   .rss-widget--canvas { padding: var(--news-space-5); }
   .rss-widget--canvas .news-layout { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .rss-widget--canvas .news-story--lead { grid-column: span 2; grid-row: span 2; }
+  .rss-widget--canvas .news-story--lead { grid-column: auto; grid-row: auto; }
   .rss-widget--canvas .news-supporting-stories { display: contents; }
+  .rss-widget--canvas .news-story--lead .news-story__visual { aspect-ratio: 16 / 9; }
   .rss-widget--canvas .news-story--supporting .news-story__visual { aspect-ratio: 16 / 9; }
   .rss-widget--canvas .news-story--supporting .news-story__copy { padding: var(--news-space-3); gap: var(--news-space-2); }
   .rss-widget--canvas .news-story--supporting h5 { font-size: var(--font-size-base); }
@@ -632,6 +668,20 @@ export default {
   .news-widget__identity p { display: none; }
   .news-section-heading { align-items: flex-start; flex-direction: column; }
   .news-section-heading span { text-align: start; }
+}
+
+@media (max-width: 42rem) {
+  .rss-widget--canvas { padding: var(--news-space-3); }
+  .rss-widget--canvas .news-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rss-widget--canvas .news-filter-field:last-child { grid-column: span 2; }
+  .rss-widget--canvas .news-widget__header { align-items: flex-start; }
+  .rss-widget--canvas .news-story__visual { aspect-ratio: 16 / 9; }
+  .rss-widget--canvas .news-story__copy { padding: var(--news-space-3); }
+}
+
+@media (max-width: 26rem) {
+  .rss-widget--canvas .news-filter-grid { grid-template-columns: minmax(0, 1fr); }
+  .rss-widget--canvas .news-filter-field:last-child { grid-column: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -3,7 +3,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 18;
 const REQUEST_TIMEOUT_MS = 8_000;
 const DETAIL_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
-const DETAIL_REQUEST_INTERVAL_MS = 1_000;
+const DETAIL_REQUEST_INTERVAL_MS = 550;
 
 export const NEWS_COUNTRIES = Object.freeze([
   'AR', 'AU', 'BR', 'CA', 'CL', 'CO', 'DE', 'ES', 'FR', 'GB', 'IN', 'IT', 'JP', 'KR', 'MX', 'PE', 'PT', 'US',
@@ -139,12 +139,34 @@ function canonicalCacheKey(filters) {
   });
 }
 
+function relaxedNewsFilters(filters = {}) {
+  const normalized = normalizeNewsFilters(filters);
+  if (normalized.cursor) return [];
+
+  const candidates = [];
+  let candidate = { ...normalized };
+  // A category is the narrowest preference. If there is no matching recent
+  // article, retain location/language before relaxing the language as well.
+  for (const key of ['topic', 'language']) {
+    if (!candidate[key]) continue;
+    candidate = { ...candidate, [key]: '' };
+    candidates.push(candidate);
+  }
+  return candidates;
+}
+
 class FreeNewsResponseError extends Error {
   constructor(status) {
     super(`FreeNewsAPI respondió con estado ${status}.`);
     this.name = 'FreeNewsResponseError';
     this.status = status;
   }
+}
+
+function abortDetailRequest() {
+  const error = new Error('Article image request superseded.');
+  error.name = 'AbortError';
+  return error;
 }
 
 export class FreeNewsService {
@@ -163,6 +185,7 @@ export class FreeNewsService {
     this.detailRequests = new Map();
     this.detailQueue = Promise.resolve();
     this.lastDetailRequestAt = 0;
+    this.detailGeneration = 0;
   }
 
   isConfigured() {
@@ -172,6 +195,11 @@ export class FreeNewsService {
   clearCache() {
     this.cache.clear();
     this.detailCache.clear();
+  }
+
+  cancelQueuedArticleDetails() {
+    this.detailGeneration += 1;
+    for (const { controller } of this.detailRequests.values()) controller?.abort();
   }
 
   async requestJson(url, { signal } = {}) {
@@ -214,27 +242,34 @@ export class FreeNewsService {
   async fetchArticleDetails(uuid) {
     const id = cleanText(uuid, 128);
     if (!id) return null;
+    const generation = this.detailGeneration;
 
     const cached = this.detailCache.get(id);
     if (cached && this.now() - cached.timestamp < DETAIL_CACHE_TTL_MS) return cached.value;
-    if (this.detailRequests.has(id)) return this.detailRequests.get(id);
+    const inFlight = this.detailRequests.get(id);
+    if (inFlight?.generation === generation) return inFlight.request;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
 
     const request = this.detailQueue.then(async () => {
+      if (generation !== this.detailGeneration) throw abortDetailRequest();
       const waitMs = Math.max(0, DETAIL_REQUEST_INTERVAL_MS - (this.now() - this.lastDetailRequestAt));
       if (waitMs) await new Promise(resolve => globalThis.setTimeout(resolve, waitMs));
+      if (generation !== this.detailGeneration) throw abortDetailRequest();
       this.lastDetailRequestAt = this.now();
-      const payload = await this.requestJson(buildFreeNewsDetailUrl(id).toString());
+      const payload = await this.requestJson(buildFreeNewsDetailUrl(id).toString(), {
+        signal: controller?.signal,
+      });
       const value = normalizeFreeNewsArticle(payload?.data || {});
       this.detailCache.set(id, { timestamp: this.now(), value });
       return value;
     });
 
     this.detailQueue = request.catch(() => undefined);
-    this.detailRequests.set(id, request);
+    this.detailRequests.set(id, { generation, request, controller });
     try {
       return await request;
     } finally {
-      this.detailRequests.delete(id);
+      if (this.detailRequests.get(id)?.request === request) this.detailRequests.delete(id);
     }
   }
 
@@ -252,6 +287,22 @@ export class FreeNewsService {
 
     try {
       const value = normalizePayload(await this.requestPayload(filters, { signal }));
+      if (!value.articles.length) {
+        for (const fallbackFilters of relaxedNewsFilters(filters)) {
+          const fallbackKey = canonicalCacheKey(fallbackFilters);
+          const fallbackCached = this.cache.get(fallbackKey);
+          const fallbackValue = !force && fallbackCached && now - fallbackCached.timestamp < CACHE_TTL_MS
+            ? fallbackCached.value
+            : normalizePayload(await this.requestPayload(fallbackFilters, { signal }));
+          this.cache.set(fallbackKey, { timestamp: now, value: fallbackValue });
+          if (!fallbackValue.articles.length) continue;
+
+          const result = { ...fallbackValue, filterFallback: true };
+          this.cache.set(cacheKey, { timestamp: now, value: result });
+          this.pruneCache();
+          return { ...result, fromCache: false, isStale: false, searchFallback: false };
+        }
+      }
       this.cache.set(cacheKey, { timestamp: now, value });
       this.pruneCache();
       return { ...value, fromCache: false, isStale: false, searchFallback: false };
