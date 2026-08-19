@@ -114,6 +114,7 @@
 import useI18nStore from '../stores/useI18nStore.js';
 import { fetchSuggestions } from '../services/DuckDuckGoSuggestService.js';
 import { buildMidoriSearchUrl } from '../utils/searchUrl.js';
+import perfMarks from '../bootstrap/perfMarks.js';
 import DashboardIcon from './icons/DashboardIcon.vue';
 
 const ASTIANGO_BANGS_DIRECTORY_URL = 'https://astiango.com/bangs';
@@ -520,9 +521,7 @@ export default {
 
   mounted() {
     document.addEventListener('mousedown', this.onClickOutside);
-    import('../bootstrap/perfMarks.js').then(({ default: perfMarks }) => {
-      perfMarks.mark('search-ready');
-    });
+    perfMarks.mark('search-ready');
   },
 
   beforeUnmount() {

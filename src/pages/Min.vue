@@ -183,6 +183,7 @@ import DashboardActions from '../components/dashboard/DashboardActions.vue';
 import DashboardShell from '../components/dashboard/DashboardShell.vue';
 import { useWidgetManagement } from '../composables/useWidgetManagement.js';
 import { subscribeViewportSize } from '../composables/layoutResizeBus.js';
+import perfMarks from '../bootstrap/perfMarks.js';
 import {
   moveWidget,
   resolveResponsiveWidgetColumns,
@@ -245,9 +246,7 @@ export default {
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        import('../bootstrap/perfMarks.js').then(({ default: perfMarks }) => {
-          perfMarks.mark('above-fold-stable');
-        });
+        perfMarks.mark('above-fold-stable');
       });
     });
   },
