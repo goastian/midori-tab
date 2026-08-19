@@ -279,6 +279,7 @@ export default {
       widgetRuntime: null,
       loadMoreObserver: null,
       loadedCursors: new Set(),
+      paginationFilters: { country: '', language: '', topic: '', query: '' },
       filterTimer: null,
       imageGeneration: 0,
       widgetPolicy: WIDGET_POLICY,
@@ -337,6 +338,7 @@ export default {
     async loadNews({ force = false, append = false } = {}) {
       if (document.visibilityState === 'hidden') return;
       const cursor = append ? this.meta.nextCursor : '';
+      const requestFilters = append ? this.paginationFilters : this.filters;
       if (append && (!cursor || this.loadedCursors.has(cursor))) return;
       if (append) this.loadedCursors.add(cursor);
       else {
@@ -354,7 +356,7 @@ export default {
 
       try {
         const result = await freeNewsService.fetchNews({
-          ...this.filters,
+          ...requestFilters,
           cursor,
         }, {
           force,
@@ -369,7 +371,10 @@ export default {
         this.trendTopics = deriveTrendTopics(nextArticles);
         this.meta = result.meta;
         this.isStale = result.isStale;
-        if (!append) this.filterFallback = Boolean(result.filterFallback);
+        if (!append) {
+          this.filterFallback = Boolean(result.filterFallback);
+          this.paginationFilters = result.effectiveFilters || { ...this.filters };
+        }
         this.lastUpdated = new Date().toISOString();
         this.lastRequestSucceeded = true;
         if (!append) this.loadArticleImage(nextArticles[0]);

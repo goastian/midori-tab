@@ -278,22 +278,34 @@ export class FreeNewsService {
       throw new Error('FreeNewsAPI no está configurada. Añade VITE_FREENEWS_API_KEY al archivo .env de Midori Tab.');
     }
 
-    const cacheKey = canonicalCacheKey(filters);
+    const requestedFilters = normalizeNewsFilters(filters);
+    const cacheKey = canonicalCacheKey(requestedFilters);
     const cached = this.cache.get(cacheKey);
     const now = this.now();
     if (!force && cached && now - cached.timestamp < CACHE_TTL_MS) {
-      return { ...cached.value, fromCache: true, isStale: false };
+      return {
+        ...cached.value,
+        effectiveFilters: cached.value.effectiveFilters || requestedFilters,
+        fromCache: true,
+        isStale: false,
+      };
     }
 
     try {
-      const value = normalizePayload(await this.requestPayload(filters, { signal }));
+      const value = {
+        ...normalizePayload(await this.requestPayload(requestedFilters, { signal })),
+        effectiveFilters: requestedFilters,
+      };
       if (!value.articles.length) {
         for (const fallbackFilters of relaxedNewsFilters(filters)) {
           const fallbackKey = canonicalCacheKey(fallbackFilters);
           const fallbackCached = this.cache.get(fallbackKey);
           const fallbackValue = !force && fallbackCached && now - fallbackCached.timestamp < CACHE_TTL_MS
             ? fallbackCached.value
-            : normalizePayload(await this.requestPayload(fallbackFilters, { signal }));
+            : {
+              ...normalizePayload(await this.requestPayload(fallbackFilters, { signal })),
+              effectiveFilters: normalizeNewsFilters(fallbackFilters),
+            };
           this.cache.set(fallbackKey, { timestamp: now, value: fallbackValue });
           if (!fallbackValue.articles.length) continue;
 
@@ -320,7 +332,10 @@ export class FreeNewsService {
         const value = {
           ...(hasFreshFallback
             ? fallbackCached.value
-            : normalizePayload(await this.requestPayload(fallbackFilters, { signal }))),
+            : {
+              ...normalizePayload(await this.requestPayload(fallbackFilters, { signal })),
+              effectiveFilters: normalizeNewsFilters(fallbackFilters),
+            }),
           searchFallback: true,
         };
         this.cache.set(cacheKey, { timestamp: now, value });
