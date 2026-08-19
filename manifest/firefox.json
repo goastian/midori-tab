@@ -12,6 +12,7 @@
     "browsingData",
     "search",
     "https://api.rss2json.com/*",
+    "https://api.freenewsapi.io/*",
     "https://api.unsplash.com/*",
     "https://api.github.com/*",
     "https://api.open-meteo.com/*",

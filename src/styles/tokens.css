@@ -100,6 +100,23 @@
   --transition-normal: 0.15s ease;
   --transition-smooth: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── News widget (Hallmark component scope) ── */
+  --font-news-display: var(--font-sans);
+  --font-news-meta: var(--font-mono);
+  --news-space-1: 0.25rem;
+  --news-space-2: 0.5rem;
+  --news-space-3: 0.75rem;
+  --news-space-4: 1rem;
+  --news-space-5: 1.25rem;
+  --news-radius: var(--radius-lg);
+  --news-radius-sm: var(--radius-md);
+  --news-dur-fast: 120ms;
+  --news-dur-short: 180ms;
+  --news-dur-medium: 280ms;
+  --news-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --news-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --news-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 /* ── Light Theme Tokens ── */
@@ -139,6 +156,22 @@
   --gradient-purple: linear-gradient(135deg, #be1c7d, #f78fc3);
   --gradient-deal: linear-gradient(135deg, #0984e3, #00cec9);
   --gradient-midori: linear-gradient(135deg, var(--midori-400), var(--accent-teal));
+
+  --news-surface: oklch(97.8% 0.014 155);
+  --news-surface-strong: oklch(94.8% 0.021 155);
+  --news-surface-muted: oklch(91.8% 0.024 155);
+  --news-ink: oklch(22% 0.026 160);
+  --news-ink-muted: oklch(43% 0.026 160);
+  --news-rule: oklch(75% 0.032 155 / 0.55);
+  --news-rule-strong: oklch(61% 0.055 155 / 0.7);
+  --news-accent: oklch(61% 0.145 151);
+  --news-accent-ink: oklch(19% 0.022 155);
+  --news-accent-soft: oklch(91% 0.075 151);
+  --news-focus: oklch(52% 0.16 214);
+  --news-danger: oklch(54% 0.18 28);
+  --news-danger-soft: oklch(92% 0.05 28);
+  --news-success: oklch(52% 0.14 151);
+  --news-art: oklch(82% 0.075 151);
 }
 
 /* ── Dark Theme Tokens (Midori Forest) ── */
@@ -178,6 +211,22 @@
   --gradient-purple: linear-gradient(135deg, #be1c7d, #4b1037);
   --gradient-deal: linear-gradient(135deg, #0984e3, #004a7c);
   --gradient-midori: linear-gradient(135deg, var(--ms-primary), var(--accent-teal));
+
+  --news-surface: oklch(17% 0.018 155);
+  --news-surface-strong: oklch(21% 0.02 155);
+  --news-surface-muted: oklch(25% 0.023 155);
+  --news-ink: oklch(94% 0.014 155);
+  --news-ink-muted: oklch(75% 0.028 155);
+  --news-rule: oklch(50% 0.035 155 / 0.55);
+  --news-rule-strong: oklch(63% 0.07 155 / 0.72);
+  --news-accent: oklch(75% 0.135 151);
+  --news-accent-ink: oklch(17% 0.018 155);
+  --news-accent-soft: oklch(33% 0.075 151);
+  --news-focus: oklch(76% 0.14 214);
+  --news-danger: oklch(72% 0.16 28);
+  --news-danger-soft: oklch(30% 0.06 28);
+  --news-success: oklch(75% 0.135 151);
+  --news-art: oklch(38% 0.09 151);
 }
 
 /* ── Category Colors (consistentes en ambos temas) ── */

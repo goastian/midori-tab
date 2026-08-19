@@ -36,7 +36,7 @@
     </section>
 
     <section
-      v-if="tab.widgetsEnabled && activeGridWidgets.length"
+      v-if="tab.widgetsEnabled && activeBoardWidgets.length"
       :class="[
         'widget-board',
         `widget-board--${widgetBoardMode}`,
@@ -44,17 +44,17 @@
       :aria-label="i18n.$t('dashboard.widgetBoard.title')"
       ref="widgetBoard"
     >
-      <p v-if="activeGridWidgets.length > 1" id="widget-board-hint" class="sr-only">
+      <p v-if="activeBoardWidgets.length > 1" id="widget-board-hint" class="sr-only">
         {{ widgetBoardHint }}
       </p>
       <div
         class="dash-widgets"
         :style="widgetGridStyle"
         role="list"
-        :aria-describedby="activeGridWidgets.length > 1 ? 'widget-board-hint' : undefined"
+        :aria-describedby="activeBoardWidgets.length > 1 ? 'widget-board-hint' : undefined"
       >
         <article
-          v-for="key in activeGridWidgets"
+          v-for="key in activeBoardWidgets"
           :key="key"
           :class="[
             'widget-card',
@@ -77,7 +77,7 @@
           <div class="widget-card__surface">
             <header class="widget-card__toolbar">
               <button
-                v-if="activeGridWidgets.length > 1"
+                v-if="activeBoardWidgets.length > 1"
                 class="widget-drag-handle"
                 type="button"
                 draggable="true"
@@ -112,6 +112,19 @@
       </div>
 
       <p class="sr-only" role="status" aria-live="polite">{{ reorderAnnouncement }}</p>
+    </section>
+
+    <section
+      v-if="tab.widgetsEnabled && widgetsStore.enabled.rss"
+      class="news-canvas"
+      :aria-label="widgetMetaMap.rss?.label || 'News'"
+    >
+      <Suspense>
+        <RssWidget canvas />
+        <template #fallback>
+          <div class="async-placeholder news-canvas__placeholder" aria-hidden="true"></div>
+        </template>
+      </Suspense>
     </section>
 
     <DashboardActions
@@ -250,6 +263,9 @@ export default {
     activeGridWidgets() {
       return this.widgetManagement.getActiveGridWidgets();
     },
+    activeBoardWidgets() {
+      return this.activeGridWidgets.filter(key => key !== 'rss');
+    },
     availableWidgets() {
       return this.widgetManagement.getAvailableWidgets();
     },
@@ -268,7 +284,7 @@ export default {
           configuredColumns: this.tab.widgetColumns,
           viewportWidth: this.viewportWidth,
         }),
-        this.activeGridWidgets.length || 1,
+        this.activeBoardWidgets.length || 1,
       ));
     },
     widgetGridStyle() {
@@ -388,7 +404,7 @@ export default {
     },
 
     handleDragStart(key, event) {
-      if (this.activeGridWidgets.length < 2) return;
+      if (this.activeBoardWidgets.length < 2) return;
       this.draggedWidgetKey = key;
       this.dropTargetKey = '';
       event.dataTransfer.effectAllowed = 'move';
@@ -406,8 +422,8 @@ export default {
 
       const rect = event.currentTarget.getBoundingClientRect();
       const stacked = window.matchMedia('(max-width: 700px)').matches;
-      const sourceIndex = this.activeGridWidgets.indexOf(this.draggedWidgetKey);
-      const targetIndex = this.activeGridWidgets.indexOf(key);
+      const sourceIndex = this.activeBoardWidgets.indexOf(this.draggedWidgetKey);
+      const targetIndex = this.activeBoardWidgets.indexOf(key);
       const sourceCard = [...event.currentTarget.parentElement.children]
         .find(card => card.dataset.widget === this.draggedWidgetKey);
       const sourceRect = sourceCard?.getBoundingClientRect();
@@ -444,7 +460,7 @@ export default {
       }
 
       const nextOrder = moveWidget(
-        this.activeGridWidgets,
+        this.activeBoardWidgets,
         sourceKey,
         targetKey,
         this.dropPlacement,
@@ -455,7 +471,7 @@ export default {
     },
 
     handleReorderKey(key, event) {
-      const currentOrder = this.activeGridWidgets;
+      const currentOrder = this.activeBoardWidgets;
       const currentIndex = currentOrder.indexOf(key);
       let nextIndex = currentIndex;
 
@@ -512,6 +528,15 @@ export default {
 .dash-sponsored {
   width: 100%;
   max-width: var(--dashboard-content-width, 45rem);
+}
+
+.news-canvas {
+  width: 100%;
+  margin-top: clamp(1.5rem, 5vh, 4rem);
+}
+
+.news-canvas__placeholder {
+  min-height: 36rem;
 }
 
 :global([data-density='compact']) .dash-sponsored {
@@ -725,7 +750,7 @@ export default {
 }
 
 .widget-card[data-widget='rss'] .widget-card__body {
-  max-height: min(380px, 52vh);
+  max-height: min(620px, 72vh);
 }
 
 .widget-card[data-widget='notes'] .widget-card__body,

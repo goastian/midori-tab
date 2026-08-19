@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>News widget — states</title>
+    <link rel="stylesheet" href="../styles/tokens.css">
+    <style>
+      /* Hallmark · component: news feed preview · genre: editorial · theme: Midori News
+       * states: default · hover · focus · active · disabled · loading · error · success
+       * contrast: pass (46–50)
+       */
+      html, body { overflow-x: clip; }
+      body { margin: 0; padding: var(--news-space-4); background: var(--news-surface); color: var(--news-ink); font-family: var(--font-news-display); }
+      .preview { max-width: 44rem; margin-inline: auto; }
+      h1 { margin: 0 0 var(--news-space-4); font-size: var(--font-size-xl); overflow-wrap: anywhere; }
+      .state-row { display: grid; grid-template-columns: minmax(0, 8rem) minmax(0, 1fr); gap: var(--news-space-3); align-items: center; padding-block: var(--news-space-3); border-top: 1px solid var(--news-rule); }
+      .state-row > span { color: var(--news-ink-muted); font-family: var(--font-news-meta); font-size: var(--font-size-xs); }
+      .preview-control { min-height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; width: fit-content; padding-inline: var(--news-space-3); border: 1px solid var(--news-rule); border-radius: var(--news-radius-sm); background: var(--news-surface-strong); color: var(--news-ink); font: inherit; white-space: nowrap; }
+      .preview-control.is-hover { border-color: var(--news-rule-strong); background: var(--news-surface-muted); }
+      .preview-control.is-focus { outline: 2px solid var(--news-focus); outline-offset: 2px; }
+      .preview-control.is-active { transform: translateY(1px); }
+      .preview-control:disabled { cursor: not-allowed; opacity: 0.55; }
+      .preview-control[data-state="loading"] { color: var(--news-accent); }
+      .preview-control[data-state="error"] { border-color: var(--news-danger); background: var(--news-danger-soft); color: var(--news-danger); }
+      .preview-control[data-state="success"] { border-color: var(--news-success); color: var(--news-success); }
+      @media (max-width: 26rem) { .state-row { grid-template-columns: minmax(0, 1fr); gap: var(--news-space-2); } }
+    </style>
+  </head>
+  <body>
+    <main class="preview">
+      <h1>News widget — 8 states</h1>
+      <div class="state-row"><span>default</span><button class="preview-control">Refresh</button></div>
+      <div class="state-row"><span>hover</span><button class="preview-control is-hover">Refresh</button></div>
+      <div class="state-row"><span>focus</span><button class="preview-control is-focus">Refresh</button></div>
+      <div class="state-row"><span>active</span><button class="preview-control is-active">Refresh</button></div>
+      <div class="state-row"><span>disabled</span><button class="preview-control" disabled>Refresh</button></div>
+      <div class="state-row"><span>loading</span><button class="preview-control" data-state="loading">Loading…</button></div>
+      <div class="state-row"><span>error</span><button class="preview-control" data-state="error">Try again</button></div>
+      <div class="state-row"><span>success</span><button class="preview-control" data-state="success">Updated</button></div>
+    </main>
+  </body>
+</html>

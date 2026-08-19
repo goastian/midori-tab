@@ -18,12 +18,30 @@ const widgetCopyByLocale = {
       unavailable: 'Bookmarks API unavailable.',
     },
     rssWidget: {
-      previousFeed: 'Previous feed',
-      nextFeed: 'Next feed',
-      autoRefresh: 'Auto-refresh',
+      title: 'News brief',
+      subtitle: 'Current stories, filtered your way',
+      searchLabel: 'Search news',
+      searchPlaceholder: 'Search headlines and topics',
+      country: 'Country',
+      language: 'Language',
+      category: 'Category',
+      allCountries: 'All countries',
+      allLanguages: 'All languages',
+      allCategories: 'All categories',
+      trending: 'Trending',
+      latest: 'Latest stories',
       refresh: 'Refresh',
       loading: 'Loading news...',
+      loadingMore: 'Loading more...',
       retry: 'Retry',
+      more: 'Show more',
+      emptyTitle: 'Nothing matched these filters.',
+      emptyText: 'Try another search, country, language, or category.',
+      clearFilters: 'Clear filters',
+      stale: 'Showing the last available update.',
+      searchFallback: 'Search is temporarily unavailable. Showing the latest stories instead.',
+      updated: 'Updated',
+      noImage: 'Publisher image unavailable',
     },
     astianRssWidget: {
       title: 'Astian News',
@@ -63,12 +81,30 @@ const widgetCopyByLocale = {
       unavailable: 'La API de marcadores no está disponible.',
     },
     rssWidget: {
-      previousFeed: 'Fuente anterior',
-      nextFeed: 'Siguiente fuente',
-      autoRefresh: 'Actualización automática',
+      title: 'Panorama de noticias',
+      subtitle: 'Historias actuales, filtradas a tu manera',
+      searchLabel: 'Buscar noticias',
+      searchPlaceholder: 'Busca titulares y temas',
+      country: 'País',
+      language: 'Idioma',
+      category: 'Categoría',
+      allCountries: 'Todos los países',
+      allLanguages: 'Todos los idiomas',
+      allCategories: 'Todas las categorías',
+      trending: 'Tendencias',
+      latest: 'Últimas historias',
       refresh: 'Actualizar',
       loading: 'Cargando noticias...',
+      loadingMore: 'Cargando más...',
       retry: 'Reintentar',
+      more: 'Ver más',
+      emptyTitle: 'No hay coincidencias con estos filtros.',
+      emptyText: 'Prueba con otra búsqueda, país, idioma o categoría.',
+      clearFilters: 'Limpiar filtros',
+      stale: 'Mostrando la última actualización disponible.',
+      searchFallback: 'La búsqueda no está disponible temporalmente. Mostrando las últimas noticias.',
+      updated: 'Actualizado',
+      noImage: 'Imagen del medio no disponible',
     },
     astianRssWidget: {
       title: 'Noticias de Astian',
@@ -413,10 +449,11 @@ function normalizeLocale(locale) {
 export function getWidgetCopy(locale) {
   const normalized = normalizeLocale(locale);
   const localized = widgetCopyByLocale[normalized] || {};
-  return {
-    ...widgetCopyByLocale.en,
-    ...localized,
-  };
+  const base = widgetCopyByLocale.en;
+  return Object.fromEntries(
+    [...new Set([...Object.keys(base), ...Object.keys(localized)])]
+      .map(key => [key, { ...(base[key] || {}), ...(localized[key] || {}) }]),
+  );
 }
 
 export default getWidgetCopy;

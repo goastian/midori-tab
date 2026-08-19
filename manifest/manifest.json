@@ -16,6 +16,7 @@
     "browsingData",
     "search",
     "https://api.rss2json.com/*",
+    "https://api.freenewsapi.io/*",
     "https://api.unsplash.com/*",
     "https://api.github.com/*",
     "https://api.open-meteo.com/*",
@@ -68,5 +69,5 @@
       "strict_min_version": "109.0"
     }
   },
-  "version": "1.0.43"
+  "version": "1.0.44"
 }
