@@ -12,6 +12,7 @@
 const DEFAULT_TIMEOUT_MS = 6000;
 const LEGACY_CACHE_KEY_PREFIX = 'ads:newtab:';
 const VISITOR_ID_KEY = 'ads:newtab:visitor_id:v1';
+export const REWARDS_INTEREST_STATE_KEY = 'midori:rewards:interest-state:v1';
 const EXPIRY_SAFETY_MS = 30 * 1000;
 const DEFAULT_IMPRESSION_ATTEMPTS = 2;
 const DEFAULT_IMPRESSION_RETRY_DELAY_MS = 200;
@@ -242,6 +243,11 @@ export default class AdsService {
     this.random = options.randomFn || Math.random;
     this.visitorIdFactory = options.visitorIdFactory || createRandomUuid;
     this.eventIdFactory = options.eventIdFactory || createRandomUuid;
+    this.rewardTokenProvider = options.rewardTokenProvider || (async () => {
+      const stored = await this.storage.get(REWARDS_INTEREST_STATE_KEY);
+      const state = stored?.value && typeof stored.value === 'object' ? stored.value : stored;
+      return typeof state?.rewardToken === 'string' ? state.rewardToken.trim() : '';
+    });
     this.legacyCacheCleanupDone = false;
   }
 
@@ -403,9 +409,12 @@ export default class AdsService {
       : null;
 
     try {
+      const rewardToken = await this.rewardTokenProvider();
+      const headers = { Accept: 'application/json' };
+      if (rewardToken) headers['X-Wallet-Token'] = rewardToken;
       const response = await this.fetchFn(url.toString(), {
         method: 'GET',
-        headers: { Accept: 'application/json' },
+        headers,
         credentials: 'omit',
         signal: controller ? controller.signal : undefined,
       });

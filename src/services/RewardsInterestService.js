@@ -36,9 +36,10 @@ export default class RewardsInterestService {
     return (await this.storage.get(REWARDS_INTEREST_STATE_KEY, null)) || null;
   }
 
-  async register(countryCode) {
+  async register(countryCode, { termsAccepted = false } = {}) {
     const country = String(countryCode || '').trim().toUpperCase();
     if (!/^[A-Z]{2}$/.test(country) || !this.fetchFn) throw new Error('Select a valid country or region.');
+    if (!termsAccepted) throw new Error('Accept the Rewards terms and tax declaration to continue.');
     const anonymousId = await this.#anonymousId();
     const controller = typeof AbortController === 'undefined' ? null : new AbortController();
     const timeoutId = controller ? setTimeout(() => controller.abort(), this.timeout) : null;
@@ -49,14 +50,18 @@ export default class RewardsInterestService {
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         credentials: 'omit',
         signal: controller?.signal,
-        body: JSON.stringify({ anonymous_id: anonymousId, country_code: country, source: 'midori_tab' }),
+        body: JSON.stringify({ anonymous_id: anonymousId, country_code: country, source: 'midori_tab', terms_accepted: true }),
       });
-      if (!response.ok) return this.#savePending(country);
+      if (!response.ok) return this.#savePending(country, termsAccepted);
       const responseBody = await response.json();
+      const token = typeof responseBody.reward_token === 'string' ? responseBody.reward_token.trim() : '';
       const next = {
         countryCode: country,
-        // Only the backend's explicit preliminary status is confirmation.
-        status: responseBody.status === 'preliminary' ? 'preliminary' : 'pending_sync',
+        // Only a server-issued token confirms an active earning identity.
+        status: responseBody.status === 'active' && token !== '' ? 'active' : 'pending_sync',
+        rewardToken: token || null,
+        payoutDestinationSet: false,
+        termsAccepted: true,
         registeredAt: Date.now(),
       };
       await this.storage.set(REWARDS_INTEREST_STATE_KEY, next);
@@ -68,14 +73,30 @@ export default class RewardsInterestService {
         throw error;
       }
 
-      return this.#savePending(country);
+      return this.#savePending(country, termsAccepted);
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
   }
 
-  async #savePending(country) {
-    const next = { countryCode: country, status: 'pending_sync', registeredAt: Date.now() };
+  async #savePending(country, termsAccepted = false) {
+    const next = { countryCode: country, status: 'pending_sync', termsAccepted: Boolean(termsAccepted), registeredAt: Date.now() };
+    await this.storage.set(REWARDS_INTEREST_STATE_KEY, next);
+    return next;
+  }
+
+  async setPayoutDestination(destination) {
+    const state = await this.state();
+    const value = String(destination || '').trim();
+    if (!state?.rewardToken || value.length < 3 || !this.fetchFn) throw new Error('Enter a valid Juky account or address.');
+    const response = await this.fetchFn(`${this.baseUrl}/api/v1/public/viewer-rewards-payout-destination`, {
+      method: 'PUT',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Wallet-Token': state.rewardToken },
+      credentials: 'omit',
+      body: JSON.stringify({ destination: value }),
+    });
+    if (!response.ok) throw new Error('We could not save your Juky destination.');
+    const next = { ...state, payoutDestinationSet: true };
     await this.storage.set(REWARDS_INTEREST_STATE_KEY, next);
     return next;
   }

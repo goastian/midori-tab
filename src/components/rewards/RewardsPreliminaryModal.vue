@@ -36,8 +36,9 @@
             <option value="" disabled>{{ t('rewards.countryPlaceholder') }}</option>
             <option v-for="option in countries" :key="option.code" :value="option.code">{{ option.name }}</option>
           </select>
+          <label class="rewards-consent"><input v-model="termsAccepted" type="checkbox" :disabled="saving"> {{ t('rewards.termsAccepted') }}</label>
           <p v-if="error" class="rewards-error" role="alert">{{ error }}</p>
-          <button class="rewards-primary" type="button" :disabled="!country || saving" @click="register">
+          <button class="rewards-primary" type="button" :disabled="!country || !termsAccepted || saving" @click="register">
             {{ saving ? t('rewards.saving') : t('rewards.continue') }}
           </button>
           <button class="rewards-secondary" type="button" :disabled="saving" @click="step = 'intro'">{{ t('rewards.back') }}</button>
@@ -50,6 +51,18 @@
           <p class="rewards-lede">{{ t('rewards.successIntro') }}</p>
           <p class="rewards-notice">{{ t('rewards.successNotice') }}</p>
           <button class="rewards-primary" type="button" @click="$emit('close')">{{ t('rewards.done') }}</button>
+        </template>
+
+        <template v-else-if="step === 'payout'">
+          <div class="rewards-mark rewards-mark--success" aria-hidden="true"><DashboardIcon name="privacy" :size="38" :stroke-width="1.7" /></div>
+          <p class="rewards-kicker">{{ t('rewards.kicker') }}</p>
+          <h1 id="rewards-title">{{ t('rewards.payoutTitle') }}</h1>
+          <p class="rewards-lede">{{ t('rewards.payoutIntro') }}</p>
+          <label class="rewards-field" for="rewards-juky">{{ t('rewards.payoutLabel') }}</label>
+          <input id="rewards-juky" v-model.trim="payoutDestination" class="rewards-select" type="text" autocomplete="off" :disabled="saving">
+          <p v-if="error" class="rewards-error" role="alert">{{ error }}</p>
+          <button class="rewards-primary" type="button" :disabled="payoutDestination.length < 3 || saving" @click="savePayoutDestination">{{ saving ? t('rewards.saving') : t('rewards.payoutSave') }}</button>
+          <button class="rewards-secondary" type="button" :disabled="saving" @click="step = 'registered'">{{ t('rewards.payoutLater') }}</button>
         </template>
 
         <template v-else-if="step === 'pending'">
@@ -89,6 +102,12 @@ const MISSING_COPY_FALLBACK = Object.freeze({
   'rewards.pendingNotice': 'Your country remains only on this device. No payment account or Juky destination has been created.',
   'rewards.retry': 'Try again',
   'rewards.changeCountry': 'Change country or region',
+  'rewards.termsAccepted': 'I accept the Midori Rewards terms and declare this country as my tax residence.',
+  'rewards.payoutTitle': 'Set your Juky destination',
+  'rewards.payoutIntro': 'Rewards are active. Paste the Juky account or address for an approved withdrawal.',
+  'rewards.payoutLabel': 'Juky account or address',
+  'rewards.payoutSave': 'Save Juky destination',
+  'rewards.payoutLater': 'I will add it later',
 });
 
 function countryCodes() {
@@ -116,6 +135,8 @@ export default {
     return {
       step: 'intro',
       country: initialCountry(),
+      termsAccepted: false,
+      payoutDestination: '',
       saving: false,
       error: '',
       stateReady: false,
@@ -140,7 +161,8 @@ export default {
       try {
         const saved = await this.service.state();
         if (saved?.countryCode && /^[A-Z]{2}$/.test(saved.countryCode)) this.country = saved.countryCode;
-        if (saved?.status === 'preliminary') this.step = 'registered';
+        this.termsAccepted = Boolean(saved?.termsAccepted);
+        if (saved?.status === 'active') this.step = saved.payoutDestinationSet ? 'registered' : 'payout';
         if (saved?.status === 'pending_sync') this.step = 'pending';
       } finally {
         this.stateReady = true;
@@ -150,8 +172,20 @@ export default {
       this.error = '';
       this.saving = true;
       try {
-        const registration = await this.service.register(this.country);
-        this.step = registration.status === 'preliminary' ? 'registered' : 'pending';
+        const registration = await this.service.register(this.country, { termsAccepted: this.termsAccepted });
+        this.step = registration.status === 'active' ? 'payout' : 'pending';
+      } catch (error) {
+        this.error = error?.message || this.t('rewards.error');
+      } finally {
+        this.saving = false;
+      }
+    },
+    async savePayoutDestination() {
+      this.error = '';
+      this.saving = true;
+      try {
+        await this.service.setPayoutDestination(this.payoutDestination);
+        this.step = 'registered';
       } catch (error) {
         this.error = error?.message || this.t('rewards.error');
       } finally {
@@ -184,6 +218,8 @@ h1 { margin: 0; font-size: clamp(1.55rem, 4vw, 2rem); line-height: 1.15; }
 .rewards-secondary:hover:not(:disabled) { color: var(--color-text); background: var(--surface-control-hover); }
 .rewards-primary:disabled, .rewards-secondary:disabled { cursor: not-allowed; opacity: .55; }
 .rewards-field { display: block; margin: 0 0 .45rem; color: var(--color-text-secondary); font-size: .9rem; font-weight: 650; text-align: left; }
+.rewards-consent { display: block; margin: -.25rem 0 1rem; color: var(--color-text-secondary); font-size: .82rem; line-height: 1.4; text-align: left; }
+.rewards-consent input { margin-right: .45rem; accent-color: var(--color-primary); }
 .rewards-select { width: 100%; min-height: 2.9rem; margin-bottom: 1rem; padding: 0 .85rem; color: var(--color-text); background: var(--surface-control); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font: inherit; }
 .rewards-error { margin: -.35rem 0 1rem; color: var(--accent-danger); font-size: .88rem; text-align: left; }
 .rewards-notice { padding: .85rem 1rem; margin: 0 0 1.5rem; color: var(--color-text-secondary); background: var(--surface-sunken); border-radius: var(--radius-md); font-size: .9rem; line-height: 1.5; }
