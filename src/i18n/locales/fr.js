@@ -250,6 +250,13 @@ export default {
     download: 'Télécharger',
     defer: 'Mettre à jour plus tard',
   },
+  dashboard: { actions: { rewards: 'Récompenses' } },
+  rewards: {
+    kicker: 'Récompenses Midori', close: 'Fermer les récompenses', title: 'Préparez les récompenses pour votre région',
+    intro: 'Indiquez votre pays pour préparer un lancement de récompenses respectueux de votre vie privée.',
+    pointOne: 'Les annonces restent sous votre contrôle dans les réglages du nouvel onglet.', pointTwo: 'Nous envoyons uniquement un identifiant local anonyme et le pays choisi.', pointThree: 'Aucun solde, compte de paiement ni destinataire Juky n’est créé pour le moment.',
+    start: 'Commencer l’inscription préliminaire', how: 'Comment cela fonctionne', regionTitle: 'Sélectionnez votre pays ou région', regionIntro: 'Cela ne confirme pas votre éligibilité et ne crée pas de compte de paiement.', countryLabel: 'Pays ou région', countryPlaceholder: 'Sélectionnez un pays', continue: 'Continuer', back: 'Retour', saving: 'Enregistrement', error: 'Nous n’avons pas pu enregistrer votre inscription préliminaire.', successTitle: 'Inscription préliminaire active', successIntro: 'Votre pays est déjà enregistré avec son identifiant local anonyme.', successNotice: 'Vous pouvez continuer à voir des annonces selon les réglages du nouvel onglet. Midori demandera votre compte ou adresse Juky uniquement lorsque les paiements seront disponibles.', pendingTitle: 'Inscription en attente', pendingIntro: 'Astian Ads n’a pas pu confirmer votre inscription préliminaire.', pendingNotice: 'Votre pays reste uniquement sur cet appareil. Aucun compte de paiement ni destinataire Juky n’a été créé.', retry: 'Réessayer', changeCountry: 'Changer de pays ou région', successPending: 'Votre pays est enregistré sur cet appareil. Midori Tabs réessaiera l’inscription préliminaire anonyme la prochaine fois que vous utiliserez les récompenses. Aucun compte de paiement ni destinataire Juky n’est créé.', done: 'Terminé', howTitle: 'Fonctionnement des récompenses préliminaires', howIntro: 'Il s’agit d’une inscription d’intérêt, pas d’un programme de paiement.', howNotice: 'Elle aide à planifier par région sans envoyer à Astian Ads votre historique de navigation, e-mail, compte ou adresse de paiement.',
+  },
   omni: {
     label: 'Menu de commandes',
     placeholder: 'Tapez une commande ou recherchez…',

@@ -8,6 +8,10 @@
       <DashboardIcon name="store" :size="14" aria-hidden="true" />
       <span>{{ i18n.$t('dashboard.actions.marketplace') }}</span>
     </button>
+    <button class="action-btn" type="button" @click="$emit('open-rewards')" :aria-label="i18n.$t('dashboard.actions.rewards')">
+      <DashboardIcon name="privacy" :size="14" aria-hidden="true" />
+      <span>{{ i18n.$t('dashboard.actions.rewards') }}</span>
+    </button>
   </div>
 </template>
 
@@ -29,7 +33,7 @@ export default {
       default: false,
     },
   },
-  emits: ['toggle-widgets', 'open-marketplace'],
+  emits: ['toggle-widgets', 'open-marketplace', 'open-rewards'],
 };
 </script>
 

@@ -61,7 +61,7 @@ const useI18nStore = defineStore('i18nStore', {
       } catch (e) {
       }
       syncLocaleToExtensionStorage(this.locale);
-      this.loadLocale(this.locale);
+      return this.loadLocale(this.locale);
     },
 
     ensureLocale() {
@@ -72,7 +72,7 @@ const useI18nStore = defineStore('i18nStore', {
       } catch (e) {
       }
       syncLocaleToExtensionStorage(this.locale);
-      this.loadLocale(this.locale);
+      return this.loadLocale(this.locale);
     },
 
     async loadLocale(code) {

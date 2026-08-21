@@ -1,5 +1,3 @@
-import en from './locales/en.js';
-
 export const DEFAULT_LOCALE = 'en';
 
 export const availableLanguages = [
@@ -15,7 +13,7 @@ export const availableLanguages = [
 ];
 
 export const localeLoaders = {
-  en: () => Promise.resolve({ default: en }),
+  en: () => import('./locales/en.js'),
   es: () => import('./locales/es.js'),
   pt: () => import('./locales/pt.js'),
   fr: () => import('./locales/fr.js'),
@@ -26,7 +24,9 @@ export const localeLoaders = {
   it: () => import('./locales/it.js'),
 };
 
-export const locales = { en };
+// Load the initial language before mounting the UI. Keeping every locale,
+// including English, async removes translations from the New Tab critical path.
+export const locales = {};
 
 export function normalizeLocale(code) {
   return String(code || '').trim().toLowerCase().split('-')[0];

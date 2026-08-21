@@ -250,6 +250,13 @@ export default {
     download: 'ダウンロード',
     defer: 'あとで更新',
   },
+  dashboard: { actions: { rewards: 'リワード' } },
+  rewards: {
+    kicker: 'Midori リワード', close: 'リワードを閉じる', title: 'お住まいの地域向けにリワードを準備',
+    intro: '国を選択して、プライバシーを尊重したリワードの提供準備にご協力ください。',
+    pointOne: '広告は引き続き新しいタブの設定から管理できます。', pointTwo: '送信するのはローカルの匿名IDと選択した国だけです。', pointThree: '現時点では残高、支払いアカウント、Juky の送付先は作成されません。',
+    start: '仮登録を開始', how: '仕組み', regionTitle: '国または地域を選択', regionIntro: 'これは利用資格を確定せず、支払いアカウントも作成しません。', countryLabel: '国または地域', countryPlaceholder: '国を選択', continue: '続ける', back: '戻る', saving: '保存中', error: '仮登録を保存できませんでした。', successTitle: '仮登録が有効です', successIntro: '国はローカルの匿名IDですでに登録されています。', successNotice: '新しいタブの設定に応じて広告は引き続き表示される場合があります。支払いが利用可能になった場合にのみ、Midori は Juky のアカウントまたはアドレスを求めます。', pendingTitle: '登録は保留中です', pendingIntro: 'Astian Ads は仮登録を確認できませんでした。', pendingNotice: '国はこのデバイスにのみ残ります。支払いアカウントや Juky の送付先は作成されていません。', retry: '再試行', changeCountry: '国または地域を変更', successPending: '国はこのデバイスに保存されました。次回リワードを使用するときに、Midori Tabs は匿名の仮登録をもう一度試します。支払いアカウントや Juky の送付先は作成されません。', done: '完了', howTitle: '仮リワードの仕組み', howIntro: 'これは関心登録であり、支払いプログラムではありません。', howNotice: '閲覧履歴、メールアドレス、アカウント、支払い先を Astian Ads に送らずに、地域別の計画に役立てます。',
+  },
   omni: {
     label: 'コマンドメニュー',
     placeholder: 'コマンドまたは検索を入力…',

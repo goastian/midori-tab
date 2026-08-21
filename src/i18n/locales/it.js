@@ -250,6 +250,13 @@ export default {
     download: 'Scarica',
     defer: 'Aggiorna più tardi',
   },
+  dashboard: { actions: { rewards: 'Ricompense' } },
+  rewards: {
+    kicker: 'Ricompense Midori', close: 'Chiudi ricompense', title: 'Prepara le ricompense per la tua regione',
+    intro: 'Indica il tuo paese per preparare un lancio delle ricompense rispettoso della privacy.',
+    pointOne: 'Gli annunci restano sotto il tuo controllo nelle impostazioni della nuova scheda.', pointTwo: 'Inviamo solo un identificatore locale anonimo e il paese scelto.', pointThree: 'Non vengono ancora creati saldo, conto di pagamento o destinazione Juky.',
+    start: 'Avvia registrazione preliminare', how: 'Come funziona', regionTitle: 'Seleziona paese o regione', regionIntro: 'Questo non conferma l’idoneità e non crea un conto di pagamento.', countryLabel: 'Paese o regione', countryPlaceholder: 'Seleziona un paese', continue: 'Continua', back: 'Indietro', saving: 'Salvataggio', error: 'Non è stato possibile salvare la registrazione preliminare.', successTitle: 'Registrazione preliminare attiva', successIntro: 'Il tuo paese è già registrato con il suo identificatore locale anonimo.', successNotice: 'Potresti continuare a vedere annunci secondo le impostazioni della nuova scheda. Midori chiederà il tuo conto o indirizzo Juky solo quando i pagamenti saranno disponibili.', pendingTitle: 'Registrazione in attesa', pendingIntro: 'Astian Ads non ha potuto confermare la registrazione preliminare.', pendingNotice: 'Il tuo paese rimane solo su questo dispositivo. Non è stato creato alcun conto di pagamento o destinatario Juky.', retry: 'Riprova', changeCountry: 'Cambia paese o regione', successPending: 'Il tuo paese è salvato su questo dispositivo. Midori Tabs ritenterà la registrazione preliminare anonima la prossima volta che utilizzerai le ricompense. Non viene creato alcun conto di pagamento o destinatario Juky.', done: 'Fatto', howTitle: 'Come funzionano le ricompense preliminari', howIntro: 'È una registrazione di interesse, non un programma di pagamenti.', howNotice: 'Aiuta a pianificare per regione senza inviare ad Astian Ads cronologia di navigazione, e-mail, conto o indirizzo di pagamento.',
+  },
   omni: {
     label: 'Menu comandi',
     placeholder: 'Digita un comando o cerca…',

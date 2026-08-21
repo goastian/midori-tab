@@ -132,6 +132,7 @@
       :show-widget-sheet="showWidgetSheet"
       @toggle-widgets="showWidgetSheet = !showWidgetSheet"
       @open-marketplace="openMarketplace()"
+      @open-rewards="showRewards = true"
     />
 
     <WidgetPicker
@@ -171,6 +172,7 @@
       :visible="showAppsMenu"
       @close="showAppsMenu = false"
     />
+    <RewardsPreliminaryModal v-if="showRewards" :i18n="i18n" @close="showRewards = false" />
   </DashboardShell>
 </template>
 
@@ -207,6 +209,7 @@ export default {
     PrivacyWidget: defineAsyncComponent(() => import('../components/PrivacyWidget.vue')),
     QuickSettingsPanel: defineAsyncComponent(() => import('../components/dashboard/QuickSettingsPanel.vue')),
     RssWidget: defineAsyncComponent(() => import('../components/RssWidget.vue')),
+    RewardsPreliminaryModal: defineAsyncComponent(() => import('../components/rewards/RewardsPreliminaryModal.vue')),
     SearchBox: defineAsyncComponent(() => import('../components/SearchBox.vue')),
     TodoWidget: defineAsyncComponent(() => import('../components/TodoWidget.vue')),
     WeatherWidget: defineAsyncComponent(() => import('../components/WeatherWidget.vue')),
@@ -226,6 +229,7 @@ export default {
       activeMarketplaceType: 'wallpaper',
       showQuickSettings: false,
       showAppsMenu: false,
+      showRewards: false,
       draggedWidgetKey: '',
       dropTargetKey: '',
       dropPlacement: 'before',

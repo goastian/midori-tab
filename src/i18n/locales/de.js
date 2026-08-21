@@ -250,6 +250,13 @@ export default {
     download: 'Herunterladen',
     defer: 'Später aktualisieren',
   },
+  dashboard: { actions: { rewards: 'Prämien' } },
+  rewards: {
+    kicker: 'Midori Prämien', close: 'Prämien schließen', title: 'Prämien für Ihre Region vorbereiten',
+    intro: 'Geben Sie Ihr Land an, damit wir einen datenschutzfreundlichen Start der Prämien vorbereiten können.',
+    pointOne: 'Anzeigen bleiben in den Einstellungen Ihres neuen Tabs steuerbar.', pointTwo: 'Wir senden nur eine lokale anonyme Kennung und das gewählte Land.', pointThree: 'Es wird noch kein Guthaben, Zahlungskonto oder Juky-Ziel erstellt.',
+    start: 'Vorläufige Registrierung starten', how: 'So funktioniert es', regionTitle: 'Land oder Region auswählen', regionIntro: 'Dies bestätigt keine Berechtigung und erstellt kein Zahlungskonto.', countryLabel: 'Land oder Region', countryPlaceholder: 'Land auswählen', continue: 'Weiter', back: 'Zurück', saving: 'Wird gespeichert', error: 'Die vorläufige Registrierung konnte nicht gespeichert werden.', successTitle: 'Vorläufige Registrierung aktiv', successIntro: 'Ihr Land ist bereits mit seiner lokalen anonymen Kennung registriert.', successNotice: 'Sie können weiterhin Anzeigen gemäß den Einstellungen des neuen Tabs sehen. Midori fragt erst nach Ihrem Juky-Konto oder Ihrer Juky-Adresse, wenn Zahlungen verfügbar sind.', pendingTitle: 'Registrierung ausstehend', pendingIntro: 'Astian Ads konnte Ihre vorläufige Registrierung nicht bestätigen.', pendingNotice: 'Ihr Land bleibt nur auf diesem Gerät. Es wurde kein Zahlungskonto oder Juky-Ziel erstellt.', retry: 'Erneut versuchen', changeCountry: 'Land oder Region ändern', successPending: 'Ihr Land ist auf diesem Gerät gespeichert. Midori Tabs versucht die anonyme vorläufige Registrierung erneut, wenn Sie Prämien das nächste Mal verwenden. Es wird kein Zahlungskonto oder Juky-Ziel erstellt.', done: 'Fertig', howTitle: 'So funktionieren vorläufige Prämien', howIntro: 'Dies ist eine Interessenregistrierung, kein Zahlungsprogramm.', howNotice: 'Sie hilft bei der regionalen Planung, ohne Ihren Browserverlauf, Ihre E-Mail, Ihr Konto oder Ihre Zahlungsadresse an Astian Ads zu senden.',
+  },
   omni: {
     label: 'Befehlsmenü',
     placeholder: 'Befehl oder Suche eingeben…',

@@ -15,35 +15,39 @@ import { getBrowserInfo } from './utils/browserInfo.js'
 import { hydrateAsyncStores } from './bootstrap/hydrateAsyncStores.js'
 import { writeBootSnapshot } from './bootstrap/bootSnapshot.js'
 
-perfMarks.setup()
+async function bootstrap() {
+  perfMarks.setup()
 
-applyInitialTheme()
+  applyInitialTheme()
 
-const app = createApp(App)
-const pinia = createPinia();
+  const app = createApp(App)
+  const pinia = createPinia();
 
-pinia.use(persistedState)
-app.use(pinia)
+  pinia.use(persistedState)
+  app.use(pinia)
 
-const i18n = useI18nStore(pinia)
-i18n.ensureLocale()
-document.documentElement.lang = i18n.locale
+  const i18n = useI18nStore(pinia)
+  await i18n.ensureLocale()
+  document.documentElement.lang = i18n.locale
 
-const browserInfo = getBrowserInfo()
-document.documentElement.setAttribute('data-browser', browserInfo.id)
+  const browserInfo = getBrowserInfo()
+  document.documentElement.setAttribute('data-browser', browserInfo.id)
 
-const tabStore = useTabStore(pinia)
-tabStore.$subscribe((_mutation, state) => writeBootSnapshot(state), { detached: true })
-const themeStore = useThemeStore(pinia)
-const initialTheme = tabStore.resolveTheme()
-document.documentElement.setAttribute('data-theme', initialTheme)
-themeStore.applyTheme(initialTheme)
+  const tabStore = useTabStore(pinia)
+  tabStore.$subscribe((_mutation, state) => writeBootSnapshot(state), { detached: true })
+  const themeStore = useThemeStore(pinia)
+  const initialTheme = tabStore.resolveTheme()
+  document.documentElement.setAttribute('data-theme', initialTheme)
+  themeStore.applyTheme(initialTheme)
 
-app.mount('#app')
-hydrateAsyncStores(pinia)
+  app.mount('#app')
+  hydrateAsyncStores(pinia)
 
-window.requestAnimationFrame(() => {
   window.requestAnimationFrame(() => {
-    perfMarks.mark('shell-visible')
+    window.requestAnimationFrame(() => {
+      perfMarks.mark('shell-visible')
+    })
   })
-})
+}
+
+bootstrap()
