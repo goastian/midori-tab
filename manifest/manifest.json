@@ -69,5 +69,21 @@
       "strict_min_version": "109.0"
     }
   },
-  "version": "1.0.46"
+  "experiment_apis": {
+    "midoriBlocker": {
+      "schema": "experiment-apis/midoriBlocker.json",
+      "parent": {
+        "scopes": [
+          "addon_parent"
+        ],
+        "script": "experiment-apis/midoriBlocker.js",
+        "paths": [
+          [
+            "midoriBlocker"
+          ]
+        ]
+      }
+    }
+  },
+  "version": "1.0.47"
 }

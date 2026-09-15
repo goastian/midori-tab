@@ -41,8 +41,38 @@ function sendToExtension(extensionId, message) {
   });
 }
 
+function sendToSelf(message) {
+  return new Promise((resolve) => {
+    try {
+      if (globalThis.browser?.runtime?.sendMessage) {
+        globalThis.browser.runtime.sendMessage(message)
+          .then(resolve)
+          .catch(() => resolve(null));
+        return;
+      }
+
+      if (globalThis.chrome?.runtime?.sendMessage) {
+        globalThis.chrome.runtime.sendMessage(message, (response) => {
+          resolve(globalThis.chrome.runtime.lastError ? null : response);
+        });
+        return;
+      }
+    } catch {
+      // Not running inside an extension context.
+    }
+    resolve(null);
+  });
+}
+
+function isBridgeResponse(response) {
+  return !!response && ( 'totalBlocked' in response || 'error' in response );
+}
+
 export async function requestPrivacyStats() {
   const message = { action: 'get-stats-summary', schemaVersion: 2 };
+
+  const selfResponse = await sendToSelf(message);
+  if (isBridgeResponse(selfResponse)) return selfResponse;
 
   if (cachedExtensionId) {
     const response = await sendToExtension(cachedExtensionId, message);

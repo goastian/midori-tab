@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import AdsService, { buildCacheKey } from '../src/services/AdsService.js'
+import AdsService, {
+  REWARDS_INTEREST_STATE_KEY,
+  VISITOR_ID_KEY,
+  impressionRetryDelayMs,
+  isDecisionActive,
+  retryAfterDelayMs,
+} from '../src/services/AdsService.js'
 
 function memoryStorage(seed = {}) {
   const state = { ...seed }
@@ -13,18 +19,12 @@ function memoryStorage(seed = {}) {
     async set(key, value) {
       state[key] = value
     },
-  }
-}
-
-function fakeAdResponse(overrides = {}) {
-  return {
-    ad_id: 42,
-    title: 'Private Search',
-    image_url: 'https://example.com/img.png',
-    cta: 'Try it',
-    destination_url: 'https://ads.astian.org/api/v1/ads/click/abc',
-    impression_token: 'jwt-token',
-    ...overrides,
+    async remove(key) {
+      delete state[key]
+    },
+    async keys() {
+      return Object.keys(state)
+    },
   }
 }
 
@@ -39,130 +39,236 @@ function makeFetch(responses) {
     return {
       ok: next.status >= 200 && next.status < 300,
       status: next.status,
-      async json() { return next.body },
+      async json() {
+        return next.body
+      },
+      body: null,
     }
   }
   fn.calls = calls
   return fn
 }
 
-test('buildCacheKey normalizes country and language', () => {
-  assert.equal(buildCacheKey({ country: 'US', language: 'EN' }), 'ads:newtab:us:en')
-  assert.equal(buildCacheKey({ country: '', language: '' }), 'ads:newtab:xx:en')
+function makeService(options = {}) {
+  const storage = options.storage || memoryStorage()
+  const fetchFn = options.fetchFn || makeFetch([])
+  return {
+    storage,
+    fetchFn,
+    service: new AdsService({
+      baseUrl: 'https://ads.astian.org',
+      storage,
+      fetchFn,
+      now: options.now || (() => Date.now()),
+      sleepFn: options.sleepFn || (async () => {}),
+      ...options.extra,
+    }),
+  }
+}
+
+test('fetchNewTabAds returns a fresh signed decision', async () => {
+  const { storage, fetchFn, service } = makeService({
+    fetchFn: makeFetch([{ status: 200, body: fakeAdResponse() }]),
+  })
+
+  const result = await service.fetchNewTabAds({ device_type: 'desktop', country: 'US', language: 'en' })
+
+  assert.equal(result.source, 'fresh')
+  assert.equal(result.ad.ad_id, 42)
+  assert.ok(Number.isFinite(result.latency_ms))
+  assert.equal(fetchFn.calls.length, 1)
+  assert.match(fetchFn.calls[0].url, /\/api\/v1\/ads\/newtab\?/)
+  assert.match(fetchFn.calls[0].url, /device_type=desktop/)
+  assert.match(fetchFn.calls[0].url, /country=US/)
+  assert.match(fetchFn.calls[0].url, /language=en/)
 })
 
-test('fetchNewTabAds returns fresh ad and writes cache', async () => {
+function fakeAdResponse(overrides = {}) {
+  return {
+    contract_version: 'ads-channel-v1',
+    format_id: 'newtab_icon_v1',
+    channel: 'midori_tab',
+    placement: 'new_tab',
+    ad_id: 42,
+    title: 'Private Search',
+    icon_url: 'https://ads.astian.org/img/icon.png',
+    image_url: 'https://ads.astian.org/img/icon.png',
+    destination_url: 'https://ads.astian.org/api/v1/ads/click/abc',
+    impression_token: 'jwt-token',
+    attribution_token: 'attr-token',
+    opportunity_id: 'opp-1',
+    request_id: 'req-1',
+    decision_id: 'dec-1',
+    expires_at: Math.floor((Date.now() + 60 * 60 * 1000) / 1000),
+    disclosure_required: true,
+    sponsor_label: 'Sponsored',
+    billing: {
+      model: 'vcpm',
+      funding_type: 'prepaid',
+      amount_micros: 1_000_000,
+      currency: 'USD',
+    },
+    transparency: {
+      data_used: ['browsing_history'],
+      frequency_cap_per_day: 3,
+      feedback_enabled: true,
+      legacy: false,
+    },
+    ...overrides,
+  }
+}
+
+test('fetchNewTabAds persists a visitor id used on the request', async () => {
   const storage = memoryStorage()
   const fetchFn = makeFetch([{ status: 200, body: fakeAdResponse() }])
   const service = new AdsService({
     baseUrl: 'https://ads.astian.org',
     storage,
     fetchFn,
-    now: () => 1_000_000,
   })
 
-  const result = await service.fetchNewTabAds({ country: 'US', language: 'en' })
-
-  assert.equal(result.source, 'fresh')
-  assert.equal(result.ad.ad_id, 42)
-  const cached = storage.state['ads:newtab:us:en']
-  assert.ok(cached)
-  assert.equal(cached.ad.ad_id, 42)
-  assert.equal(cached.fetchedAt, 1_000_000)
-  assert.equal(fetchFn.calls.length, 1)
-  assert.match(fetchFn.calls[0].url, /\/api\/v1\/ads\/newtab\?/)
-  assert.match(fetchFn.calls[0].url, /country=US/)
-  assert.match(fetchFn.calls[0].url, /language=en/)
+  await service.fetchNewTabAds()
+  const visitorId = storage.state[VISITOR_ID_KEY]
+  assert.ok(typeof visitorId === 'string' && visitorId.length > 10)
+  assert.match(fetchFn.calls[0].url, new RegExp(`visitor_id=${visitorId}`))
 })
 
-test('fetchNewTabAds returns cache within TTL without hitting network', async () => {
-  const cachedAd = fakeAdResponse({ ad_id: 7 })
+test('fetchNewTabAds attaches the active Midori Rewards token to the ad decision request', async () => {
   const storage = memoryStorage({
-    'ads:newtab:us:en': { ad: cachedAd, fetchedAt: 1_000_000 },
+    [REWARDS_INTEREST_STATE_KEY]: { status: 'active', rewardToken: 'reward-token' },
   })
-  const fetchFn = makeFetch([])
-  const service = new AdsService({
-    baseUrl: 'https://ads.astian.org',
-    storage,
-    fetchFn,
-    ttl: 15 * 60 * 1000,
-    now: () => 1_000_000 + 5 * 60 * 1000, // 5 min later
+  const fetchFn = makeFetch([{ status: 200, body: fakeAdResponse() }])
+  const service = new AdsService({ baseUrl: 'https://ads.astian.org', storage, fetchFn })
+
+  await service.fetchNewTabAds()
+
+  assert.equal(fetchFn.calls[0].opts.headers['X-Wallet-Token'], 'reward-token')
+})
+
+test('fetchNewTabAds returns null ad with source none on 204', async () => {
+  const { service, fetchFn } = makeService({
+    fetchFn: makeFetch([{ status: 204, body: null }]),
   })
 
-  const result = await service.fetchNewTabAds({ country: 'US', language: 'en' })
+  const result = await service.fetchNewTabAds()
 
-  assert.equal(result.source, 'cache')
-  assert.equal(result.ad.ad_id, 7)
+  assert.equal(result.source, 'none')
+  assert.equal(result.ad, null)
+})
+
+test('fetchNewTabAds returns none when no campaign is available', async () => {
+  const { service, fetchFn } = makeService({
+    fetchFn: makeFetch([{ status: 404, body: { message: 'No ad' } }]),
+  })
+
+  const result = await service.fetchNewTabAds()
+
+  assert.equal(result.source, 'none')
+  assert.equal(result.ad, null)
+})
+
+test('fetchNewTabAds reports an error without blocking on network failure', async () => {
+  const { service } = makeService({
+    fetchFn: makeFetch([new Error('offline')]),
+  })
+
+  const result = await service.fetchNewTabAds()
+
+  assert.equal(result.source, 'error')
+  assert.equal(result.ad, null)
+  assert.ok(typeof result.error === 'string')
+})
+
+test('fetchNewTabAds rejects malformed responses that fail the contract', async () => {
+  const { service } = makeService({
+    fetchFn: makeFetch([{ status: 200, body: { contract_version: 'ads-channel-v1', title: 'broken' } }]),
+  })
+
+  const result = await service.fetchNewTabAds()
+
+  assert.equal(result.source, 'none')
+  assert.equal(result.ad, null)
+})
+
+test('isDecisionActive gates expired decisions with an expiry safety margin', () => {
+  // now() is ms; expires_at is in seconds (the service multiplies it by 1000).
+  const now = () => 1_000_000
+
+  assert.equal(
+    isDecisionActive({ expires_at: 1031 }, now, 30_000),
+    true,
+  )
+  assert.equal(
+    isDecisionActive({ expires_at: 1029 }, now, 30_000),
+    false,
+  )
+})
+
+test('retryAfterDelayMs parses header seconds and caps the delay', () => {
+  const now = () => Date.now()
+  const seconds = retryAfterDelayMs({
+    headers: { get: () => '3' },
+  }, now)
+  assert.ok(Number.isFinite(seconds) && seconds >= 2000 && seconds <= 5000)
+
+  const dateHeader = retryAfterDelayMs({
+    headers: { get: () => new Date(now() + 4000).toUTCString() },
+  }, now)
+  assert.ok(Number.isFinite(dateHeader) && dateHeader >= 3000 && dateHeader <= 5000)
+
+  const missing = retryAfterDelayMs({ headers: { get: () => null } }, now)
+  assert.equal(missing, null)
+})
+
+test('impressionRetryDelayMs applies exponential backoff with jitter', () => {
+  const random = () => 0
+  const backoff = impressionRetryDelayMs({ attempt: 3, random })
+  assert.ok(backoff >= 50 && backoff <= 5000)
+  const fast = impressionRetryDelayMs({ attempt: 1, random: () => 0.5 })
+  assert.ok(fast >= 50 && fast <= 5000)
+})
+
+test('trackImpression POSTs the signed decision once with keepalive', async () => {
+  const { fetchFn, service } = makeService({
+    fetchFn: makeFetch([{ status: 200, body: null }]),
+  })
+  const ad = fakeAdResponse()
+
+  const accepted = await service.trackImpression('jwt-token', {
+    expiresAt: ad.expires_at,
+  })
+
+  assert.equal(accepted, true)
+  assert.equal(fetchFn.calls.length, 1)
+  assert.equal(fetchFn.calls[0].opts.method, 'POST')
+  assert.match(fetchFn.calls[0].url, /\/api\/v1\/ads\/impression$/)
+  assert.equal(fetchFn.calls[0].opts.keepalive, true)
+})
+
+test('trackImpression does not fire when the decision is expired', async () => {
+  const { fetchFn, service } = makeService({
+    fetchFn: makeFetch([{ status: 200, body: null }]),
+  })
+  const expired = Math.floor((Date.now() - 60 * 60 * 1000) / 1000)
+
+  const accepted = await service.trackImpression('jwt-token', { expiresAt: expired })
+
+  assert.equal(accepted, false)
   assert.equal(fetchFn.calls.length, 0)
 })
 
-test('fetchNewTabAds falls back to stale cache on network error', async () => {
-  const cachedAd = fakeAdResponse({ ad_id: 9 })
-  const storage = memoryStorage({
-    'ads:newtab:us:en': { ad: cachedAd, fetchedAt: 1_000_000 },
+test('trackClientEvent only accepts the allow-listed event types', async () => {
+  const { fetchFn, service } = makeService({
+    fetchFn: makeFetch([{ status: 200, body: null }]),
   })
-  const fetchFn = makeFetch([new Error('offline')])
-  const service = new AdsService({
-    baseUrl: 'https://ads.astian.org',
-    storage,
-    fetchFn,
-    ttl: 60_000,
-    now: () => 1_000_000 + 5 * 60 * 1000, // past TTL
-  })
+  const ad = fakeAdResponse()
 
-  const result = await service.fetchNewTabAds({ country: 'US', language: 'en' })
+  const invalid = await service.trackClientEvent('nope', 'jwt-token', { expiresAt: ad.expires_at })
+  assert.equal(invalid, false)
+  assert.equal(fetchFn.calls.length, 0)
 
-  assert.equal(result.source, 'stale')
-  assert.equal(result.ad.ad_id, 9)
-})
-
-test('fetchNewTabAds returns none when 404 and no cache', async () => {
-  const storage = memoryStorage()
-  const fetchFn = makeFetch([{ status: 404, body: { message: 'No ad' } }])
-  const service = new AdsService({
-    baseUrl: 'https://ads.astian.org',
-    storage,
-    fetchFn,
-    now: () => 1_000_000,
-  })
-
-  const result = await service.fetchNewTabAds({ country: 'US', language: 'en' })
-
-  assert.equal(result.source, 'none')
-  assert.equal(result.ad, null)
-})
-
-test('fetchNewTabAds rejects malformed response (no ad_id)', async () => {
-  const storage = memoryStorage()
-  const fetchFn = makeFetch([{ status: 200, body: { title: 'broken' } }])
-  const service = new AdsService({
-    baseUrl: 'https://ads.astian.org',
-    storage,
-    fetchFn,
-    now: () => 1_000_000,
-  })
-
-  const result = await service.fetchNewTabAds({ country: 'US', language: 'en' })
-
-  assert.equal(result.source, 'none')
-  assert.equal(result.ad, null)
-})
-
-test('fetchNewTabAds discards cache older than 7-day hard cap', async () => {
-  const cachedAd = fakeAdResponse()
-  const eightDaysAgo = Date.now() - 8 * 24 * 60 * 60 * 1000
-  const storage = memoryStorage({
-    'ads:newtab:us:en': { ad: cachedAd, fetchedAt: eightDaysAgo },
-  })
-  const fetchFn = makeFetch([new Error('offline')])
-  const service = new AdsService({
-    baseUrl: 'https://ads.astian.org',
-    storage,
-    fetchFn,
-  })
-
-  const result = await service.fetchNewTabAds({ country: 'US', language: 'en' })
-
-  assert.equal(result.source, 'none')
-  assert.equal(result.ad, null)
+  const valid = await service.trackClientEvent('ad_dismissed', 'jwt-token', { expiresAt: ad.expires_at })
+  assert.equal(valid, true)
+  assert.equal(fetchFn.calls.length, 1)
+  assert.match(fetchFn.calls[0].url, /\/api\/v1\/ads\/client-event$/)
 })

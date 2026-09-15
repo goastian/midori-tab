@@ -60,8 +60,8 @@ import {
 
 /**
  * Privacy statistics widget.
- * Communicates with the Midori Privacy extension via runtime.sendMessage
- * to fetch real uBlock counters without storage reads or tab scans.
+ * Fetches stats from the native Midori blocker through the new-tab
+ * background page, keeping the legacy companion extension as fallback.
  */
 
 const EVENT_REFRESH_DEBOUNCE_MS = 2_000;
@@ -246,7 +246,7 @@ export default {
       return true;
     },
 
-    /** Fetches stats from Midori Privacy extension. */
+    /** Fetches stats from the native blocker bridge. */
     async fetchStats(options = {}) {
       if (this.inFlight) return;
       if (!options.force && !this.canRefresh()) {
