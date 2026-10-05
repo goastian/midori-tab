@@ -1,6 +1,7 @@
 const DEFAULT_VERSION = 1;
 const DEFAULT_DEBOUNCE_MS = 600;
 const timers = new Map();
+const queues = new Map();
 
 function hasRuntimeLastError() {
   return typeof chrome !== 'undefined' && chrome.runtime?.lastError;
@@ -136,7 +137,7 @@ function pickNewestPayload(primary, secondary, fallback) {
   if (secondary === undefined) return unwrapPayload(primary, fallback);
 
   return unwrapPayload(
-    getPayloadTimestamp(secondary) > getPayloadTimestamp(primary) ? secondary : primary,
+    getPayloadTimestamp(secondary) >= getPayloadTimestamp(primary) ? secondary : primary,
     fallback,
   );
 }
@@ -156,14 +157,18 @@ function readLocalStoragePayload(key) {
   }
 }
 
-export async function getJson(key, fallback = null) {
+export async function getJson(key, fallback = null, options = {}) {
   const localPayload = readLocalStoragePayload(key);
   const storage = getExtensionStorage();
   if (storage?.get) {
     try {
       const result = await storageGet(storage, key);
       return pickNewestPayload(result?.[key], localPayload, fallback);
-    } catch {
+    } catch (error) {
+      if (options.strictRead && localPayload === undefined) {
+        reportFailure(key, error);
+        throw error;
+      }
       return unwrapPayload(localPayload, fallback);
     }
   }
@@ -180,91 +185,148 @@ export async function verifyJsonStored(key, expected) {
 }
 
 export async function quotaSafeSet(key, value, options = {}) {
-  const version = options.version || DEFAULT_VERSION;
-  const snapshot = snapshotJsonValue(value);
-  return persistSnapshot(key, snapshot, version, options);
+  try {
+    const payload = preparePayload(key, value, options);
+    writeMirror(key, payload);
+    return await enqueue(key, () => writeExtension(key, payload));
+  } catch (error) {
+    reportFailure(key, error);
+    throw error;
+  }
 }
 
-function persistSnapshot(key, snapshot, version, options = {}) {
+function preparePayload(key, value, options = {}) {
   const maxBytes = Number(options.maxBytes) || 0;
-  const payload = wrapPayload(snapshot, version);
+  const payload = wrapPayload(snapshotJsonValue(value), options.version || DEFAULT_VERSION);
+  payload.updatedAt = Math.max(payload.updatedAt, getPayloadTimestamp(readLocalStoragePayload(key)) + 1);
   const serialized = JSON.stringify(payload);
-
   if (maxBytes > 0 && new Blob([serialized]).size > maxBytes) {
-    return Promise.reject(new Error(`Storage payload for ${key} exceeds ${maxBytes} bytes.`));
+    throw new Error(`Storage payload for ${key} exceeds ${maxBytes} bytes.`);
   }
+  return payload;
+}
 
+function writeMirror(key, payload) {
   try {
-    localStorage.setItem(key, serialized);
-  } catch {
-    /* localStorage inaccesible en contextos restringidos */
+    localStorage.setItem(key, JSON.stringify(payload));
+    return true;
+  } catch (error) {
+    if (!getExtensionStorage()?.set) throw error;
+    return false;
   }
+}
 
+async function writeExtension(key, payload) {
   const storage = getExtensionStorage();
-  if (!storage?.set) return Promise.resolve(true);
+  if (!storage?.set) return true;
+  await storageSet(storage, { [key]: payload });
+  return true;
+}
 
-  return storageSet(storage, { [key]: payload }).then(
-    () => true,
-    (error) => {
-      console.warn(`[StorageService] chrome.storage write failed for ${key}:`, error);
-      return true;
-    },
-  );
+function enqueue(key, task) {
+  const operation = (queues.get(key) || Promise.resolve()).then(task);
+  const tail = operation.then(() => {}, () => {});
+  queues.set(key, tail);
+  tail.then(() => {
+    if (queues.get(key) === tail) queues.delete(key);
+  });
+  return operation;
+}
+
+function reportFailure(key, error) {
+  console.error(`[StorageService] Could not save ${key}:`, error);
+  if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+    window.__midoriStorageError = true;
+    window.dispatchEvent(new CustomEvent('midori:storage-error', {
+      detail: { key, message: error?.message || String(error) },
+    }));
+  }
+}
+
+function observed(promise) {
+  promise.catch(() => {});
+  return promise;
+}
+
+function settlePending(pending, result, error) {
+  for (const waiter of pending.waiters) {
+    if (error) waiter.reject(error);
+    else waiter.resolve(result);
+  }
 }
 
 export function setJsonDebounced(key, value, options = {}) {
   const delay = Number(options.delayMs) >= 0 ? Number(options.delayMs) : DEFAULT_DEBOUNCE_MS;
-  const version = options.version || DEFAULT_VERSION;
-  const snapshot = snapshotJsonValue(value);
-  persistLocalSnapshot(key, snapshot, version);
-  const previous = timers.get(key);
-  if (previous) clearTimeout(previous);
-
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      timers.delete(key);
-      persistSnapshot(key, snapshot, version, options).then(resolve, reject);
-    }, delay);
-    timers.set(key, timer);
-  });
-}
-
-function persistLocalSnapshot(key, snapshot, version) {
+  let payload;
   try {
-    localStorage.setItem(key, JSON.stringify(wrapPayload(snapshot, version)));
-  } catch {
-    /* localStorage inaccesible en contextos restringidos */
+    payload = preparePayload(key, value, options);
+    writeMirror(key, payload);
+  } catch (error) {
+    reportFailure(key, error);
+    return observed(Promise.reject(error));
   }
+  const previous = timers.get(key);
+  if (previous) clearTimeout(previous.timer);
+
+  const pending = {
+    payload,
+    waiters: previous?.waiters || [],
+    timer: null,
+  };
+  const result = observed(new Promise((resolve, reject) => pending.waiters.push({ resolve, reject })));
+  pending.timer = setTimeout(() => {
+    if (timers.get(key) !== pending) return;
+    timers.delete(key);
+    enqueue(key, () => writeExtension(key, pending.payload)).then(
+      value => settlePending(pending, value),
+      error => { reportFailure(key, error); settlePending(pending, null, error); },
+    );
+  }, delay);
+  timers.set(key, pending);
+  return result;
 }
 
 export async function flushDebounced(key, value, options = {}) {
-  const previous = timers.get(key);
-  if (previous) {
-    clearTimeout(previous);
+  let payload;
+  try {
+    payload = preparePayload(key, value, options);
+    writeMirror(key, payload);
+  } catch (error) {
+    reportFailure(key, error);
+    throw error;
+  }
+  const pending = timers.get(key);
+  if (pending) {
+    clearTimeout(pending.timer);
     timers.delete(key);
   }
-  return persistSnapshot(key, snapshotJsonValue(value), options.version || DEFAULT_VERSION, options);
+  try {
+    const result = await enqueue(key, () => writeExtension(key, payload));
+    if (pending) settlePending(pending, result);
+    return result;
+  } catch (error) {
+    reportFailure(key, error);
+    if (pending) settlePending(pending, null, error);
+    throw error;
+  }
 }
 
 export async function remove(key) {
-  const previous = timers.get(key);
-  if (previous) {
-    clearTimeout(previous);
+  const pending = timers.get(key);
+  if (pending) {
+    clearTimeout(pending.timer);
     timers.delete(key);
-  }
-
-  const storage = getExtensionStorage();
-  if (storage?.remove) {
-    try {
-      await storageRemove(storage, key);
-    } catch {
-      /* fall through to localStorage cleanup */
-    }
+    settlePending(pending, null, new DOMException('Storage write cancelled by remove', 'AbortError'));
   }
   try {
-    localStorage.removeItem(key);
-  } catch {
-    /* noop */
+    return await enqueue(key, async () => {
+      const storage = getExtensionStorage();
+      if (storage?.remove) await storageRemove(storage, key);
+      localStorage.removeItem(key);
+    });
+  } catch (error) {
+    reportFailure(key, error);
+    throw error;
   }
 }
 

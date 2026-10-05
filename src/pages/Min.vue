@@ -251,6 +251,7 @@ export default {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         perfMarks.mark('above-fold-stable');
+        if (!this.widgetsStore.enabled.search) perfMarks.mark('interaction-ready');
       });
     });
   },

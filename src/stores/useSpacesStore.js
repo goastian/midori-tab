@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { reconcileHydration, snapshotHydration } from '../bootstrap/reconcileHydration.js';
 import { getJson, setJsonDebounced } from '../services/StorageService.js';
 import useTabStore from './useTabStore.js';
 
@@ -141,11 +142,12 @@ const useSpacesStore = defineStore('spacesStore', {
     },
 
     async hydrateAsyncState() {
+      const initialSpaces = snapshotHydration(this.spaces);
       const legacy = readLegacySpacesState();
       const asyncState = await getJson(SPACES_ASYNC_STATE_KEY, null);
       const spaces = sanitizeSpaces(asyncState?.spaces || legacy.spaces || this.spaces);
 
-      this.spaces = spaces.length ? spaces : DEFAULT_SPACES.map(s => ({ ...s }));
+      this.spaces = reconcileHydration(initialSpaces, this.spaces, spaces.length ? spaces : DEFAULT_SPACES.map(s => ({ ...s })));
       if (!this.spaces.some(space => space.id === this.activeSpaceId)) {
         this.activeSpaceId = this.spaces[0]?.id || 'personal';
       }

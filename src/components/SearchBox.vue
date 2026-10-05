@@ -521,7 +521,10 @@ export default {
 
   mounted() {
     document.addEventListener('mousedown', this.onClickOutside);
-    perfMarks.mark('search-ready');
+    if (this.$refs.input) {
+      perfMarks.mark('search-ready');
+      perfMarks.mark('interaction-ready');
+    }
   },
 
   beforeUnmount() {

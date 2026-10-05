@@ -65,7 +65,7 @@ function sendToSelf(message) {
 }
 
 function isBridgeResponse(response) {
-  return !!response && ( 'totalBlocked' in response || 'error' in response );
+  return !!response && typeof response === 'object' && !response.error && 'totalBlocked' in response;
 }
 
 export async function requestPrivacyStats() {
@@ -109,7 +109,12 @@ export function normalizePrivacyStats(data) {
   if (!data || typeof data !== 'object') return null;
 
   const totalBlocked = toCount(data.totalBlocked);
-  const totalRequests = Math.max(totalBlocked, toCount(data.totalRequests));
+  const reportedRequests = toCount(data.totalRequests);
+  const hasRequestCounts = data.capabilities?.requestCounts !== false
+    && data.totalRequests !== null && data.totalRequests !== undefined
+    && Number.isFinite(Number(data.totalRequests))
+    && reportedRequests >= totalBlocked;
+  const totalRequests = hasRequestCounts ? reportedRequests : null;
   const categories = {};
 
   for (const key of CATEGORY_KEYS) {
@@ -120,11 +125,11 @@ export function normalizePrivacyStats(data) {
     totalBlocked,
     totalRequests,
     pageBlocked: toCount(data.pageBlocked),
-    pageRequests: toCount(data.pageRequests),
-    blockRate: totalRequests === 0 ? 0 : (totalBlocked / totalRequests) * 100,
+    pageRequests: data.capabilities?.pageRequestCounts === false || data.pageRequests == null
+      ? null : toCount(data.pageRequests),
+    blockRate: totalRequests === null || totalRequests === 0 ? null : (totalBlocked / totalRequests) * 100,
     categories,
     enabled: data.enabled !== false,
     state: String(data.state || 'ready').toLowerCase(),
   };
 }
-

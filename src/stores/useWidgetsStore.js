@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { reconcileHydration, snapshotHydration } from '../bootstrap/reconcileHydration.js';
 import { getJson, setJsonDebounced } from '../services/StorageService.js';
 import { mergeWidgetSubset } from '../utils/widgetLayout.js';
 
@@ -126,13 +127,14 @@ const useWidgetsStore = defineStore('widgetsStore', {
     },
 
     async hydrateAsyncState() {
+      const initialWidgets = snapshotHydration(this.installedMarketplaceWidgets);
       const legacy = readLegacyWidgetsState();
       const asyncState = await getJson(WIDGETS_ASYNC_STATE_KEY, null);
       const installedMarketplaceWidgets = normalizeInstalledWidgets(
         asyncState?.installedMarketplaceWidgets || legacy.installedMarketplaceWidgets,
       );
 
-      this.installedMarketplaceWidgets = installedMarketplaceWidgets;
+      this.installedMarketplaceWidgets = reconcileHydration(initialWidgets, this.installedMarketplaceWidgets, installedMarketplaceWidgets);
       this.persistAsyncState();
     },
 

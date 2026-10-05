@@ -15,6 +15,10 @@
       />
     </Transition>
     <Minimalist />
+    <aside v-if="storageError" class="storage-error" role="alert">
+      <span>{{ i18n.locale === 'es' ? 'No se pudieron guardar los cambios. Libera espacio y vuelve a intentarlo.' : 'Changes could not be saved. Free storage space and try again.' }}</span>
+      <button type="button" :aria-label="i18n.locale === 'es' ? 'Cerrar aviso' : 'Dismiss notice'" @click="storageError = false">×</button>
+    </aside>
     <div class="credits" v-if="showCredits">
       <span class="credits__label">Photo</span> by
       <a :href="imageAuthorLink" target="_blank" rel="noopener noreferrer">{{ imageAuthor }}</a>
@@ -98,6 +102,8 @@
           visible: false,
           latestVersion: '',
         },
+        storageError: Boolean(window.__midoriStorageError),
+        storageErrorListener: null,
       }
     },
 
@@ -132,6 +138,8 @@
     },
 
     async mounted() {
+      this.storageErrorListener = () => { this.storageError = true; };
+      window.addEventListener('midori:storage-error', this.storageErrorListener);
       this.loadSettings();
       this.load();
       this.setupWallpaperRefresh();
@@ -151,6 +159,7 @@
     },
 
     beforeUnmount() {
+      if (this.storageErrorListener) window.removeEventListener('midori:storage-error', this.storageErrorListener);
       // Limpiar event listeners
       if (this.refreshWallpaperListener) {
         window.removeEventListener('midori:refresh-wallpaper', this.refreshWallpaperListener);
@@ -609,6 +618,31 @@
 </script>
 
 <style scoped>
+.storage-error {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  z-index: 190;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: min(36rem, calc(100vw - 2rem));
+  padding: 0.85rem 1rem;
+  transform: translateX(-50%);
+  border: 1px solid var(--accent-danger);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-xl);
+}
+.storage-error button {
+  margin-left: auto;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
 .viewport {
   width: 100%;
   min-width: 0;

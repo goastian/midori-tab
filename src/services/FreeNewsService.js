@@ -4,6 +4,9 @@ const CACHE_MAX_ENTRIES = 18;
 const REQUEST_TIMEOUT_MS = 8_000;
 const DETAIL_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const DETAIL_REQUEST_INTERVAL_MS = 550;
+export const NEWS_MAX_ARTICLES = 80;
+export const DETAIL_CACHE_MAX_ENTRIES = 48;
+export const DETAIL_CACHE_MAX_BYTES = 320_000;
 
 export const NEWS_COUNTRIES = Object.freeze([
   'AR', 'AU', 'BR', 'CA', 'CL', 'CO', 'DE', 'ES', 'FR', 'GB', 'IN', 'IT', 'JP', 'KR', 'MX', 'PE', 'PT', 'US',
@@ -107,6 +110,18 @@ export function deriveTrendTopics(articles = []) {
     .map(([topic, count]) => ({ topic, count }));
 }
 
+export function appendNewsArticles(current = [], incoming = []) {
+  const known = new Set(current.map(article => article.id));
+  const result = current.slice(0, NEWS_MAX_ARTICLES);
+  for (const article of incoming) {
+    if (result.length >= NEWS_MAX_ARTICLES) break;
+    if (!article?.id || known.has(article.id)) continue;
+    known.add(article.id);
+    result.push(article);
+  }
+  return result;
+}
+
 export function bindBrowserFetch(fetchSource = globalThis) {
   if (!fetchSource || typeof fetchSource.fetch !== 'function') return null;
   return fetchSource.fetch.bind(fetchSource);
@@ -114,6 +129,7 @@ export function bindBrowserFetch(fetchSource = globalThis) {
 
 function normalizePayload(payload = {}) {
   const articles = (Array.isArray(payload.data) ? payload.data : [])
+    .slice(0, NEWS_MAX_ARTICLES)
     .map(normalizeFreeNewsArticle)
     .filter(article => article.id && article.title);
 
@@ -200,6 +216,18 @@ export class FreeNewsService {
   cancelQueuedArticleDetails() {
     this.detailGeneration += 1;
     for (const { controller } of this.detailRequests.values()) controller?.abort();
+    this.detailQueue = Promise.resolve();
+  }
+
+  pruneDetailCache() {
+    let bytes = 0;
+    for (const { value } of this.detailCache.values()) bytes += new Blob([JSON.stringify(value)]).size;
+    while (this.detailCache.size > DETAIL_CACHE_MAX_ENTRIES || bytes > DETAIL_CACHE_MAX_BYTES) {
+      const oldestKey = this.detailCache.keys().next().value;
+      const oldest = this.detailCache.get(oldestKey);
+      bytes -= new Blob([JSON.stringify(oldest.value)]).size;
+      this.detailCache.delete(oldestKey);
+    }
   }
 
   async requestJson(url, { signal } = {}) {
@@ -245,7 +273,11 @@ export class FreeNewsService {
     const generation = this.detailGeneration;
 
     const cached = this.detailCache.get(id);
-    if (cached && this.now() - cached.timestamp < DETAIL_CACHE_TTL_MS) return cached.value;
+    if (cached && this.now() - cached.timestamp < DETAIL_CACHE_TTL_MS) {
+      this.detailCache.delete(id);
+      this.detailCache.set(id, cached);
+      return cached.value;
+    }
     const inFlight = this.detailRequests.get(id);
     if (inFlight?.generation === generation) return inFlight.request;
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -260,7 +292,9 @@ export class FreeNewsService {
         signal: controller?.signal,
       });
       const value = normalizeFreeNewsArticle(payload?.data || {});
+      if (generation !== this.detailGeneration) throw abortDetailRequest();
       this.detailCache.set(id, { timestamp: this.now(), value });
+      this.pruneDetailCache();
       return value;
     });
 

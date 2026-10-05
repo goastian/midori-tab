@@ -118,10 +118,11 @@ export default {
     },
 
     formattedRequests() {
-      return this.formatCompact(this.totalRequests);
+      return this.totalRequests === null ? '—' : this.formatCompact(this.totalRequests);
     },
 
     formattedBlockRate() {
+      if (this.blockRate === null) return '—';
       if (this.blockRate >= 10) return Math.round(this.blockRate) + '%';
       return this.blockRate.toFixed(1) + '%';
     },

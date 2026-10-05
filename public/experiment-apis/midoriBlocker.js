@@ -59,7 +59,7 @@ this.midoriBlocker = class extends ExtensionAPI {
 
           return {
             totalBlocked,
-            totalRequests: totalBlocked,
+            totalRequests: null,
             categories: {
               scripts: 0,
               frames: 0,
@@ -70,7 +70,8 @@ this.midoriBlocker = class extends ExtensionAPI {
               other: 0,
             },
             pageBlocked,
-            pageRequests: pageBlocked,
+            pageRequests: null,
+            capabilities: { requestCounts: false, pageRequestCounts: false, categories: false },
             enabled,
             state: "ready",
           };

@@ -10,18 +10,19 @@
         v-model="newTask"
         class="todo-input"
         :placeholder="copy.placeholder"
+        :disabled="!ready"
         @keydown.enter="addTask"
       />
-      <button class="todo-add-btn" @click="addTask">+</button>
+      <button class="todo-add-btn" :disabled="!ready" @click="addTask">+</button>
     </div>
 
     <ul class="todo-list" v-if="items.length">
       <li v-for="(item, idx) in items" :key="idx" class="todo-item" :class="{ done: item.done }">
-        <button class="todo-check" @click="toggleItem(idx)">
+        <button class="todo-check" :disabled="!ready" @click="toggleItem(idx)">
           <span v-if="item.done">✓</span>
         </button>
         <span class="todo-text">{{ item.text }}</span>
-        <button class="todo-delete" @click="removeItem(idx)">×</button>
+        <button class="todo-delete" :disabled="!ready" @click="removeItem(idx)">×</button>
       </li>
     </ul>
     <p v-else class="todo-empty">{{ copy.empty }}</p>
@@ -45,6 +46,7 @@ export default {
   data() {
     return {
       items: [],
+      ready: false,
       newTask: '',
       i18n: useI18nStore(),
     };
@@ -61,19 +63,23 @@ export default {
 
   methods: {
     async load() {
-      const saved = await getJson(STORAGE_KEY, []);
+      const saved = await getJson(STORAGE_KEY, [], { strictRead: true });
       this.items = Array.isArray(saved) ? saved : [];
+      this.ready = true;
     },
 
     saveDebounced() {
+      if (!this.ready) return;
       setJsonDebounced(STORAGE_KEY, this.items, { delayMs: 700, maxBytes: 160_000 });
     },
 
     flush() {
+      if (!this.ready) return Promise.resolve();
       return flushDebounced(STORAGE_KEY, this.items, { maxBytes: 160_000 }).catch(() => undefined);
     },
 
     addTask() {
+      if (!this.ready) return;
       const text = this.newTask.trim();
       if (!text) return;
       this.items.push({ text, done: false });
@@ -82,18 +88,20 @@ export default {
     },
 
     toggleItem(idx) {
+      if (!this.ready) return;
       this.items[idx].done = !this.items[idx].done;
       this.saveDebounced();
     },
 
     removeItem(idx) {
+      if (!this.ready) return;
       this.items.splice(idx, 1);
       this.saveDebounced();
     },
   },
 
   mounted() {
-    this.load();
+    void this.load().catch(() => undefined);
   },
 
   beforeUnmount() {

@@ -207,7 +207,7 @@ import {
   NEWS_TOPICS,
   deriveTrendTopics,
 } from '../services/FreeNewsService.js';
-import freeNewsService from '../services/FreeNewsService.js';
+import freeNewsService, { NEWS_MAX_ARTICLES, appendNewsArticles } from '../services/FreeNewsService.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import { getWidgetCopy } from '../i18n/widget-copy.js';
 import { WIDGET_COST, createWidgetRuntime } from '../composables/useWidgetRuntime.js';
@@ -308,7 +308,7 @@ export default {
     this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
       onVisible: () => this.loadNewsWhenVisible(),
       onFocus: () => this.loadNewsWhenVisible(),
-      onHidden: () => this.abortRequest(),
+      onHidden: () => this.suspendNews(),
     });
     this.$nextTick(() => this.widgetRuntime?.mount());
     this.$nextTick(() => this.setupLoadMoreObserver());
@@ -339,7 +339,7 @@ export default {
       if (document.visibilityState === 'hidden') return;
       const cursor = append ? this.meta.nextCursor : '';
       const requestFilters = append ? this.paginationFilters : this.filters;
-      if (append && (!cursor || this.loadedCursors.has(cursor))) return;
+      if (append && (!cursor || this.loadedCursors.has(cursor) || this.articles.length >= NEWS_MAX_ARTICLES)) return;
       if (append) this.loadedCursors.add(cursor);
       else {
         this.loadedCursors.clear();
@@ -365,11 +365,11 @@ export default {
         if (requestId !== this.requestSequence) return;
 
         const nextArticles = append
-          ? [...this.articles, ...result.articles.filter(article => !this.articles.some(item => item.id === article.id))]
-          : result.articles;
-        this.articles = nextArticles;
-        this.trendTopics = deriveTrendTopics(nextArticles);
-        this.meta = result.meta;
+          ? appendNewsArticles(this.articles, result.articles)
+          : result.articles.slice(0, NEWS_MAX_ARTICLES);
+        this.articles = nextArticles.slice(0, NEWS_MAX_ARTICLES);
+        this.trendTopics = deriveTrendTopics(this.articles);
+        this.meta = { ...result.meta, hasMore: Boolean(result.meta?.hasMore) && this.articles.length < NEWS_MAX_ARTICLES };
         this.isStale = result.isStale;
         if (!append) {
           this.filterFallback = Boolean(result.filterFallback);
@@ -398,6 +398,14 @@ export default {
         this.requestController.abort();
         this.requestController = null;
       }
+    },
+    suspendNews() {
+      this.requestSequence += 1;
+      this.imageGeneration += 1;
+      this.abortRequest();
+      freeNewsService.cancelQueuedArticleDetails();
+      this.loading = false;
+      this.loadingMore = false;
     },
     refreshNews() {
       this.loadNewsWhenVisible({ force: true });

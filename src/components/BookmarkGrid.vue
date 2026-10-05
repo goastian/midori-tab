@@ -10,6 +10,7 @@
         <button class="tab-btn" type="button" @click="activeTab = category">{{ category }}</button>
         <button
           v-if="categories.length > 1 && showDeleteButton"
+          :disabled="!bookmarksReady"
           class="tab-delete"
           type="button"
           :title="i18n.$t('bookmarks.deleteCategory')"
@@ -21,6 +22,7 @@
       </div>
       <button
         v-if="showAddButton"
+        :disabled="!bookmarksReady"
         class="tab-add"
         type="button"
         :title="i18n.$t('bookmarks.addCategory')"
@@ -54,6 +56,7 @@
         <div v-if="showDeleteButton" class="card-actions">
           <button
             class="card-action-btn"
+            :disabled="!bookmarksReady"
             type="button"
             :title="i18n.$t('bookmarks.edit')"
             :aria-label="`${i18n.$t('bookmarks.edit')}: ${bookmark.title}`"
@@ -63,6 +66,7 @@
           </button>
           <button
             class="card-action-btn card-action-btn--danger"
+            :disabled="!bookmarksReady"
             type="button"
             :title="i18n.$t('bookmarks.delete')"
             :aria-label="`${i18n.$t('bookmarks.delete')}: ${bookmark.title}`"
@@ -202,7 +206,7 @@
         v-if="showSpeedDials && showAddButton && currentBookmarks.length < speedDialLimit"
         class="speed-dial-card speed-dial-card--add"
       >
-        <button class="speed-dial-link add-link" type="button" @click="openBookmarkEditor()">
+        <button class="speed-dial-link add-link" type="button" :disabled="!bookmarksReady" @click="openBookmarkEditor()">
           <span class="speed-dial-icon add-icon" aria-hidden="true">+</span>
           <span class="speed-dial-title">{{ i18n.$t('bookmarks.add') }}</span>
         </button>
@@ -321,6 +325,7 @@ export default {
       i18n: useI18nStore(),
       adsStore: useAdsStore(),
       bookmarks: cloneDefaults(),
+      bookmarksReady: false,
       categories: [...DEFAULT_CATEGORIES],
       activeTab: DEFAULT_CATEGORIES[0],
       failedFavicons: {},
@@ -454,7 +459,7 @@ export default {
     },
   },
   mounted() {
-    void this.loadBookmarks();
+    void this.loadBookmarks().catch(() => undefined);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.handleAdPageVisibility);
     }
@@ -519,6 +524,7 @@ export default {
       return parsed;
     },
     openBookmarkEditor(index = -1) {
+      if (!this.bookmarksReady) return;
       const bookmark = index >= 0 ? this.currentBookmarks[index] : null;
       this.editingIndex = index;
       this.editorMode = 'bookmark';
@@ -530,6 +536,7 @@ export default {
       };
     },
     openCategoryEditor() {
+      if (!this.bookmarksReady) return;
       this.editingIndex = -1;
       this.editorMode = 'category';
       this.editorError = '';
@@ -541,6 +548,7 @@ export default {
       this.editorError = '';
     },
     saveEditor() {
+      if (!this.bookmarksReady) return;
       if (this.editorMode === 'category') {
         const category = this.draft.category.trim();
         if (!category || this.categories.includes(category)) {
@@ -576,6 +584,7 @@ export default {
       }
     },
     addBookmarkExternal(title, url) {
+      if (!this.bookmarksReady) return false;
       try {
         const parsed = this.normalizeBookmarkUrl(url);
         if (!this.bookmarks[this.activeTab]) this.bookmarks[this.activeTab] = [];
@@ -587,12 +596,14 @@ export default {
       }
     },
     confirmDeleteBookmark(index) {
+      if (!this.bookmarksReady) return;
       if (index < 0 || index >= this.currentBookmarks.length) return;
       this.bookmarks[this.activeTab].splice(index, 1);
       this.pendingBookmarkDelete = -1;
       this.saveBookmarksDebounced();
     },
     confirmDeleteCategory() {
+      if (!this.bookmarksReady) return;
       const category = this.pendingCategoryDelete;
       if (!category || this.categories.length <= 1) return;
       this.categories = this.categories.filter(item => item !== category);
@@ -603,8 +614,8 @@ export default {
     },
     async loadBookmarks() {
       const [savedBookmarks, savedCategories] = await Promise.all([
-        getJson(STORAGE_KEY, null),
-        getJson(CATEGORIES_KEY, null),
+        getJson(STORAGE_KEY, null, { strictRead: true }),
+        getJson(CATEGORIES_KEY, null, { strictRead: true }),
       ]);
       if (savedBookmarks && typeof savedBookmarks === 'object' && !Array.isArray(savedBookmarks)) {
         this.bookmarks = savedBookmarks;
@@ -614,12 +625,15 @@ export default {
       }
       if (!this.categories.length) this.categories = [...DEFAULT_CATEGORIES];
       this.activeTab = this.categories.includes(this.activeTab) ? this.activeTab : this.categories[0];
+      this.bookmarksReady = true;
     },
     saveBookmarksDebounced() {
+      if (!this.bookmarksReady) return;
       setJsonDebounced(STORAGE_KEY, this.bookmarks, { delayMs: 700, maxBytes: 350_000 });
       setJsonDebounced(CATEGORIES_KEY, this.categories, { delayMs: 700, maxBytes: 32_000 });
     },
     async flushBookmarks() {
+      if (!this.bookmarksReady) return;
       await Promise.all([
         flushDebounced(STORAGE_KEY, this.bookmarks, { maxBytes: 350_000 }),
         flushDebounced(CATEGORIES_KEY, this.categories, { maxBytes: 32_000 }),

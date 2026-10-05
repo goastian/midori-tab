@@ -8,6 +8,7 @@
       v-model="content"
       class="notes-area"
       :placeholder="placeholder"
+      :disabled="!ready"
       @input="saveDebounced"
     ></textarea>
   </div>
@@ -30,6 +31,7 @@ export default {
   data() {
     return {
       content: '',
+      ready: false,
       visibilityListener: null,
       pagehideListener: null,
       i18n: useI18nStore(),
@@ -50,20 +52,23 @@ export default {
 
   methods: {
     async load() {
-      this.content = await getJson(STORAGE_KEY, '');
+      this.content = await getJson(STORAGE_KEY, '', { strictRead: true });
+      this.ready = true;
     },
 
     saveDebounced() {
+      if (!this.ready) return;
       setJsonDebounced(STORAGE_KEY, this.content, { delayMs: 800, maxBytes: 200_000 });
     },
 
     flush() {
+      if (!this.ready) return Promise.resolve();
       return flushDebounced(STORAGE_KEY, this.content, { maxBytes: 200_000 }).catch(() => undefined);
     },
   },
 
   mounted() {
-    this.load();
+    void this.load().catch(() => undefined);
     this.visibilityListener = () => {
       if (document.visibilityState === 'hidden') {
         this.flush();

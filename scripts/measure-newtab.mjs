@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, firefox } from 'playwright';
 import { connectWithMaxRetries, findFreeTcpPort } from '../node_modules/web-ext-run/lib/firefox/remote.js';
-import { buildRuntimeReport, percentile } from './perf-report.mjs';
+import { buildRuntimeReport, percentile, visibleInteractionReady } from './perf-report.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = resolve(ROOT, 'dist');
@@ -43,14 +44,16 @@ function build(engine) {
 }
 
 async function extensionUrl(context) {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
     for (const worker of context.serviceWorkers()) {
       const id = worker.url().match(/^chrome-extension:\/\/([^/]+)\//)?.[1];
       if (id) return `chrome-extension://${id}/index.html`;
     }
     await new Promise(done => setTimeout(done, 250));
   }
-  throw new Error('Chromium did not register the Midori extension');
+  const hash = createHash('sha256').update(DIST).digest('hex').slice(0, 32);
+  const id = [...hash].map(digit => String.fromCharCode(97 + Number.parseInt(digit, 16))).join('');
+  return `chrome-extension://${id}/index.html`;
 }
 
 async function openContext(options) {
@@ -61,6 +64,7 @@ async function openContext(options) {
       const port = await findFreeTcpPort();
       context = await firefox.launchPersistentContext(profile, {
         headless: true,
+        timeout: 15_000,
         args: ['-start-debugger-server', String(port)],
         executablePath: process.env.MIDORI_FIREFOX_EXECUTABLE || undefined,
         firefoxUserPrefs: {
@@ -93,6 +97,9 @@ async function openContext(options) {
     rmSync(profile, { recursive: true, force: true });
     if (/requires a privileged add-on/.test(error.message)) {
       throw new Error('Firefox estándar no acepta experiment_apis; usa el ejecutable Midori con MIDORI_FIREFOX_EXECUTABLE para medir la extensión completa.', { cause: error });
+    }
+    if (options.engine === 'firefox' && /juggler-pipe/.test(error.message)) {
+      throw new Error('Este Midori Firefox no admite el transporte Playwright (-juggler-pipe). La extensión se puede instalar mediante RDP, pero el runner de 30 muestras aún necesita un transporte Gecko compatible.', { cause: error });
     }
     throw error;
   }
@@ -135,6 +142,10 @@ async function prepareScenario(session, options) {
         if (globalThis.browser?.tabs?.create) await tabs.create(details);
         else await new Promise((resolve, reject) => tabs.create(details, tab => globalThis.chrome.runtime.lastError ? reject(new Error(globalThis.chrome.runtime.lastError.message)) : resolve(tab)));
       }
+      const allTabs = globalThis.browser?.tabs?.query
+        ? await tabs.query({})
+        : await new Promise((resolve, reject) => tabs.query({}, found => globalThis.chrome.runtime.lastError ? reject(new Error(globalThis.chrome.runtime.lastError.message)) : resolve(found)));
+      if (allTabs.length < count) throw new Error(`Stress requested ${count} tabs but only ${allTabs.length} exist`);
     }, options.stressTabs);
   } finally { await page.close(); }
 }
@@ -157,9 +168,10 @@ async function measure(session, index) {
       return { perf, start: performance.timeOrigin, fcp: fcp?.startTime ?? null, dcl: navigation?.domContentLoadedEventEnd ?? null, load: navigation?.loadEventEnd ?? null };
     });
     const marks = data.perf?.marks || {};
-    const beforeInteraction = [...requests.values()].filter(request => request.start < data.start + marks['interaction-ready']);
+    const interactionReadyMs = visibleInteractionReady(marks);
+    const beforeInteraction = [...requests.values()].filter(request => request.start < data.start + interactionReadyMs);
     const sample = {
-      index, navigationStartEpochMs: data.start, bootStartMs: marks['boot-start'], shellVisibleMs: marks['shell-visible'], interactionReadyMs: marks['interaction-ready'],
+      index, navigationStartEpochMs: data.start, bootStartMs: marks['boot-start'], shellVisibleMs: marks['shell-visible'], interactionReadyMs,
       aboveFoldStableMs: marks['above-fold-stable'], idleCompleteMs: marks['idle-complete'],
       firstContentfulPaintMs: data.fcp, domContentLoadedMs: data.dcl, loadEventMs: data.load,
       longTasksMs: data.perf?.longTasks?.totalMs, cls: data.perf?.cls, nodeCount: data.perf?.nodes,

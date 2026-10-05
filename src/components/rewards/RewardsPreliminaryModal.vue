@@ -90,9 +90,8 @@
 <script>
 import { markRaw } from 'vue';
 import DashboardIcon from '../icons/DashboardIcon.vue';
-import RewardsInterestService from '../../services/RewardsInterestService.js';
+import RewardsInterestService, { REWARDS_COUNTRY_CODES } from '../../services/RewardsInterestService.js';
 
-const FALLBACK_COUNTRY_CODES = ['AR', 'AU', 'BR', 'CA', 'CL', 'CO', 'DE', 'ES', 'FR', 'GB', 'IT', 'JP', 'MX', 'NL', 'PE', 'PT', 'US', 'UY'];
 // A hot-reloaded extension can temporarily combine this lazy view with an
 // older already-loaded locale chunk. Never expose translation keys in that
 // short compatibility window; normal locale files remain the source of truth.
@@ -110,19 +109,9 @@ const MISSING_COPY_FALLBACK = Object.freeze({
   'rewards.payoutLater': 'I will add it later',
 });
 
-function countryCodes() {
-  try {
-    const values = Intl.supportedValuesOf?.('region') || [];
-    const codes = values.filter(value => /^[A-Z]{2}$/.test(value));
-    return codes.length ? codes : FALLBACK_COUNTRY_CODES;
-  } catch (_) {
-    return FALLBACK_COUNTRY_CODES;
-  }
-}
-
 function initialCountry() {
   const candidate = String(navigator.language || '').split('-')[1] || '';
-  return /^[A-Za-z]{2}$/.test(candidate) ? candidate.toUpperCase() : '';
+  return REWARDS_COUNTRY_CODES.includes(candidate.toUpperCase()) ? candidate.toUpperCase() : '';
 }
 
 export default {
@@ -140,17 +129,23 @@ export default {
       saving: false,
       error: '',
       stateReady: false,
+      closed: false,
+      requestController: null,
       service: markRaw(new RewardsInterestService()),
     };
   },
   computed: {
     countries() {
       const names = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames([this.i18n.locale || 'en'], { type: 'region' }) : null;
-      return countryCodes().map(code => ({ code, name: names?.of(code) || code })).sort((a, b) => a.name.localeCompare(b.name));
+      return REWARDS_COUNTRY_CODES.map(code => ({ code, name: names?.of(code) || code })).sort((a, b) => a.name.localeCompare(b.name));
     },
   },
   mounted() {
     this.restoreRegistrationState();
+  },
+  beforeUnmount() {
+    this.closed = true;
+    this.requestController?.abort();
   },
   methods: {
     t(key) {
@@ -160,36 +155,47 @@ export default {
     async restoreRegistrationState() {
       try {
         const saved = await this.service.state();
+        if (this.closed) return;
         if (saved?.countryCode && /^[A-Z]{2}$/.test(saved.countryCode)) this.country = saved.countryCode;
         this.termsAccepted = Boolean(saved?.termsAccepted);
         if (saved?.status === 'active') this.step = saved.payoutDestinationSet ? 'registered' : 'payout';
         if (saved?.status === 'pending_sync') this.step = 'pending';
       } finally {
-        this.stateReady = true;
+        if (!this.closed) this.stateReady = true;
       }
     },
     async register() {
+      if (this.saving || this.closed) return;
       this.error = '';
       this.saving = true;
+      const controller = new AbortController();
+      this.requestController = controller;
       try {
-        const registration = await this.service.register(this.country, { termsAccepted: this.termsAccepted });
+        const registration = await this.service.register(this.country, { termsAccepted: this.termsAccepted, signal: controller.signal });
+        if (this.closed) return;
         this.step = registration.status === 'active' ? 'payout' : 'pending';
       } catch (error) {
-        this.error = error?.message || this.t('rewards.error');
+        if (!this.closed && error?.name !== 'AbortError') this.error = error?.message || this.t('rewards.error');
       } finally {
-        this.saving = false;
+        if (this.requestController === controller) this.requestController = null;
+        if (!this.closed) this.saving = false;
       }
     },
     async savePayoutDestination() {
+      if (this.saving || this.closed) return;
       this.error = '';
       this.saving = true;
+      const controller = new AbortController();
+      this.requestController = controller;
       try {
-        await this.service.setPayoutDestination(this.payoutDestination);
+        await this.service.setPayoutDestination(this.payoutDestination, { signal: controller.signal });
+        if (this.closed) return;
         this.step = 'registered';
       } catch (error) {
-        this.error = error?.message || this.t('rewards.error');
+        if (!this.closed && error?.name !== 'AbortError') this.error = error?.message || this.t('rewards.error');
       } finally {
-        this.saving = false;
+        if (this.requestController === controller) this.requestController = null;
+        if (!this.closed) this.saving = false;
       }
     },
   },

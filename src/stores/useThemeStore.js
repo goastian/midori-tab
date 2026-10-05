@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { reconcileHydration, snapshotHydration } from '../bootstrap/reconcileHydration.js';
 import { getJson, setJsonDebounced } from '../services/StorageService.js';
 
 /**
@@ -422,13 +423,15 @@ const useThemeStore = defineStore('themeStore', {
     },
 
     async hydrateAsyncState() {
+      const initialThemes = snapshotHydration(this.marketplaceThemes);
+      const initialCustom = snapshotHydration(this.customTheme);
       const legacy = readLegacyThemeState();
       const asyncState = await getJson(THEME_ASYNC_STATE_KEY, null);
       const marketplaceThemes = asyncState?.marketplaceThemes || legacy.marketplaceThemes || {};
       const customTheme = asyncState?.customTheme || legacy.customTheme || this.customTheme;
 
-      this.marketplaceThemes = clonePlain(marketplaceThemes, {});
-      this.customTheme = clonePlain(customTheme, this.customTheme);
+      this.marketplaceThemes = reconcileHydration(initialThemes, this.marketplaceThemes, clonePlain(marketplaceThemes, {}));
+      this.customTheme = reconcileHydration(initialCustom, this.customTheme, clonePlain(customTheme, this.customTheme));
       this.applyTheme();
       this.persistAsyncState();
     },

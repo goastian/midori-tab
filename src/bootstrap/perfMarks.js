@@ -7,7 +7,8 @@
  * `midori:perf-report`. No modifica el camino de arranque.
  */
 
-const MILESTONES = ['boot-start', 'shell-visible', 'search-ready', 'above-fold-stable', 'idle-complete'];
+const MILESTONES = ['boot-start', 'shell-visible', 'search-ready', 'interaction-ready', 'above-fold-stable', 'idle-complete'];
+const REQUIRED_MILESTONES = ['boot-start', 'shell-visible', 'interaction-ready', 'above-fold-stable', 'idle-complete'];
 
 const state = {
   marks: {},
@@ -21,24 +22,19 @@ let longTaskObserver = null;
 let layoutShiftObserver = null;
 let nativeAdd = null;
 let nativeRemove = null;
+let expiryTimer = null;
+let completionTimer = null;
+let collected = false;
 
 function now() {
   return typeof window !== 'undefined' && 'performance' in window ? window.performance.now() : Date.now();
-}
-
-function bootStart() {
-  state.bootStartMs = now();
 }
 
 export function mark(name) {
   if (!MILESTONES.includes(name)) return false;
   if (state.marks[name] !== undefined) return false;
 
-  state.marks[name] = name === 'boot-start'
-    ? 0
-    : state.bootStartMs !== undefined
-      ? Math.round((now() - state.bootStartMs) * 100) / 100
-      : 0;
+  state.marks[name] = Math.round(now() * 100) / 100;
 
   try {
     window.performance.mark(name);
@@ -51,6 +47,9 @@ export function mark(name) {
   }
 
   publishSnapshot();
+  if (REQUIRED_MILESTONES.every(milestone => state.marks[milestone] !== undefined) && !completionTimer) {
+    completionTimer = setTimeout(collect, 500);
+  }
 
   return true;
 }
@@ -66,12 +65,14 @@ function captureNodes() {
 export function setup() {
   if (typeof window === 'undefined') return;
 
-  bootStart();
+  state.bootStartMs = now();
   mark('boot-start');
+  window.__midoriCollectPerf = collect;
+  expiryTimer = setTimeout(collect, 15_000);
+
+  if (typeof window.PerformanceObserver === 'undefined') return;
 
   try {
-    if (typeof window.PerformanceObserver === 'undefined') return;
-
     longTaskObserver = new window.PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
         if (entry.entryType === 'longtask') {
@@ -83,7 +84,11 @@ export function setup() {
       }
     });
     longTaskObserver.observe({ type: 'longtask', buffered: true });
+  } catch {
+    longTaskObserver = null;
+  }
 
+  try {
     layoutShiftObserver = new window.PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
         if (entry.entryType === 'layout-shift' && !entry.hadRecentInput) {
@@ -93,7 +98,7 @@ export function setup() {
     });
     layoutShiftObserver.observe({ type: 'layout-shift', buffered: true });
   } catch {
-    /* observadores no disponibles */
+    layoutShiftObserver = null;
   }
 }
 
@@ -133,7 +138,7 @@ function buildReport() {
   return {
     schema: 1,
     bootStartMs: state.bootStartMs ?? 0,
-    isComplete: MILESTONES.every((name) => state.marks[name] !== undefined),
+    isComplete: REQUIRED_MILESTONES.every((name) => state.marks[name] !== undefined),
     marks: { ...state.marks },
     longTasks: {
       count: state.longTasks.length,
@@ -157,6 +162,16 @@ function publishSnapshot() {
 }
 
 export function collect() {
+  if (collected) return buildReport();
+  collected = true;
+  if (completionTimer) clearTimeout(completionTimer);
+  if (expiryTimer) clearTimeout(expiryTimer);
+  for (const entry of longTaskObserver?.takeRecords?.() || []) {
+    state.longTasks.push({ startMs: entry.startTime, durationMs: entry.duration });
+  }
+  for (const entry of layoutShiftObserver?.takeRecords?.() || []) {
+    if (!entry.hadRecentInput) state.layoutShifts.push(entry.value);
+  }
   const report = buildReport();
   try {
     window.__midoriPerf = report;
