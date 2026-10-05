@@ -182,7 +182,7 @@ const useTabStore = defineStore('tabStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: [
+    pick: [
       'tabName',
       'theme',
       'density',
@@ -200,7 +200,7 @@ const useTabStore = defineStore('tabStore', {
       'widgetsEnabled',
       'widgetColumns',
     ],
-    afterRestore(ctx) {
+    afterHydrate(ctx) {
       ctx.store.applyStartPageSettings(ctx.store.$state);
     },
     serializer: {

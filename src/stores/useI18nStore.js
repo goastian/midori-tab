@@ -129,7 +129,7 @@ const useI18nStore = defineStore('i18nStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['locale'],
+    pick: ['locale'],
   },
 });
 

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://midori-browser.org/schemas/newtab-performance-v2.json",
+  "title": "Midori New Tab runtime measurement v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "engine", "deviceClass", "scenario", "cacheState", "profilePolicy", "locale", "layout", "samples", "gate"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "engine": { "enum": ["firefox", "chromium"] },
+    "deviceClass": { "enum": ["desktop", "android"] },
+    "scenario": { "enum": ["default", "stress"] },
+    "cacheState": { "enum": ["cold", "warm"] },
+    "profilePolicy": { "enum": ["fresh-per-sample", "reused-warmed"] },
+    "locale": { "type": "string", "minLength": 2 },
+    "layout": { "type": "string", "minLength": 1 },
+    "samples": {
+      "type": "array",
+      "minItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "navigationStartEpochMs", "shellVisibleMs", "interactionReadyMs", "firstContentfulPaintMs", "domContentLoadedMs", "loadEventMs", "longTasksMs", "cls", "nodeCount", "networkBeforeInteraction", "errors"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 0 },
+          "navigationStartEpochMs": { "type": "number", "minimum": 0 },
+          "shellVisibleMs": { "$ref": "#/$defs/milliseconds" },
+          "interactionReadyMs": { "$ref": "#/$defs/milliseconds" },
+          "firstContentfulPaintMs": { "$ref": "#/$defs/milliseconds" },
+          "domContentLoadedMs": { "$ref": "#/$defs/milliseconds" },
+          "loadEventMs": { "$ref": "#/$defs/milliseconds" },
+          "longTasksMs": { "$ref": "#/$defs/milliseconds" },
+          "cls": { "type": "number", "minimum": 0 },
+          "nodeCount": { "type": "integer", "minimum": 0 },
+          "networkBeforeInteraction": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["total", "unexpected", "pendingOrCancelled"],
+            "properties": {
+              "total": { "type": "integer", "minimum": 0 },
+              "unexpected": { "type": "integer", "minimum": 0 },
+              "pendingOrCancelled": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "errors": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "gate": { "enum": ["not-evaluated", "pass", "fail"] }
+  },
+  "$defs": {
+    "milliseconds": { "type": "number", "minimum": 0 }
+  }
+}

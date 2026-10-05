@@ -170,6 +170,15 @@ export async function getJson(key, fallback = null) {
   return unwrapPayload(localPayload, fallback);
 }
 
+export async function verifyJsonStored(key, expected) {
+  const storage = getExtensionStorage();
+  const payload = storage?.get
+    ? (await storageGet(storage, key))?.[key]
+    : readLocalStoragePayload(key);
+  return isWrappedPayload(payload)
+    && JSON.stringify(payload.value) === JSON.stringify(expected);
+}
+
 export async function quotaSafeSet(key, value, options = {}) {
   const version = options.version || DEFAULT_VERSION;
   const snapshot = snapshotJsonValue(value);

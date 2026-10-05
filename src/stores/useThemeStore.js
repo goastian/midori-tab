@@ -444,7 +444,7 @@ const useThemeStore = defineStore('themeStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['activeThemeId'],
+    pick: ['activeThemeId'],
   },
 });
 

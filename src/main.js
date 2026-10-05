@@ -14,16 +14,19 @@ import useThemeStore from './stores/useThemeStore.js'
 import { getBrowserInfo } from './utils/browserInfo.js'
 import { hydrateAsyncStores } from './bootstrap/hydrateAsyncStores.js'
 import { writeBootSnapshot } from './bootstrap/bootSnapshot.js'
+import { createSafePersistencePlugin, migrateLegacyStores } from './bootstrap/migrateLegacyStores.js'
 
 async function bootstrap() {
   perfMarks.setup()
 
   applyInitialTheme()
 
+  const unmigratedStores = await migrateLegacyStores()
+
   const app = createApp(App)
   const pinia = createPinia();
 
-  pinia.use(persistedState)
+  pinia.use(createSafePersistencePlugin(persistedState, unmigratedStores))
   app.use(pinia)
 
   const i18n = useI18nStore(pinia)
@@ -36,6 +39,7 @@ async function bootstrap() {
   const tabStore = useTabStore(pinia)
   tabStore.$subscribe((_mutation, state) => writeBootSnapshot(state), { detached: true })
   const themeStore = useThemeStore(pinia)
+  themeStore.$persist()
   const initialTheme = tabStore.resolveTheme()
   document.documentElement.setAttribute('data-theme', initialTheme)
   themeStore.applyTheme(initialTheme)

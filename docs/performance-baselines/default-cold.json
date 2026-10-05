@@ -1,4 +1,11 @@
 {
+  "classification": "historical-invalid-for-runtime-gates",
+  "invalidReasons": [
+    "The recorded cold flag did not create a fresh profile per sample; the scenario remained default.",
+    "Marks are relative to bootStartMs, not navigationStart, and omit static-import evaluation.",
+    "First paint and FCP summaries read the wrong sample field and have no valid observations.",
+    "Network totals compare different clock origins and exclude Unsplash from the unexpected count."
+  ],
   "generatedAt": "2026-08-09T16:36:05.611Z",
   "scenario": "default",
   "reps": 30,
@@ -123,5 +130,5 @@
   },
   "remoteRequestsBeforeSearchReady": 4,
   "unexpectedRequestsBeforeSearchReady": 0,
-  "note": "Las marcas miden desde navigationStart de index.html. Ver plan §2 y §6."
+  "note": "HISTÓRICA: las marcas son relativas a bootStartMs; no representan la navegación completa ni cumplen el gate runtime. Ver plan §2 y §6."
 }

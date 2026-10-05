@@ -136,7 +136,7 @@ const useSuggestionsStore = defineStore('suggestionsStore', {
   persist: {
     enable: true,
     storage: debouncedStorage,
-    paths: ['habits', 'enabled'],
+    pick: ['habits', 'enabled'],
   },
 });
 

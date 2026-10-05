@@ -91,7 +91,9 @@ const useWidgetsStore = defineStore('widgetsStore', {
 
     async installMarketplaceWidget(asset) {
       const { resolveBuiltinWidgetKey } = await import('../utils/marketplaceAssets.js');
-      const builtinWidgetKey = resolveBuiltinWidgetKey(asset);
+      const resolvedKey = resolveBuiltinWidgetKey(asset);
+      const normalizedKey = normalizeWidgetKey(resolvedKey);
+      const builtinWidgetKey = Object.hasOwn(DEFAULT_ENABLED, normalizedKey) ? normalizedKey : null;
 
       this.installedMarketplaceWidgets[asset.slug] = {
         slug: asset.slug,
@@ -144,8 +146,8 @@ const useWidgetsStore = defineStore('widgetsStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['enabled', 'order'],
-    afterRestore(ctx) {
+    pick: ['enabled', 'order'],
+    afterHydrate(ctx) {
       const store = ctx.store;
       // Migrate from old flat format { search: true } to new { enabled: { search: true } }
       const raw = readLegacyWidgetsState();
@@ -196,7 +198,6 @@ const useWidgetsStore = defineStore('widgetsStore', {
         }
       }
 
-      store.installedMarketplaceWidgets = {};
     },
   },
 });

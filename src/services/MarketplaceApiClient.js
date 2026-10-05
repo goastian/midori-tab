@@ -11,8 +11,8 @@ function normalizeBaseUrl(rawBaseUrl) {
 }
 
 function resolveBaseUrl() {
-  const explicitBaseUrl = import.meta.env.VITE_MARKETPLACE_API_BASE_URL;
-  const legacyServer = import.meta.env.VITE_PASSPORT_SERVER;
+  const explicitBaseUrl = import.meta.env?.VITE_MARKETPLACE_API_BASE_URL;
+  const legacyServer = import.meta.env?.VITE_PASSPORT_SERVER;
 
   if (explicitBaseUrl) {
     return normalizeBaseUrl(explicitBaseUrl);

@@ -165,7 +165,7 @@ const useSpacesStore = defineStore('spacesStore', {
   persist: {
     enable: true,
     storage: localStorage,
-    paths: ['activeSpaceId', 'enabled'],
+    pick: ['activeSpaceId', 'enabled'],
   },
 });
 

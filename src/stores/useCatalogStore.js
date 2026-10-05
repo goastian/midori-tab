@@ -220,7 +220,7 @@ const useCatalogStore = defineStore('catalogStore', {
 
       if (asset.type === 'widget') {
         const widgetsStore = useWidgetsStore();
-        const builtinWidgetKey = widgetsStore.installMarketplaceWidget(asset);
+        const builtinWidgetKey = await widgetsStore.installMarketplaceWidget(asset);
 
         installedRecord = buildInstalledAssetRecord(asset, {
           builtinWidgetKey,

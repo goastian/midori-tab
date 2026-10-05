@@ -29,6 +29,10 @@ export function hydrateAsyncStores(pinia) {
       spacesStore.hydrateAsyncState(),
     ]);
 
+    themeStore.$persist();
+    widgetsStore.$persist();
+    spacesStore.$persist();
+
     themeStore.$subscribe(() => themeStore.persistAsyncState(), { detached: true });
     widgetsStore.$subscribe(() => widgetsStore.persistAsyncState(), { detached: true });
     spacesStore.$subscribe(() => spacesStore.persistAsyncState(), { detached: true });
