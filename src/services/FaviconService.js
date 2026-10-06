@@ -7,14 +7,56 @@ const MAX_CACHE_ENTRIES = 128;
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class FaviconService {
-  constructor({ cacheStorage = globalThis.caches, fetchFn = globalThis.fetch?.bind(globalThis), now = Date.now } = {}) {
+  constructor({ cacheStorage = globalThis.caches, fetchFn = globalThis.fetch?.bind(globalThis), now = Date.now,
+    privilegedFetch = ['moz-extension:', 'chrome-extension:'].includes(globalThis.location?.protocol),
+    imageFactory = () => new Image(), imageTimeoutMs = 15000,
+  } = {}) {
     this.cacheStorage = cacheStorage;
     this.fetchFn = fetchFn;
     this.now = now;
+    this.privilegedFetch = privilegedFetch;
+    this.imageFactory = imageFactory;
+    this.imageTimeoutMs = imageTimeoutMs;
   }
 
   url(domain) {
     return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`;
+  }
+
+  async loadIcon(domain, { signal } = {}) {
+    // Android can embed the page outside the extension origin. The provider
+    // allows image loads but does not send CORS headers for ordinary fetch().
+    if (this.privilegedFetch) {
+      try { return { blob: await this.fetchIcon(domain, { signal }) }; }
+      catch (error) {
+        if (signal?.aborted || error?.name !== 'TypeError') throw error;
+        this.privilegedFetch = false;
+      }
+    }
+    return { url: await this.loadImage(domain, { signal }) };
+  }
+
+  loadImage(domain, { signal } = {}) {
+    if (signal?.aborted) return Promise.reject(new DOMException('Request cancelled', 'AbortError'));
+    return new Promise((resolve, reject) => {
+      const image = this.imageFactory();
+      const url = this.url(domain);
+      const finish = error => {
+        clearTimeout(timer);
+        image.onload = image.onerror = null;
+        signal?.removeEventListener('abort', onAbort);
+        if (error) { image.removeAttribute('src'); reject(error); }
+        else resolve(url);
+      };
+      const onAbort = () => finish(new DOMException('Request cancelled', 'AbortError'));
+      const timer = setTimeout(() => finish(new Error('Favicon image timed out')), this.imageTimeoutMs);
+      image.onload = () => finish(image.naturalWidth ? null : new Error('Invalid favicon image'));
+      image.onerror = () => finish(new Error('Favicon image failed'));
+      image.referrerPolicy = 'no-referrer';
+      // Do not set crossOrigin: displaying the original icon needs no CORS.
+      signal?.addEventListener('abort', onAbort, { once: true });
+      image.src = url;
+    });
   }
 
   async readCached(domain) {

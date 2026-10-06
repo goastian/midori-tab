@@ -569,10 +569,10 @@ export default {
         this.faviconTaskKeys.add(key);
         void scheduleRemoteTask(key, async signal => {
           try {
-            const blob = await faviconService.fetchIcon(domain, { signal });
+            const icon = await faviconService.loadIcon(domain, { signal });
             if (signal.aborted || this.faviconsDisposed || !this.visibleBookmarks.some(item => this.bookmarkDomain(item) === domain)) return false;
             const previous = this.faviconUrls[domain];
-            this.faviconUrls[domain] = URL.createObjectURL(blob);
+            this.faviconUrls[domain] = icon.blob ? URL.createObjectURL(icon.blob) : icon.url;
             this.staleFavicons[domain] = false;
             if (previous) URL.revokeObjectURL(previous);
             return true;
@@ -580,8 +580,11 @@ export default {
             if (!signal.aborted && error?.name !== 'AbortError') this.failedFavicons[domain] = true;
             return false;
           }
-        }, { priority: 3 }).then(() => {
+        }, { priority: 3 }).then(completed => {
           this.faviconTaskKeys.delete(key);
+          // Android may hide and restore the tab before the cancelled request
+          // settles. Retry once the coordinator has released its running slot.
+          if (!completed && !this.failedFavicons[domain]) this.queueFavicons();
         });
       }
     },

@@ -35,6 +35,12 @@ export function mark(name) {
   if (state.marks[name] !== undefined) return false;
 
   state.marks[name] = Math.round(now() * 100) / 100;
+  if (name === 'shell-visible' || name === 'above-fold-stable') {
+    captureNodes();
+  }
+  // A listener can start the remote coordinator while this event is dispatched.
+  // Publish readiness first so it never reads the previous milestone snapshot.
+  publishSnapshot();
 
   try {
     window.performance.mark(name);
@@ -43,11 +49,6 @@ export function mark(name) {
     /* not supported */
   }
 
-  if (name === 'shell-visible' || name === 'above-fold-stable') {
-    captureNodes();
-  }
-
-  publishSnapshot();
   if (REQUIRED_MILESTONES.every(milestone => state.marks[milestone] !== undefined) && !completionTimer) {
     completionTimer = setTimeout(collect, 500);
   }

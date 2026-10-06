@@ -33,13 +33,14 @@ function drain() {
     const controller = new AbortController();
     running.set(next.key, controller);
     Promise.resolve().then(() => next.run(controller.signal)).then(
-      value => settle(next, value === undefined ? true : value),
+      value => value === undefined ? true : value,
       error => {
         if (error?.name !== 'AbortError') console.warn(`[Midori] Remote task ${next.key} failed`, error);
-        settle(next, false);
+        return false;
       },
-    ).finally(() => {
+    ).then(value => {
       running.delete(next.key);
+      settle(next, value);
       drain();
     });
   }
