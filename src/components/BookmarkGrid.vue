@@ -84,14 +84,13 @@
         >
           <span class="speed-dial-icon" aria-hidden="true">
             <img
-              v-if="remoteImagesReady && faviconRequested(bookmark) && !faviconFailed(bookmark)"
-              :src="getFaviconUrl(bookmark)"
+              v-if="faviconUrls[bookmarkDomain(bookmark)]"
+              :src="faviconUrls[bookmarkDomain(bookmark)]"
               alt=""
               loading="eager"
               decoding="async"
               referrerpolicy="no-referrer"
-              @load="settleFavicon(bookmark, true)"
-              @error="settleFavicon(bookmark, false)"
+              @error="markFaviconFailed(bookmark)"
             />
             <span v-else class="speed-dial-initial">{{ bookmarkInitial(bookmark) }}</span>
           </span>
@@ -270,6 +269,7 @@ import { createAdInteractionGuard } from '../services/AdInteractionGuard.js';
 import { observeElementSize } from '../composables/layoutResizeBus.js';
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
 import { cancelRemoteTask, scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
+import faviconService from '../services/FaviconService.js';
 import {
   getSpeedDialMetrics,
   requiresPaidDisclosure,
@@ -333,9 +333,11 @@ export default {
       categories: [...DEFAULT_CATEGORIES],
       activeTab: DEFAULT_CATEGORIES[0],
       failedFavicons: {},
-      readyFavicons: {},
-      loadingFavicons: {},
-      faviconSettlers: new Map(),
+      faviconUrls: {},
+      staleFavicons: {},
+      faviconGeneration: 0,
+      faviconCacheLoading: false,
+      faviconsDisposed: false,
       faviconTaskKeys: new Set(),
       layoutWidth: typeof window === 'undefined' ? 1080 : Math.max(0, window.innerWidth - 40),
       unobserveLayout: null,
@@ -436,7 +438,7 @@ export default {
     },
   },
   watch: {
-    visibleBookmarks() { this.queueFavicons(); },
+    visibleBookmarks() { void this.primeFavicons(); },
     showAds(enabled) {
       if (!enabled) {
         this.teardownAdObserver();
@@ -475,7 +477,8 @@ export default {
       }
     };
     window.addEventListener('midori:perf-mark', this.perfMarkListener);
-    void this.loadBookmarks().then(() => this.queueFavicons()).catch(() => undefined);
+    this.remoteImagesReady = Boolean(window.__midoriPerf?.marks?.['interaction-ready']);
+    void this.loadBookmarks().then(() => this.primeFavicons()).catch(() => undefined);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.handleAdPageVisibility);
     }
@@ -486,10 +489,12 @@ export default {
     });
   },
   beforeUnmount() {
+    this.faviconsDisposed = true;
+    this.faviconGeneration += 1;
     window.removeEventListener('midori:perf-mark', this.perfMarkListener);
     for (const key of this.faviconTaskKeys) cancelRemoteTask(key);
     this.faviconTaskKeys.clear();
-    this.faviconSettlers.clear();
+    for (const url of Object.values(this.faviconUrls)) URL.revokeObjectURL(url);
     cancelRemoteTask('ads-decision');
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.handleAdPageVisibility);
@@ -528,49 +533,64 @@ export default {
     bookmarkDomain(bookmark) {
       try { return bookmark.domain || new URL(bookmark.url).hostname; } catch (_) { return ''; }
     },
-    getFaviconUrl(bookmark) {
-      return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(this.bookmarkDomain(bookmark))}.ico`;
-    },
-    faviconRequested(bookmark) {
-      const domain = this.bookmarkDomain(bookmark);
-      return Boolean(this.loadingFavicons[domain] || this.readyFavicons[domain]);
-    },
-    settleFavicon(bookmark, success) {
-      this.faviconSettlers.get(this.bookmarkDomain(bookmark))?.(success);
+    async primeFavicons() {
+      if (!this.bookmarksReady || this.faviconsDisposed) return;
+      const generation = ++this.faviconGeneration;
+      this.faviconCacheLoading = true;
+      const domains = new Set(this.visibleBookmarks.map(bookmark => this.bookmarkDomain(bookmark)).filter(Boolean));
+      for (const [domain, url] of Object.entries(this.faviconUrls)) {
+        if (!domains.has(domain)) {
+          URL.revokeObjectURL(url);
+          delete this.faviconUrls[domain];
+          delete this.staleFavicons[domain];
+        }
+      }
+      for (const key of this.faviconTaskKeys) {
+        if (!domains.has(key.slice('favicon:'.length))) cancelRemoteTask(key);
+      }
+      await Promise.all([...domains].map(async domain => {
+        if (this.faviconUrls[domain]) return;
+        const cached = await faviconService.readCached(domain);
+        if (!cached || this.faviconsDisposed || generation !== this.faviconGeneration || this.faviconUrls[domain]) return;
+        this.faviconUrls[domain] = URL.createObjectURL(cached.blob);
+        this.staleFavicons[domain] = cached.stale;
+      }));
+      if (generation === this.faviconGeneration) {
+        this.faviconCacheLoading = false;
+        this.queueFavicons();
+      }
     },
     queueFavicons() {
-      if (!this.remoteImagesReady || document.visibilityState === 'hidden') return;
+      if (this.faviconsDisposed || this.faviconCacheLoading || !this.bookmarksReady || !this.remoteImagesReady || document.visibilityState === 'hidden') return;
       for (const bookmark of this.visibleBookmarks) {
         const domain = this.bookmarkDomain(bookmark);
         const key = `favicon:${domain}`;
-        if (!domain || this.readyFavicons[domain] || this.failedFavicons[domain] || this.faviconTaskKeys.has(key)) continue;
+        if (!domain || (this.faviconUrls[domain] && !this.staleFavicons[domain]) || this.failedFavicons[domain] || this.faviconTaskKeys.has(key)) continue;
         this.faviconTaskKeys.add(key);
-        void scheduleRemoteTask(key, signal => new Promise(resolve => {
-          let settled = false;
-          const finish = success => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timeout);
-            signal.removeEventListener('abort', onAbort);
-            this.faviconSettlers.delete(domain);
-            if (success) this.readyFavicons = { ...this.readyFavicons, [domain]: true };
-            else if (!signal.aborted) this.failedFavicons = { ...this.failedFavicons, [domain]: true };
-            this.loadingFavicons = { ...this.loadingFavicons, [domain]: false };
-            resolve(success);
-          };
-          const onAbort = () => finish(false);
-          const timeout = setTimeout(onAbort, 6000);
-          signal.addEventListener('abort', onAbort, { once: true });
-          if (signal.aborted) { finish(false); return; }
-          this.faviconSettlers.set(domain, finish);
-          this.loadingFavicons = { ...this.loadingFavicons, [domain]: true };
-        }), { priority: 0 }).then(() => {
+        void scheduleRemoteTask(key, async signal => {
+          try {
+            const blob = await faviconService.fetchIcon(domain, { signal });
+            if (signal.aborted || this.faviconsDisposed || !this.visibleBookmarks.some(item => this.bookmarkDomain(item) === domain)) return false;
+            const previous = this.faviconUrls[domain];
+            this.faviconUrls[domain] = URL.createObjectURL(blob);
+            this.staleFavicons[domain] = false;
+            if (previous) URL.revokeObjectURL(previous);
+            return true;
+          } catch (error) {
+            if (!signal.aborted && error?.name !== 'AbortError') this.failedFavicons[domain] = true;
+            return false;
+          }
+        }, { priority: 3 }).then(() => {
           this.faviconTaskKeys.delete(key);
         });
       }
     },
-    faviconFailed(bookmark) {
-      return Boolean(this.failedFavicons[this.bookmarkDomain(bookmark)]);
+    markFaviconFailed(bookmark) {
+      const domain = this.bookmarkDomain(bookmark);
+      URL.revokeObjectURL(this.faviconUrls[domain]);
+      delete this.faviconUrls[domain];
+      this.failedFavicons[domain] = true;
+      void faviconService.remove(domain);
     },
     normalizeBookmarkUrl(rawUrl) {
       const candidate = /^[a-z][a-z\d+.-]*:/i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
@@ -744,7 +764,10 @@ export default {
       }
     },
     handleAdPageVisibility() {
-      if (document.visibilityState === 'visible') this.queueFavicons();
+      if (document.visibilityState === 'visible') {
+        this.failedFavicons = {};
+        void this.primeFavicons();
+      }
       this.adViewability?.setPageVisible(
         typeof document === 'undefined' || document.visibilityState === 'visible',
       );

@@ -11,6 +11,7 @@
     "history",
     "browsingData",
     "search",
+    "https://icons.duckduckgo.com/*",
     "https://api.rss2json.com/*",
     "https://api.freenewsapi.io/*",
     "https://api.unsplash.com/*",
