@@ -1,4 +1,5 @@
 import { getJson, setJsonDebounced } from './StorageService.js';
+import { fetchJsonWithTimeout } from './fetchJsonWithTimeout.js';
 
 const CACHE_KEY = 'midori_currency_cache_v1';
 const CACHE_TTL_MS = 45 * 60 * 1000;
@@ -26,6 +27,12 @@ function writeCache(cache) {
 }
 
 class CurrencyService {
+  async getCachedRates(base = 'USD') {
+    const cache = await readCache();
+    const entry = cache[String(base || 'USD').toUpperCase()];
+    return entry?.data ? { ...entry.data, fromCache: true, stale: Date.now() - entry.timestamp >= CACHE_TTL_MS } : null;
+  }
+
   async getRates(base = 'USD', options = {}) {
     const normalizedBase = String(base || 'USD').toUpperCase();
     const cache = await readCache();
@@ -37,25 +44,19 @@ class CurrencyService {
 
     const url = `https://open.er-api.com/v6/latest/${encodeURIComponent(normalizedBase)}`;
     let response;
-    let timeoutId = null;
+    let payload;
     try {
-      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      timeoutId = controller ? globalThis.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS) : null;
-      if (options.signal && controller) {
-        if (options.signal.aborted) controller.abort();
-        else options.signal.addEventListener('abort', () => controller.abort(), { once: true });
-      }
-      response = await fetch(url, {
+      ({ response, payload } = await fetchJsonWithTimeout(url, {
         cache: options.forceRefresh ? 'reload' : 'default',
-        signal: controller?.signal,
-      });
+        signal: options.signal,
+        timeoutMs: FETCH_TIMEOUT_MS,
+      }));
     } catch (error) {
+      if (options.signal?.aborted || error?.name === 'AbortError') throw error;
       if (cache[normalizedBase]) {
         return { ...cache[normalizedBase].data, fromCache: true, stale: true };
       }
       throw error;
-    } finally {
-      if (timeoutId) globalThis.clearTimeout(timeoutId);
     }
 
     if (!response.ok) {
@@ -65,7 +66,6 @@ class CurrencyService {
       throw new Error(`Currency request failed: ${response.status}`);
     }
 
-    const payload = await response.json();
     if (payload.result !== 'success' || !payload.rates) {
       if (cache[normalizedBase]) {
         return { ...cache[normalizedBase].data, fromCache: true, stale: true };

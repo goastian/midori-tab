@@ -117,7 +117,7 @@
             @click="handleArticleClick($event, leadStory)"
           >
             <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail, 'is-ready': leadStory.imageLoaded, 'is-loading': leadStory.imageRequested && !leadStory.imageFailed && !leadStory.thumbnail, 'is-unavailable': leadStory.imageFailed && !leadStory.thumbnail }">
-              <img v-if="leadStory.thumbnail" :src="leadStory.thumbnail" :alt="leadStory.title" loading="eager" fetchpriority="high" decoding="async" @load="markArticleImageLoaded(leadStory)" @error="clearArticleImage(leadStory)">
+              <img v-if="remoteImagesReady && leadStory.thumbnail" :src="leadStory.thumbnail" :alt="leadStory.title" loading="eager" fetchpriority="high" decoding="async" @load="markArticleImageLoaded(leadStory)" @error="clearArticleImage(leadStory)">
               <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(leadStory)" /></span>
             </figure>
             <div class="news-story__copy">
@@ -129,7 +129,7 @@
           </a>
           <div v-else class="news-story__link news-story__link--static">
             <figure class="news-story__visual" :class="{ 'has-image': leadStory.thumbnail, 'is-ready': leadStory.imageLoaded, 'is-loading': leadStory.imageRequested && !leadStory.imageFailed && !leadStory.thumbnail, 'is-unavailable': leadStory.imageFailed && !leadStory.thumbnail }">
-              <img v-if="leadStory.thumbnail" :src="leadStory.thumbnail" :alt="copy.noImage" loading="eager" fetchpriority="high" decoding="async" @load="markArticleImageLoaded(leadStory)" @error="clearArticleImage(leadStory)">
+              <img v-if="remoteImagesReady && leadStory.thumbnail" :src="leadStory.thumbnail" :alt="copy.noImage" loading="eager" fetchpriority="high" decoding="async" @load="markArticleImageLoaded(leadStory)" @error="clearArticleImage(leadStory)">
               <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(leadStory)" /></span>
             </figure>
             <div class="news-story__copy">
@@ -152,7 +152,7 @@
               @click="handleArticleClick($event, article)"
             >
               <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail, 'is-ready': article.imageLoaded, 'is-loading': article.imageRequested && !article.imageFailed && !article.thumbnail, 'is-unavailable': article.imageFailed && !article.thumbnail }">
-                <img v-if="article.thumbnail" :src="article.thumbnail" :alt="article.title" loading="lazy" decoding="async" @load="markArticleImageLoaded(article)" @error="clearArticleImage(article)">
+                <img v-if="remoteImagesReady && article.thumbnail" :src="article.thumbnail" :alt="article.title" loading="lazy" decoding="async" @load="markArticleImageLoaded(article)" @error="clearArticleImage(article)">
                 <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(article)" /></span>
               </figure>
               <div class="news-story__copy">
@@ -163,7 +163,7 @@
             </a>
             <div v-else class="news-story__link news-story__link--static">
               <figure class="news-story__visual" :class="{ 'has-image': article.thumbnail, 'is-ready': article.imageLoaded, 'is-loading': article.imageRequested && !article.imageFailed && !article.thumbnail, 'is-unavailable': article.imageFailed && !article.thumbnail }">
-                <img v-if="article.thumbnail" :src="article.thumbnail" :alt="copy.noImage" loading="lazy" decoding="async" @load="markArticleImageLoaded(article)" @error="clearArticleImage(article)">
+                <img v-if="remoteImagesReady && article.thumbnail" :src="article.thumbnail" :alt="copy.noImage" loading="lazy" decoding="async" @load="markArticleImageLoaded(article)" @error="clearArticleImage(article)">
                 <span v-else class="news-story__fallback" aria-hidden="true"><Icon :icon="imageStateIcon(article)" /></span>
               </figure>
               <div class="news-story__copy">
@@ -200,7 +200,8 @@
 </template>
 
 <script>
-import { Icon } from '@iconify/vue';
+import Icon from './icons/NewsIcon.vue';
+import { cancelRemoteTask, scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
 import {
   NEWS_COUNTRIES,
   NEWS_LANGUAGES,
@@ -211,6 +212,7 @@ import freeNewsService, { NEWS_MAX_ARTICLES, appendNewsArticles } from '../servi
 import useI18nStore from '../stores/useI18nStore.js';
 import { getWidgetCopy } from '../i18n/widget-copy.js';
 import { WIDGET_COST, createWidgetRuntime } from '../composables/useWidgetRuntime.js';
+import { observeNewsImage } from '../composables/newsImageObserver.js';
 
 const NEWS_REFRESH_MS = 5 * 60 * 1000;
 const FILTER_DELAY_MS = 180;
@@ -230,20 +232,11 @@ export default {
     newsImage: {
       mounted(element, binding) {
         const load = () => binding.instance?.loadArticleImage(binding.value);
-        if (typeof IntersectionObserver === 'undefined') {
-          load();
-          return;
-        }
-        element.__newsImageObserver = new IntersectionObserver((entries) => {
-          if (!entries.some(entry => entry.isIntersecting)) return;
-          element.__newsImageObserver?.disconnect();
-          load();
-        }, { rootMargin: '240px 0px' });
-        element.__newsImageObserver.observe(element);
+        element.__stopNewsImageObservation = observeNewsImage(element, load);
       },
       beforeUnmount(element) {
-        element.__newsImageObserver?.disconnect();
-        delete element.__newsImageObserver;
+        element.__stopNewsImageObservation?.();
+        delete element.__stopNewsImageObservation;
       },
     },
   },
@@ -282,7 +275,10 @@ export default {
       paginationFilters: { country: '', language: '', topic: '', query: '' },
       filterTimer: null,
       imageGeneration: 0,
+      pendingArticleDetailKeys: new Set(),
       widgetPolicy: WIDGET_POLICY,
+      remoteImagesReady: Boolean(window.__midoriPerf?.marks?.['interaction-ready']),
+      perfMarkListener: null,
     };
   },
   computed: {
@@ -305,6 +301,22 @@ export default {
     },
   },
   mounted() {
+    this.perfMarkListener = event => {
+      if (event.detail?.name !== 'interaction-ready') return;
+      this.remoteImagesReady = true;
+      for (const article of this.articles.slice(0, 5)) this.loadArticleImage(article);
+    };
+    window.addEventListener('midori:perf-mark', this.perfMarkListener);
+    const initialFilters = JSON.stringify(this.filters);
+    void freeNewsService.getSnapshot(this.filters).then(snapshot => {
+      if (!snapshot || this.requestSequence || JSON.stringify(this.filters) !== initialFilters) return;
+      this.articles = snapshot.articles;
+      this.trendTopics = deriveTrendTopics(snapshot.articles);
+      this.meta = snapshot.meta || { hasMore: false, nextCursor: '' };
+      this.isStale = Boolean(snapshot.isStale);
+      this.lastUpdated = new Date(snapshot.fetchedAt).toISOString();
+      this.lastRequestSucceeded = true;
+    }).catch(() => undefined);
     this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
       onVisible: () => this.loadNewsWhenVisible(),
       onFocus: () => this.loadNewsWhenVisible(),
@@ -314,9 +326,9 @@ export default {
     this.$nextTick(() => this.setupLoadMoreObserver());
   },
   beforeUnmount() {
+    window.removeEventListener('midori:perf-mark', this.perfMarkListener);
     if (this.filterTimer) clearTimeout(this.filterTimer);
-    this.abortRequest();
-    freeNewsService.cancelQueuedArticleDetails();
+    this.suspendNews();
     this.widgetRuntime?.dispose();
     this.loadMoreObserver?.disconnect();
     this.loadMoreObserver = null;
@@ -375,16 +387,18 @@ export default {
           this.filterFallback = Boolean(result.filterFallback);
           this.paginationFilters = result.effectiveFilters || { ...this.filters };
         }
-        this.lastUpdated = new Date().toISOString();
+        this.lastUpdated = result.fetchedAt ? new Date(result.fetchedAt).toISOString() : new Date().toISOString();
         this.lastRequestSucceeded = true;
         if (!append) this.loadArticleImage(nextArticles[0]);
         this.$nextTick(() => this.setupLoadMoreObserver());
+        return !result.isStale;
       } catch (error) {
         if (append) this.loadedCursors.delete(cursor);
         if (error?.name === 'AbortError') return;
         if (requestId !== this.requestSequence) return;
         this.error = error instanceof Error ? error.message : String(error || 'No se pudieron cargar las noticias.');
         this.lastRequestSucceeded = false;
+        return false;
       } finally {
         if (requestId === this.requestSequence) {
           this.requestController = null;
@@ -400,8 +414,14 @@ export default {
       }
     },
     suspendNews() {
+      cancelRemoteTask('news-page');
       this.requestSequence += 1;
       this.imageGeneration += 1;
+      for (const key of this.pendingArticleDetailKeys) cancelRemoteTask(key);
+      this.pendingArticleDetailKeys.clear();
+      for (const article of this.articles) {
+        if (!article.thumbnail) article.imageRequested = false;
+      }
       this.abortRequest();
       freeNewsService.cancelQueuedArticleDetails();
       this.loading = false;
@@ -412,7 +432,7 @@ export default {
     },
     loadMore() {
       if (!this.meta.hasMore || !this.meta.nextCursor || this.loadingMore) return;
-      this.loadNews({ append: true });
+      void scheduleRemoteTask('news-page', () => this.loadNews({ append: true }), { priority: 0 });
     },
     setupLoadMoreObserver() {
       if (!this.canvas || !this.$refs.loadMoreSentinel || typeof IntersectionObserver === 'undefined') return;
@@ -472,11 +492,13 @@ export default {
       globalThis.location.assign(url);
     },
     async loadArticleImage(article) {
-      if (!article?.id || article.thumbnail || article.imageRequested) return;
+      if (!this.remoteImagesReady || document.visibilityState === 'hidden' || !article?.id || article.thumbnail || article.imageRequested) return;
       article.imageRequested = true;
       const generation = this.imageGeneration;
+      const taskKey = `news-detail:${generation}:${article.id}`;
+      this.pendingArticleDetailKeys.add(taskKey);
       try {
-        const detail = await freeNewsService.fetchArticleDetails(article.id);
+        const detail = await scheduleRemoteTask(taskKey, () => freeNewsService.fetchArticleDetails(article.id), { priority: 0 });
         if (generation !== this.imageGeneration) return;
         if (detail?.url) article.url = detail.url;
         if (detail?.thumbnail) {
@@ -487,6 +509,8 @@ export default {
       } catch (_) {
         // A missing image must not prevent the article itself from rendering.
         if (generation === this.imageGeneration) article.imageFailed = true;
+      } finally {
+        this.pendingArticleDetailKeys.delete(taskKey);
       }
     },
     clearArticleImage(article) {

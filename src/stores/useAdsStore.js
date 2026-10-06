@@ -87,7 +87,7 @@ const useAdsStore = defineStore('adsStore', {
   },
 
   actions: {
-    async loadAd(force = false) {
+    async loadAd(force = false, options = {}) {
       if (this.loading) return;
       if (!force && this.hasAd) return;
 
@@ -100,7 +100,9 @@ const useAdsStore = defineStore('adsStore', {
           device_type: detectDeviceType(),
           country: detectCountry(),
           language: detectLanguage(),
+          signal: options.signal,
         });
+        if (options.signal?.aborted) return false;
         this.requestLatencyMs = Number.isSafeInteger(result?.latency_ms)
           ? result.latency_ms
           : 0;
@@ -139,6 +141,7 @@ const useAdsStore = defineStore('adsStore', {
       } finally {
         this.loading = false;
       }
+      return true;
     },
 
     dismiss() {

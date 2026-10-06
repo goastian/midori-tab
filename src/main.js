@@ -18,6 +18,9 @@ import { createSafePersistencePlugin, migrateLegacyStores } from './bootstrap/mi
 
 async function bootstrap() {
   perfMarks.setup()
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => perfMarks.mark('shell-visible'), { once: true })
+  } else perfMarks.mark('shell-visible')
 
   applyInitialTheme()
 
@@ -38,20 +41,21 @@ async function bootstrap() {
 
   const tabStore = useTabStore(pinia)
   tabStore.$subscribe((_mutation, state) => writeBootSnapshot(state), { detached: true })
+  writeBootSnapshot(tabStore.$state)
   const themeStore = useThemeStore(pinia)
   themeStore.$persist()
   const initialTheme = tabStore.resolveTheme()
   document.documentElement.setAttribute('data-theme', initialTheme)
   themeStore.applyTheme(initialTheme)
 
+  const bootInput = document.getElementById('midori-boot-search')
+  window.__midoriBootSearch = bootInput
+    ? { query: bootInput.value, focused: document.activeElement === bootInput,
+        selectionStart: bootInput.selectionStart, selectionEnd: bootInput.selectionEnd }
+    : null
   app.mount('#app')
   hydrateAsyncStores(pinia)
 
-  window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => {
-      perfMarks.mark('shell-visible')
-    })
-  })
 }
 
 bootstrap()

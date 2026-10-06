@@ -1061,6 +1061,7 @@ midoriBlockerOnMessageExternal?.addListener?.((message, sender, sendResponse) =>
 
 globalThis.__midoriOmniBackground = {
   collectOmniData,
+  queryOmni,
   ensureStaticActions,
   ensureTabsCache,
   pruneTabsCache,

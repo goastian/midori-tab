@@ -1,4 +1,6 @@
 import { getJson, quotaSafeSet, remove } from './StorageService.js';
+import { scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
+import { fetchJsonWithTimeout } from './fetchJsonWithTimeout.js';
 
 const CACHE_KEY_LIST = 'unsplash_cache_images';
 const CACHE_EXPIRY = 'unsplash_cache_expiry';
@@ -93,7 +95,7 @@ class UnsplashService {
     this.#imageLink = meta.imagePage;
   }
 
-  async setImagen() {
+  async setImagen({ signal } = {}) {
     try {
       const now = Date.now();
       const expiry = Number(localStorage.getItem(CACHE_EXPIRY)) || 0;
@@ -118,12 +120,13 @@ class UnsplashService {
        * actual y el cache para la próxima apertura, evitando que una
        * primera pestaña en frío se quede sin fondo.
        */
-      const batch = await this.#fetchMetadataBatch();
+      const batch = await this.#fetchMetadataBatch({ signal });
+      if (signal?.aborted) return;
       if (batch && batch.length > 0) {
         this.#setImage(batch[0]);
       }
     } catch (error) {
-      console.error('Error al establecer la imagen:', error);
+      if (error?.name !== 'AbortError' && !signal?.aborted) console.error('Error al establecer la imagen:', error);
     }
   }
 
@@ -135,38 +138,20 @@ class UnsplashService {
       return;
     }
 
-    const lockUntil = Number(localStorage.getItem(CACHE_FETCH_LOCK)) || 0;
-    if (lockUntil > now) {
-      return;
-    }
-
-    localStorage.setItem(CACHE_FETCH_LOCK, String(now + CACHE_FETCH_LOCK_TTL_MS));
-
-    const doRefresh = async () => {
+    const doRefresh = async (signal) => {
+      const startedAt = Date.now();
+      if ((Number(localStorage.getItem(CACHE_FETCH_LOCK)) || 0) > startedAt) return false;
+      localStorage.setItem(CACHE_FETCH_LOCK, String(startedAt + CACHE_FETCH_LOCK_TTL_MS));
       try {
-        await this.#fetchMetadataBatch();
+        await this.#fetchMetadataBatch({ signal });
       } finally {
         localStorage.removeItem(CACHE_FETCH_LOCK);
       }
     };
-
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      window.requestIdleCallback(() => {
-        doRefresh().catch((error) => {
-          console.warn('Error al refrescar metadata de Unsplash:', error);
-        });
-      }, { timeout: 1500 });
-      return;
-    }
-
-    setTimeout(() => {
-      doRefresh().catch((error) => {
-        console.warn('Error al refrescar metadata de Unsplash:', error);
-      });
-    }, 300);
+    void scheduleRemoteTask('unsplash-metadata', doRefresh, { priority: 0 });
   }
 
-  async #fetchMetadataBatch() {
+  async #fetchMetadataBatch({ signal } = {}) {
     try {
       const params = new URLSearchParams({
         client_id: import.meta.env.VITE_UNSPLASH_API,
@@ -175,9 +160,11 @@ class UnsplashService {
         orientation: 'landscape',
         query: 'landscape',
       });
-      const res = await fetch(`https://api.unsplash.com/photos?${params}`);
+      const { response: res, payload: data } = await fetchJsonWithTimeout(`https://api.unsplash.com/photos?${params}`, {
+        signal, timeoutMs: 8000,
+      });
       if (!res.ok) return null;
-      const data = await res.json();
+      if (signal?.aborted) return null;
 
       const now = Date.now();
       const newList = [];
@@ -203,7 +190,7 @@ class UnsplashService {
       localStorage.setItem(CACHE_EXPIRY, String(now + 24 * 60 * 60 * 1000)); // 24h
       return newList;
     } catch (error) {
-      console.error('Error en la precarga de imágenes:', error);
+      if (error?.name !== 'AbortError' && !signal?.aborted) console.error('Error en la precarga de imágenes:', error);
       return null;
     }
   }

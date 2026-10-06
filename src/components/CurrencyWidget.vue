@@ -81,6 +81,8 @@ export default {
       amountInput: '1',
       currencyCodes: ['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'CAD', 'AUD', 'MXN', 'BRL', 'RUB', 'INR'],
       requestController: null,
+      requestSequence: 0,
+      disposed: false,
       widgetPolicy: WIDGET_POLICY,
       widgetRuntime: null,
     };
@@ -132,15 +134,24 @@ export default {
 
   async mounted() {
     await this.restoreSettings();
+    if (this.disposed) return;
+    const cached = await currencyService.getCachedRates(this.from);
+    if (this.disposed) return;
+    if (cached) {
+      this.rates = cached.rates;
+      this.fetchedAt = cached.fetchedAt;
+      this.isStale = Boolean(cached.stale);
+    }
     this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
       onVisible: () => this.refreshWhenVisible(),
       onFocus: () => this.refreshWhenVisible(),
       onHidden: () => this.abortRequest(),
     });
-    this.$nextTick(() => this.widgetRuntime?.mount());
+    this.$nextTick(() => { if (!this.disposed) this.widgetRuntime?.mount(); });
   },
 
   beforeUnmount() {
+    this.disposed = true;
     this.widgetRuntime?.dispose();
     this.abortRequest();
   },
@@ -149,11 +160,13 @@ export default {
     async restoreSettings() {
       try {
         const parsed = await getJson(SETTINGS_KEY, {});
+        if (this.disposed) return;
         const settings = { ...getDefaultSettings(), ...parsed };
         this.from = settings.from;
         this.to = settings.to;
         this.amountInput = settings.amountInput;
       } catch {
+        if (this.disposed) return;
         const defaults = getDefaultSettings();
         this.from = defaults.from;
         this.to = defaults.to;
@@ -174,6 +187,7 @@ export default {
     },
 
     abortRequest() {
+      this.requestSequence += 1;
       if (this.requestController) {
         this.requestController.abort();
         this.requestController = null;
@@ -187,24 +201,30 @@ export default {
     },
 
     async refresh(forceRefresh = false) {
+      this.abortRequest();
+      const requestId = this.requestSequence;
       this.loading = true;
       this.error = '';
-      this.abortRequest();
       this.requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
       try {
         const data = await currencyService.getRates(this.from, {
           forceRefresh,
           signal: this.requestController?.signal,
         });
+        if (requestId !== this.requestSequence) return false;
         this.rates = data.rates;
         this.fetchedAt = data.fetchedAt;
         this.isStale = Boolean(data.stale);
+        return !data.stale;
       } catch (error) {
-        if (error?.name === 'AbortError') return;
+        if (error?.name === 'AbortError' || requestId !== this.requestSequence) return false;
         this.error = this.i18n.$t('currency.errors.unavailable');
+        return false;
       } finally {
-        this.requestController = null;
-        this.loading = false;
+        if (requestId === this.requestSequence) {
+          this.requestController = null;
+          this.loading = false;
+        }
       }
     },
   },

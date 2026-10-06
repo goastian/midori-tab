@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, firefox } from 'playwright';
 import { connectWithMaxRetries, findFreeTcpPort } from '../node_modules/web-ext-run/lib/firefox/remote.js';
 import { buildRuntimeReport, percentile, visibleInteractionReady } from './perf-report.mjs';
+import { criticalResourceViolations } from './critical-requests.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = resolve(ROOT, 'dist');
@@ -16,7 +17,7 @@ export function parseOptions(args) {
   const options = { engine: 'firefox', scenario: 'default', cacheState: 'cold', reps: 30, locale: 'en', layout: 'default', build: false, smoke: false, stressTabs: 500 };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === '--build' || arg === '--smoke') { options[arg.slice(2)] = true; continue; }
+    if (arg === '--build' || arg === '--smoke' || arg === '--gate') { options[arg.slice(2)] = true; continue; }
     if (arg === '--cold' || arg === '--warm') { options.cacheState = arg.slice(2); continue; }
     if (arg === '--help') { console.log('Usage: npm run measure:newtab -- --engine firefox|chromium --scenario default|stress --cold|--warm --reps 30 [--build] [--smoke]'); process.exit(0); }
     if (!arg.startsWith('--')) throw new Error(`Unknown option ${arg}`);
@@ -105,7 +106,7 @@ async function openContext(options) {
   }
 }
 
-async function openContextWithRetry(options) {
+export async function openContextWithRetry(options) {
   let lastError;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try { return await openContext(options); }
@@ -118,7 +119,7 @@ async function openContextWithRetry(options) {
   throw lastError;
 }
 
-async function closeContext(session) {
+export async function closeContext(session) {
   await session.context.close();
   rmSync(session.profile, { recursive: true, force: true });
 }
@@ -150,7 +151,7 @@ async function prepareScenario(session, options) {
   } finally { await page.close(); }
 }
 
-async function measure(session, index) {
+async function measure(session, index, options) {
   const page = await session.context.newPage();
   const errors = [];
   const requests = new Map();
@@ -165,7 +166,11 @@ async function measure(session, index) {
       const perf = window.__midoriCollectPerf?.() || window.__midoriPerf;
       const navigation = performance.getEntriesByType('navigation')[0];
       const fcp = performance.getEntriesByType('paint').find(entry => entry.name === 'first-contentful-paint');
-      return { perf, start: performance.timeOrigin, fcp: fcp?.startTime ?? null, dcl: navigation?.domContentLoadedEventEnd ?? null, load: navigation?.loadEventEnd ?? null };
+      const beforeSearch = perf?.marks?.['search-ready'] ?? perf?.marks?.['interaction-ready'];
+      const startupResources = performance.getEntriesByType('resource')
+        .filter(entry => entry.startTime < beforeSearch).map(entry => entry.name);
+      return { perf, start: performance.timeOrigin, origin: location.href, startupResources,
+        fcp: fcp?.startTime ?? null, dcl: navigation?.domContentLoadedEventEnd ?? null, load: navigation?.loadEventEnd ?? null };
     });
     const marks = data.perf?.marks || {};
     const interactionReadyMs = visibleInteractionReady(marks);
@@ -176,11 +181,15 @@ async function measure(session, index) {
       firstContentfulPaintMs: data.fcp, domContentLoadedMs: data.dcl, loadEventMs: data.load,
       longTasksMs: data.perf?.longTasks?.totalMs, cls: data.perf?.cls, nodeCount: data.perf?.nodes,
       networkBeforeInteraction: { total: beforeInteraction.length, unexpected: beforeInteraction.length, pendingOrCancelled: beforeInteraction.filter(request => request.state !== 'finished').length },
+      startupGraphViolations: criticalResourceViolations(data.startupResources, data.origin),
       errors,
     };
     if (typeof marks['search-ready'] === 'number') sample.searchReadyMs = marks['search-ready'];
     for (const [key, value] of Object.entries(sample)) if (value === null || value === undefined) throw new Error(`Sample ${index} missing ${key}`);
     if (errors.length) throw new Error(`Sample ${index} page errors: ${errors.join('; ')}`);
+    if (options.gate && (beforeInteraction.length || sample.startupGraphViolations.length)) {
+      throw new Error(`Sample ${index} critical network gate failed: ${beforeInteraction.length} HTTP(S), ${sample.startupGraphViolations.join(', ') || 'no extra chunks'}`);
+    }
     return sample;
   } finally { await page.close(); }
 }
@@ -197,7 +206,7 @@ async function main() {
     if (options.cacheState === 'warm') { session = await openContextWithRetry(options); await prepareScenario(session, options); }
     for (let i = 0; i < options.reps; i += 1) {
       if (options.cacheState === 'cold') { session = await openContextWithRetry(options); if (options.scenario === 'stress') await prepareScenario(session, options); }
-      try { samples.push(await measure(session, i)); }
+      try { samples.push(await measure(session, i, options)); }
       finally { if (options.cacheState === 'cold') { await closeContext(session); session = null; } }
       process.stdout.write(`\r[measure-newtab] ${i + 1}/${options.reps}`);
     }

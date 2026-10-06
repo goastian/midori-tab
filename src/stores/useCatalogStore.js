@@ -31,6 +31,8 @@ const CATALOG_CACHE_KEY = 'midori_marketplace_catalog_cache_v2';
 const INSTALLED_ASSETS_KEY = 'midori_marketplace_installed_assets_v1';
 const CATALOG_CACHE_TTL_MS = 15 * 60 * 1000;
 const CATALOG_CACHE_MAX_ITEMS_PER_TYPE = 24;
+const catalogRequests = new Map();
+const catalogTokens = new Map();
 
 function toPlainObject(value, fallback) {
   try {
@@ -88,6 +90,9 @@ const useCatalogStore = defineStore('catalogStore', {
   actions: {
     async ensureCatalog(type, options = {}) {
       const normalizedType = type || 'theme';
+      const token = Symbol(normalizedType);
+      catalogTokens.set(normalizedType, token);
+      catalogRequests.get(normalizedType)?.abort();
       const normalizedQuery = String(options.q || '').trim();
       const force = Boolean(options.force);
 
@@ -106,17 +111,19 @@ const useCatalogStore = defineStore('catalogStore', {
       }
 
       if (!force) {
-        const cachedItems = await this.loadCachedCatalog(normalizedType, normalizedQuery);
+        const cachedItems = await this.loadCachedCatalog(normalizedType, normalizedQuery, token);
+        if (catalogTokens.get(normalizedType) !== token) return [];
         if (cachedItems.length) {
           return cachedItems;
         }
       }
 
-      return this.fetchCatalog(normalizedType, options);
+      return this.fetchCatalog(normalizedType, options, token);
     },
 
-    async loadCachedCatalog(type, query) {
+    async loadCachedCatalog(type, query, token) {
       const cache = await getJson(CATALOG_CACHE_KEY, {});
+      if (token && catalogTokens.get(type) !== token) return [];
       const entry = cache?.[type];
       if (!entry || entry.query !== query || Date.now() - entry.timestamp > CATALOG_CACHE_TTL_MS) {
         return [];
@@ -146,8 +153,11 @@ const useCatalogStore = defineStore('catalogStore', {
       setJsonDebounced(CATALOG_CACHE_KEY, cache, { delayMs: 800, maxBytes: 350_000 });
     },
 
-    async fetchCatalog(type, options = {}) {
+    async fetchCatalog(type, options = {}, token) {
       const normalizedType = type || 'theme';
+      catalogRequests.get(normalizedType)?.abort();
+      const controller = new AbortController();
+      catalogRequests.set(normalizedType, controller);
       this.statusByType[normalizedType] = 'loading';
       this.errorByType[normalizedType] = '';
 
@@ -157,7 +167,9 @@ const useCatalogStore = defineStore('catalogStore', {
           q: options.q,
           page: options.page || 1,
           per_page: options.perPage || 12,
-        });
+        }, { signal: controller.signal });
+        if (controller.signal.aborted || catalogRequests.get(normalizedType) !== controller
+          || (token && catalogTokens.get(normalizedType) !== token)) return [];
 
         const items = Array.isArray(response?.data)
           ? response.data.map(item => normalizeMarketplaceAsset(item, { apiBaseUrl: client.baseUrl }))
@@ -174,9 +186,13 @@ const useCatalogStore = defineStore('catalogStore', {
 
         return items;
       } catch (error) {
+        if (controller.signal.aborted || error?.name === 'AbortError'
+          || (token && catalogTokens.get(normalizedType) !== token)) return [];
         this.statusByType[normalizedType] = 'error';
         this.errorByType[normalizedType] = error?.message || 'Marketplace request failed.';
         return [];
+      } finally {
+        if (catalogRequests.get(normalizedType) === controller) catalogRequests.delete(normalizedType);
       }
     },
 

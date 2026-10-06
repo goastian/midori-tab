@@ -59,12 +59,11 @@
 
 <script>
   import { defineAsyncComponent, markRaw, nextTick } from 'vue';
-  import { APP_VERSION } from './utils/appVersion.js';
-  import { getBrowserInfo } from './utils/browserInfo.js';
   import useI18nStore from './stores/useI18nStore.js';
   import useTabStore from './stores/useTabStore.js';
   import Minimalist from './pages/Min.vue';
   import useThemeStore from './stores/useThemeStore.js';
+  import { cancelRemoteTask, scheduleRemoteTask } from './bootstrap/remoteTaskCoordinator.js';
 
   const MIDORI_DOWNLOAD_URL = 'https://astian.org/midori-browser/download';
   const UPDATE_CHECK_WINDOW_MS = 10 * 60 * 1000;
@@ -94,7 +93,7 @@
         autoTheme: null,
         updateForegroundListener: null,
         lastForegroundUpdateCheckAt: 0,
-        updateBrowserInfo: null,
+        updateBrowserInfoPromise: null,
         updateCheckInFlight: false,
         updateService: null,
         updateServicePromise: null,
@@ -104,6 +103,12 @@
         },
         storageError: Boolean(window.__midoriStorageError),
         storageErrorListener: null,
+        backgroundRequestId: 0,
+        backgroundController: null,
+        wallpaperVisibilityListener: null,
+        deferredMountHandle: null,
+        deferredMountKind: '',
+        disposed: false,
       }
     },
 
@@ -141,7 +146,7 @@
       this.storageErrorListener = () => { this.storageError = true; };
       window.addEventListener('midori:storage-error', this.storageErrorListener);
       this.loadSettings();
-      this.load();
+      this.scheduleInitialBackground();
       this.setupWallpaperRefresh();
       this.setupDeferredMounts();
       this.setupOmniLazyTriggers();
@@ -153,13 +158,27 @@
 
       // Auto Theme
       if (this.tabStore.autoTheme) {
-        this.autoTheme = (await import('./composables/useAutoTheme.js')).useAutoTheme();
+        const { useAutoTheme } = await import('./composables/useAutoTheme.js');
+        if (this.disposed) return;
+        this.autoTheme = useAutoTheme();
         this.autoTheme.start();
       }
     },
 
     beforeUnmount() {
+      this.disposed = true;
+      if (this.deferredMountHandle !== null) {
+        if (this.deferredMountKind === 'idle') window.cancelIdleCallback?.(this.deferredMountHandle);
+        else clearTimeout(this.deferredMountHandle);
+        this.deferredMountHandle = null;
+      }
       if (this.storageErrorListener) window.removeEventListener('midori:storage-error', this.storageErrorListener);
+      cancelRemoteTask('wallpaper');
+      cancelRemoteTask('update');
+      cancelRemoteTask('unsplash-metadata');
+      this.backgroundRequestId += 1;
+      this.backgroundController?.abort();
+      if (this.wallpaperVisibilityListener) document.removeEventListener('visibilitychange', this.wallpaperVisibilityListener);
       // Limpiar event listeners
       if (this.refreshWallpaperListener) {
         window.removeEventListener('midori:refresh-wallpaper', this.refreshWallpaperListener);
@@ -191,15 +210,44 @@
     },
 
     methods: {
+      scheduleInitialBackground() {
+        const kind = this.tabStore.background?.type;
+        if (kind === 'Unsplash' || kind === 'MarketplaceWallpaper') {
+          void scheduleRemoteTask('wallpaper', signal => this.load({ signal }), { priority: 0 });
+          this.wallpaperVisibilityListener = () => {
+            if (document.visibilityState === 'visible' && !this.backgroundImage) {
+              void scheduleRemoteTask('wallpaper', signal => this.load({ signal }), { priority: 0 });
+            }
+          };
+          document.addEventListener('visibilitychange', this.wallpaperVisibilityListener);
+        } else void this.load();
+      },
       loadSettings() {
         this.tabStore.loadSettings();
       },
 
-      async load() {
+      async load({ signal } = {}) {
+        this.backgroundController?.abort();
+        const controller = new AbortController();
+        this.backgroundController = controller;
+        const abort = () => controller.abort();
+        signal?.addEventListener('abort', abort, { once: true });
+        if (signal?.aborted) controller.abort();
+        try {
+          return await this.loadBackground({ signal: controller.signal });
+        } finally {
+          signal?.removeEventListener('abort', abort);
+          if (this.backgroundController === controller) this.backgroundController = null;
+        }
+      },
+
+      async loadBackground({ signal } = {}) {
+        const requestId = ++this.backgroundRequestId;
         if (this.tabStore.background?.type === 'MarketplaceWallpaper') {
           const background = this.tabStore.background;
           this.releaseLocalBlobUrl();
-          await this.loadMarketplaceWallpaper(background);
+          await this.loadMarketplaceWallpaper(background, signal, requestId);
+          if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
           this.imageAuthor = background.authorName || '';
           this.imageAuthorLink = background.authorUrl || '';
           this.imageLink = background.sourceUrl || background.imageUrl || '';
@@ -209,7 +257,7 @@
         this.releaseMarketplaceBlobUrl();
 
         if (this.tabStore.background?.type === 'LocalFolder') {
-          await this.loadLocalWallpaper();
+          await this.loadLocalWallpaper(requestId, signal);
           return;
         }
 
@@ -225,14 +273,18 @@
 
         try {
           const { default: UnsService } = await import('./services/UnsService.js');
+          if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
           const uns = new UnsService();
-          await uns.setImagen();
+          await uns.setImagen({ signal });
+          if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
+          await this.preloadImage(uns.getUrl(), signal);
+          if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
           this.applyBackgroundImage(uns.getUrl(), uns.getSrcSet?.() || '');
           this.imageAuthor = uns.getAuthor();
           this.imageAuthorLink = uns.getAuthorLink();
           this.imageLink = uns.getImageLink();
         } catch (e) {
-          console.error("Error al cargar la imagen de fondo:", e);
+          if (e?.name !== 'AbortError') console.error("Error al cargar la imagen de fondo:", e);
         }
       },
 
@@ -265,7 +317,7 @@
         this.localBlobUrl = '';
       },
 
-      async loadLocalWallpaper() {
+      async loadLocalWallpaper(requestId, signal) {
         this.imageAuthor = '';
         this.imageAuthorLink = '';
         this.imageLink = '';
@@ -276,16 +328,29 @@
           const service = new LocalWallpaperService();
           await service.setImagen();
           const url = service.getUrl();
+          if (signal?.aborted || requestId !== this.backgroundRequestId) {
+            if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+            return;
+          }
           if (url) {
             this.localBlobUrl = url;
-            await this.preloadImage(url);
+            await this.preloadImage(url, signal);
+            if (signal?.aborted || requestId !== this.backgroundRequestId) {
+              URL.revokeObjectURL(url);
+              if (this.localBlobUrl === url) this.localBlobUrl = previousBlobUrl;
+              return;
+            }
             this.applyBackgroundImage(url, '');
           } else {
+            this.localBlobUrl = '';
             this.applyBackgroundImage('', '');
           }
         } catch (error) {
           console.warn('Local wallpaper load failed', error);
-          this.applyBackgroundImage('', '');
+          if (!signal?.aborted && requestId === this.backgroundRequestId) {
+            this.localBlobUrl = '';
+            this.applyBackgroundImage('', '');
+          }
         } finally {
           if (previousBlobUrl && previousBlobUrl !== this.localBlobUrl && previousBlobUrl.startsWith('blob:')) {
             URL.revokeObjectURL(previousBlobUrl);
@@ -297,33 +362,44 @@
         return typeof url === 'string' && /\/api\/v1\/assets\/[^/]+\/download(?:$|\?)/.test(url);
       },
 
-      async preloadImage(url) {
+      async preloadImage(url, signal) {
         if (!url) return;
 
         await new Promise((resolve) => {
           const img = new Image();
           img.decoding = 'async';
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            signal?.removeEventListener('abort', onAbort);
+            img.onload = null;
+            img.onerror = null;
+            resolve();
+          };
+          const onAbort = () => { img.src = ''; finish(); };
+          if (signal?.aborted) { resolve(); return; }
+          const timeout = setTimeout(onAbort, 8000);
+          signal?.addEventListener('abort', onAbort, { once: true });
+          img.onload = finish;
+          img.onerror = finish;
           img.src = url;
         });
       },
 
-      async resolveMarketplaceDownloadImage(downloadUrl, assetSlug) {
-        this.releaseMarketplaceBlobUrl();
-
+      async resolveMarketplaceDownloadImage(downloadUrl, assetSlug, signal) {
         try {
+          const { fetchBlobWithTimeout } = await import('./services/fetchJsonWithTimeout.js');
           if (typeof caches !== 'undefined') {
             const cache = await caches.open('midori-marketplace-wallpapers-v1');
             const request = new Request(downloadUrl, { method: 'GET', mode: 'cors', credentials: 'omit' });
             let response = await cache.match(request);
+            const cached = Boolean(response);
+            let blob;
 
             if (!response) {
-              response = await fetch(request);
-              const contentType = response?.headers?.get('content-type') || '';
-              if (response.ok && contentType.includes('image/')) {
-                await cache.put(request, response.clone());
-              }
+              ({ response, payload: blob } = await fetchBlobWithTimeout(request, { signal, timeoutMs: 8000 }));
             }
 
             if (!response?.ok) {
@@ -335,80 +411,109 @@
               return '';
             }
 
-            const blob = await response.blob();
-            if (!blob || !blob.type || !blob.type.startsWith('image/')) {
+            blob ||= await response.blob();
+            if (!blob || !blob.type?.startsWith('image/') || blob.size > 8 * 1024 * 1024 || signal?.aborted) {
+              await cache.delete(request);
               return '';
             }
-
-            this.marketplaceBlobUrl = URL.createObjectURL(blob);
-            return this.marketplaceBlobUrl;
+            try {
+              if (cached) await cache.delete(request);
+              await cache.put(request, new Response(blob, { headers: { 'content-type': blob.type } }));
+              const keys = await cache.keys();
+              for (const old of keys.slice(0, Math.max(0, keys.length - 8))) await cache.delete(old);
+            } catch (error) {
+              console.warn('Marketplace wallpaper cache unavailable', error);
+            }
+            return URL.createObjectURL(blob);
           }
 
-          const response = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
+          const { response, payload: blob } = await fetchBlobWithTimeout(downloadUrl, {
+            mode: 'cors', credentials: 'omit', signal, timeoutMs: 8000,
+          });
           if (!response.ok) {
             return '';
           }
 
-          const blob = await response.blob();
-          if (!blob || !blob.type || !blob.type.startsWith('image/')) {
+          if (!blob || !blob.type?.startsWith('image/') || blob.size > 8 * 1024 * 1024 || signal?.aborted) {
             return '';
           }
 
-          this.marketplaceBlobUrl = URL.createObjectURL(blob);
-          return this.marketplaceBlobUrl;
+          return URL.createObjectURL(blob);
         } catch (error) {
-          console.warn('Marketplace wallpaper fallback failed', { assetSlug, error });
+          if (error?.name !== 'AbortError' && !signal?.aborted) console.warn('Marketplace wallpaper fallback failed', { assetSlug, error });
           return '';
         }
       },
 
-      async loadMarketplaceWallpaper(background) {
+      async loadMarketplaceWallpaper(background, signal, requestId) {
         const previewUrl = background?.previewUrl || '';
         const sourceUrl = background?.imageUrl || background?.downloadUrl || '';
         const srcSet = background?.imageSrcSet || '';
 
-        if (previewUrl) {
+        if (previewUrl && !signal?.aborted && requestId === this.backgroundRequestId) {
           this.applyBackgroundImage(previewUrl, '', { immediate: true });
+          this.releaseMarketplaceBlobUrl();
         }
 
         if (!sourceUrl) {
           if (!previewUrl) {
             this.applyBackgroundImage('', '');
+            this.releaseMarketplaceBlobUrl();
           }
           return;
         }
 
         let resolvedUrl = sourceUrl;
         if (this.isMarketplaceDownloadUrl(sourceUrl)) {
-          resolvedUrl = await this.resolveMarketplaceDownloadImage(sourceUrl, background?.assetSlug || '');
+          resolvedUrl = await this.resolveMarketplaceDownloadImage(sourceUrl, background?.assetSlug || '', signal);
+        }
+
+        if (signal?.aborted || requestId !== this.backgroundRequestId) {
+          if (resolvedUrl?.startsWith('blob:')) URL.revokeObjectURL(resolvedUrl);
+          return;
         }
 
         if (!resolvedUrl) {
           if (!previewUrl) {
             this.applyBackgroundImage('', '');
+            this.releaseMarketplaceBlobUrl();
           }
           return;
         }
 
-        await this.preloadImage(resolvedUrl);
+        await this.preloadImage(resolvedUrl, signal);
+        if (signal?.aborted || requestId !== this.backgroundRequestId) {
+          if (resolvedUrl.startsWith('blob:')) URL.revokeObjectURL(resolvedUrl);
+          return;
+        }
         this.applyBackgroundImage(resolvedUrl, resolvedUrl.startsWith('blob:') ? '' : srcSet);
+        if (resolvedUrl.startsWith('blob:')) {
+          const previous = this.marketplaceBlobUrl;
+          this.marketplaceBlobUrl = resolvedUrl;
+          if (previous && previous !== resolvedUrl) URL.revokeObjectURL(previous);
+        }
       },
 
       setupDeferredMounts() {
         const enable = async () => {
+          this.deferredMountHandle = null;
+          if (this.disposed) return;
           this.renderSmartSuggestions = true;
-          if (!this.getUpdateBrowserInfo().isMidori) {
+          if (!(await this.getUpdateBrowserInfo()).isMidori || this.disposed) {
             return;
           }
           await this.syncUpdateNoticeFromCache();
+          if (this.disposed) return;
           if (await this.shouldRevalidateMidoriUpdate()) {
-            await this.checkMidoriUpdate();
+            await this.scheduleUpdateCheck();
           }
         };
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-          window.requestIdleCallback(enable, { timeout: 1000 });
+          this.deferredMountKind = 'idle';
+          this.deferredMountHandle = window.requestIdleCallback(enable, { timeout: 1000 });
         } else {
-          setTimeout(enable, 400);
+          this.deferredMountKind = 'timeout';
+          this.deferredMountHandle = setTimeout(enable, 400);
         }
       },
 
@@ -427,11 +532,13 @@
 
       setupOmniLazyTriggers() {
         const openOmni = async ({ toggle = false } = {}) => {
+          if (this.disposed) return;
           this.renderOmniLauncher = true;
           const [{ useOmniStore }] = await Promise.all([
             import('./stores/useOmniStore.js'),
             nextTick(),
           ]);
+          if (this.disposed) return;
           const omniStore = useOmniStore();
           if (toggle) {
             omniStore.toggle();
@@ -475,12 +582,12 @@
           }
 
           this.lastForegroundUpdateCheckAt = now;
-          if (!this.getUpdateBrowserInfo().isMidori) {
+          if (!(await this.getUpdateBrowserInfo()).isMidori || this.disposed || document.visibilityState === 'hidden') {
             return;
           }
           await this.syncUpdateNoticeFromCache(now);
           if (await this.shouldRevalidateMidoriUpdate(now)) {
-            await this.checkMidoriUpdate({ now });
+            await this.scheduleUpdateCheck({ now });
           }
         };
 
@@ -490,10 +597,12 @@
       },
 
       getUpdateBrowserInfo() {
-        if (!this.updateBrowserInfo) {
-          this.updateBrowserInfo = getBrowserInfo();
+        if (!this.updateBrowserInfoPromise) {
+          this.updateBrowserInfoPromise = import('./utils/midoriBrowserInfo.js')
+            .then(({ getMidoriBrowserInfo }) => getMidoriBrowserInfo())
+            .catch(() => ({ isMidori: false, version: '' }));
         }
-        return this.updateBrowserInfo;
+        return this.updateBrowserInfoPromise;
       },
 
       getUpdateService() {
@@ -519,17 +628,16 @@
           return;
         }
 
-        if (!result.deferredToday) {
-          this.updateNotice = {
-            visible: false,
-            latestVersion: result.latestVersion || '',
-          };
-        }
+        this.updateNotice = {
+          visible: false,
+          latestVersion: result.latestVersion || '',
+        };
       },
 
       async syncUpdateNoticeFromCache(now = Date.now()) {
-        const browserInfo = this.getUpdateBrowserInfo();
+        const browserInfo = await this.getUpdateBrowserInfo();
         if (!browserInfo.isMidori) {
+          this.updateNotice.visible = false;
           return null;
         }
 
@@ -537,7 +645,6 @@
         const state = updateService.getCachedState();
         const result = updateService.getEligibility({
           browserInfo,
-          currentVersion: APP_VERSION,
           state,
           now,
         });
@@ -546,7 +653,7 @@
       },
 
       async shouldRevalidateMidoriUpdate(now = Date.now()) {
-        const browserInfo = this.getUpdateBrowserInfo();
+        const browserInfo = await this.getUpdateBrowserInfo();
         if (!browserInfo.isMidori) {
           return false;
         }
@@ -569,8 +676,8 @@
           return;
         }
 
-        const browserInfo = this.getUpdateBrowserInfo();
-        if (!browserInfo.isMidori) {
+        const browserInfo = await this.getUpdateBrowserInfo();
+        if (!browserInfo.isMidori || document.visibilityState === 'hidden' || options.signal?.aborted) {
           return;
         }
 
@@ -579,17 +686,25 @@
           const updateService = await this.getUpdateService();
           const result = await updateService.checkForUpdate({
             browserInfo,
-            currentVersion: APP_VERSION,
             now: options.now,
             force: options.force,
+            signal: options.signal,
           });
 
-          this.applyUpdateResult(result);
+          if (!options.signal?.aborted && document.visibilityState !== 'hidden') this.applyUpdateResult(result);
         } catch (error) {
-          console.warn('Midori update check failed:', error);
+          if (error?.name !== 'AbortError' && !options.signal?.aborted) console.warn('Midori update check failed:', error);
         } finally {
           this.updateCheckInFlight = false;
         }
+      },
+
+      async scheduleUpdateCheck(options = {}) {
+        if (this.disposed || !(await this.getUpdateBrowserInfo()).isMidori) return false;
+        return scheduleRemoteTask('update', signal => this.checkMidoriUpdate({ ...options, signal }), {
+          priority: 0,
+          notBeforeMs: 5000,
+        });
       },
 
       async deferUpdateForToday() {

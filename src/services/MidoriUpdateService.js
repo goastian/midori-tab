@@ -1,6 +1,5 @@
 import GitHubReleaseClient from './GitHubReleaseClient.js'
-import { APP_VERSION } from '../utils/appVersion.js'
-import { compareSemver } from '../utils/semver.js'
+import { compareSemver, parseSemver } from '../utils/semver.js'
 
 const STORAGE_KEY = 'midori_update_check_state_v1'
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
@@ -77,7 +76,7 @@ export default class MidoriUpdateService {
   async checkForUpdate(options = {}) {
     const now = Number(options.now) > 0 ? Number(options.now) : Date.now()
     const browserInfo = options.browserInfo || null
-    const currentVersion = options.currentVersion || APP_VERSION
+    const currentVersion = browserInfo?.version || ''
     const force = Boolean(options.force)
     const state = this.getCachedState()
 
@@ -88,7 +87,7 @@ export default class MidoriUpdateService {
         source: 'skipped',
         reason: 'not-midori',
         checkedAt: now,
-        ...this.getEligibility({ browserInfo, currentVersion, state, now }),
+        ...this.getEligibility({ browserInfo, state, now }),
       }
     }
 
@@ -103,14 +102,14 @@ export default class MidoriUpdateService {
         source: 'cache',
         reason: 'check-window-active',
         checkedAt: state.lastCheckedAt,
-        ...this.getEligibility({ browserInfo, currentVersion, state, now }),
+        ...this.getEligibility({ browserInfo, state, now }),
       }
     }
 
     const headers = state.etag ? { 'If-None-Match': state.etag } : {}
 
     try {
-      const response = await this.client.getLatestStableRelease({ headers })
+      const response = await this.client.getLatestStableRelease({ headers, signal: options.signal })
       const nextState = {
         ...state,
         lastCheckedAt: now,
@@ -127,7 +126,7 @@ export default class MidoriUpdateService {
           source: 'network',
           reason: 'not-modified',
           checkedAt: now,
-          ...this.getEligibility({ browserInfo, currentVersion, state: nextState, now }),
+          ...this.getEligibility({ browserInfo, state: nextState, now }),
         }
       }
 
@@ -143,9 +142,10 @@ export default class MidoriUpdateService {
         source: 'network',
         reason: 'fetched',
         checkedAt: now,
-        ...this.getEligibility({ browserInfo, currentVersion, state: nextState, now }),
+        ...this.getEligibility({ browserInfo, state: nextState, now }),
       }
     } catch (error) {
+      if (options.signal?.aborted) throw error
       const nextState = {
         ...state,
         lastCheckedAt: now,
@@ -162,14 +162,15 @@ export default class MidoriUpdateService {
         reason: 'error',
         checkedAt: now,
         error,
-        ...this.getEligibility({ browserInfo, currentVersion, state: nextState, now }),
+        ...this.getEligibility({ browserInfo, state: nextState, now }),
       }
     }
   }
 
-  getEligibility({ browserInfo, currentVersion = APP_VERSION, state = this.getCachedState(), now = Date.now() } = {}) {
+  getEligibility({ browserInfo, state = this.getCachedState(), now = Date.now() } = {}) {
+    const currentVersion = browserInfo?.version || ''
     const latestVersion = state.latestVersion || ''
-    const hasNewerVersion = latestVersion
+    const hasNewerVersion = parseSemver(currentVersion) && parseSemver(latestVersion)
       ? compareSemver(latestVersion, currentVersion) > 0
       : false
     const deferredToday = isWithinWindow(state.deferredUntil, now, this.deferWindowMs)

@@ -3,6 +3,7 @@ import {
   subscribeWidgetVisibility,
   subscribeWidgetFocus,
 } from './widgetVisibilityBus.js';
+import { cancelRemoteTask, scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
 
 export const WIDGET_COST = Object.freeze({
   LOW: 'low',
@@ -49,9 +50,21 @@ export function createWidgetRuntime(component, policy = {}, hooks = {}) {
     const force = Boolean(options.force);
     if (!canRun() && !options.allowHidden) return false;
     if (!shouldRun(force)) return false;
-    lastRunAt = Date.now();
-    await task();
-    return true;
+    const execute = async () => {
+      if (!canRun()) return false;
+      try {
+        const result = await task();
+        if (result === false || !canRun()) return false;
+        lastRunAt = Date.now();
+        return true;
+      } catch (error) {
+        if (error?.name !== 'AbortError') console.warn(`[Midori] Widget ${policy.key} refresh failed`, error);
+        return false;
+      }
+    };
+    return policy.usesNetwork
+      ? scheduleRemoteTask(`widget:${policy.key}`, execute, { priority: policy.cost === WIDGET_COST.HIGH ? 2 : 1 })
+      : execute();
   };
 
   const scheduleRefresh = (task, delayMs = policy.ttlMs) => {
@@ -72,6 +85,7 @@ export function createWidgetRuntime(component, policy = {}, hooks = {}) {
       return;
     }
     clearRefreshTimer();
+    if (policy.usesNetwork) cancelRemoteTask(`widget:${policy.key}`);
     if (typeof hooks.onHidden === 'function') hooks.onHidden();
   };
 
@@ -107,6 +121,7 @@ export function createWidgetRuntime(component, policy = {}, hooks = {}) {
 
   const dispose = () => {
     clearRefreshTimer();
+    if (policy.usesNetwork) cancelRemoteTask(`widget:${policy.key}`);
     if (unobserve) {
       unobserve();
       unobserve = null;

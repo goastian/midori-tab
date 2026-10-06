@@ -20,9 +20,11 @@ function sendMessage(request) {
 export function useOmniSearch() {
   const store = useOmniStore();
   let debounceTimer = null;
+  let generation = 0;
 
-  async function runSearch(query) {
+  async function runSearch(query, requestId) {
     const response = await sendMessage({ request: 'query-omni', query });
+    if (requestId !== generation || !store.isOpen) return;
     store.setResults(response?.results ?? [], 0);
   }
 
@@ -31,10 +33,11 @@ export function useOmniSearch() {
    * Updates store.results asynchronously after a short delay.
    */
   function search(query, options = {}) {
+    const requestId = ++generation;
     const wait = options.immediate ? 0 : 160;
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
-      await runSearch(query);
+      await runSearch(query, requestId);
     }, wait);
   }
 

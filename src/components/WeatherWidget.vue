@@ -11,8 +11,8 @@
       </div>
     </header>
 
-    <div v-if="loading" class="weather-state">{{ i18n.$t('weather.loading') }}</div>
-    <div v-else-if="error" class="weather-state weather-state--error">{{ error }}</div>
+    <div v-if="loading && !forecast" class="weather-state">{{ i18n.$t('weather.loading') }}</div>
+    <div v-else-if="error && !forecast" class="weather-state weather-state--error">{{ error }}</div>
     <div v-else-if="forecast" class="weather-body">
       <div class="weather-temp">{{ rounded(forecast.temperature) }}{{ degreeSuffix }}</div>
       <div class="weather-meta">
@@ -22,6 +22,7 @@
         <span>{{ i18n.$t('weather.wind') }} {{ rounded(forecast.wind) }}</span>
       </div>
       <p v-if="forecast.stale" class="weather-stale">{{ i18n.$t('weather.stale') }}</p>
+      <p v-if="loading" class="weather-stale">{{ i18n.$t('weather.loading') }}</p>
     </div>
 
     <footer class="weather-footer">
@@ -63,7 +64,8 @@ function defaultSettings() {
 }
 
 function hasValidCoordinates(settings) {
-  return Number.isFinite(Number(settings.latitude)) && Number.isFinite(Number(settings.longitude));
+  return settings.latitude !== null && settings.longitude !== null
+    && Number.isFinite(Number(settings.latitude)) && Number.isFinite(Number(settings.longitude));
 }
 
 function formatCoordinates(latitude, longitude) {
@@ -88,6 +90,8 @@ export default {
       manualLocation: '',
       settings: defaultSettings(),
       requestController: null,
+      requestSequence: 0,
+      disposed: false,
       widgetPolicy: WIDGET_POLICY,
       widgetRuntime: null,
     };
@@ -108,15 +112,22 @@ export default {
 
   async mounted() {
     await this.restoreSettings();
+    if (this.disposed) return;
+    if (hasValidCoordinates(this.settings)) {
+      const cached = await weatherService.getCachedForecast(this.settings);
+      if (this.disposed) return;
+      this.forecast = cached;
+    }
     this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
       onVisible: () => this.loadWhenVisible(),
       onFocus: () => this.loadWhenVisible(),
       onHidden: () => this.abortRequest(),
     });
-    this.$nextTick(() => this.widgetRuntime?.mount());
+    this.$nextTick(() => { if (!this.disposed) this.widgetRuntime?.mount(); });
   },
 
   beforeUnmount() {
+    this.disposed = true;
     this.widgetRuntime?.dispose();
     this.abortRequest();
   },
@@ -130,12 +141,14 @@ export default {
     async restoreSettings() {
       try {
         const parsed = await getJson(SETTINGS_KEY, {});
+        if (this.disposed) return;
         this.settings = {
           ...defaultSettings(),
           ...parsed,
         };
         this.manualLocation = this.settings.locationLabel || '';
       } catch {
+        if (this.disposed) return;
         this.settings = defaultSettings();
       }
     },
@@ -194,10 +207,11 @@ export default {
         this.manualLocation = this.settings.locationLabel;
         this.persistSettings();
         await this.refresh(true);
+        return true;
       } catch {
-        this.forecast = null;
         this.error = this.i18n.$t('weather.errors.locationRequired');
         this.loading = false;
+        return false;
       }
     },
 
@@ -210,6 +224,7 @@ export default {
     },
 
     abortRequest() {
+      this.requestSequence += 1;
       if (this.requestController) {
         this.requestController.abort();
         this.requestController = null;
@@ -219,39 +234,44 @@ export default {
     async loadWhenVisible() {
       return this.widgetRuntime?.runWhenVisible(async () => {
         if (!hasValidCoordinates(this.settings) || this.shouldReplaceLegacyDefault()) {
-          await this.useApproximateLocation();
-          return;
+          return this.useApproximateLocation();
         }
-        await this.refresh();
+        return this.refresh();
       });
     },
 
     async refresh(forceRefresh = false) {
       if (!hasValidCoordinates(this.settings)) {
-        this.forecast = null;
         this.error = this.i18n.$t('weather.errors.locationRequired');
         this.loading = false;
-        return;
+        return false;
       }
 
+      this.abortRequest();
+      const requestId = this.requestSequence;
       this.loading = true;
       this.error = '';
-      this.abortRequest();
       this.requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
       try {
-        this.forecast = await weatherService.getForecast({
+        const forecast = await weatherService.getForecast({
           latitude: this.settings.latitude,
           longitude: this.settings.longitude,
           unit: this.settings.unit,
           forceRefresh,
           signal: this.requestController?.signal,
         });
+        if (requestId !== this.requestSequence) return false;
+        this.forecast = forecast;
+        return !forecast.stale;
       } catch (error) {
-        if (error?.name === 'AbortError') return;
+        if (error?.name === 'AbortError' || requestId !== this.requestSequence) return false;
         this.error = this.i18n.$t('weather.errors.unavailable');
+        return false;
       } finally {
-        this.requestController = null;
-        this.loading = false;
+        if (requestId === this.requestSequence) {
+          this.requestController = null;
+          this.loading = false;
+        }
       }
     },
 

@@ -48,6 +48,7 @@
               "pendingOrCancelled": { "type": "integer", "minimum": 0 }
             }
           },
+          "startupGraphViolations": { "type": "array", "items": { "type": "string" } },
           "errors": { "type": "array", "items": { "type": "string" } }
         }
       }

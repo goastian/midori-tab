@@ -32,18 +32,17 @@ const ENTRY_FILE = resolve(DIST_DIR, 'index.html');
 const DEFAULT_JS_BUDGET = 165;
 const DEFAULT_CSS_BUDGET = 44;
 
-const CRITICAL_PRELOAD_RE = /^\/?(index\.js|assets\/vendor-|assets\/i18n-en-|assets\/omni-.*\.css$)/;
-
 function isCriticalJSPreload(path) {
   return (
     path === '/index.js'
+    || path === '/boot-shell.js'
     || /^\/assets\/vendor-.*\.js$/.test(path)
     || /^\/assets\/i18n-en-.*\.js$/.test(path)
   );
 }
 
 function isCriticalCSSPreload(path) {
-  return /^\/assets\/index-.*\.css$/.test(path);
+  return path === '/boot-shell.css' || /^\/assets\/index-.*\.css$/.test(path);
 }
 
 function parseBool(flag, argv) {

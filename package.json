@@ -35,11 +35,13 @@
     "@types/firefox-webext-browser": "^120.0.4",
     "@vitejs/plugin-vue": "^6.0.0",
     "ajv": "^8.17.1",
+    "playwright": "1.62.0",
     "terser": "^5.46.2",
     "typescript": "^5.9.2",
     "vite": "^7.0.4",
     "vite-plugin-static-copy": "^3.1.1",
     "vite-plugin-web-extension": "^4.4.5",
+    "web-ext-run": "0.2.3",
     "vue-tsc": "^3.0.5"
   }
 }

@@ -260,7 +260,7 @@ export default class AdsService {
    *   - ad: object | null
    *   - source: 'fresh' | 'none' | 'error'
    */
-  async fetchNewTabAds({ device_type = 'desktop', country = '', language = 'en' } = {}) {
+  async fetchNewTabAds({ device_type = 'desktop', country = '', language = 'en', signal } = {}) {
     await this.#removeLegacyDecisionCache({ country, language });
     const startedAt = Number(this.now());
 
@@ -269,7 +269,7 @@ export default class AdsService {
     }
 
     try {
-      const ad = await this.#requestAd({ device_type, country, language });
+      const ad = await this.#requestAd({ device_type, country, language, signal });
       const latencyMs = Math.max(0, Math.round(Number(this.now()) - startedAt));
       return ad
         ? { ad, source: 'fresh', latency_ms: latencyMs }
@@ -393,7 +393,7 @@ export default class AdsService {
     }
   }
 
-  async #requestAd({ device_type, country, language }) {
+  async #requestAd({ device_type, country, language, signal }) {
     const url = new URL(`${this.baseUrl}${this.path}`);
     if (device_type) url.searchParams.set('device_type', device_type);
     if (country) url.searchParams.set('country', country);
@@ -404,12 +404,16 @@ export default class AdsService {
     url.searchParams.set('visitor_id', visitorId);
 
     const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const onAbort = () => controller?.abort();
+    if (signal?.aborted) onAbort();
+    else signal?.addEventListener('abort', onAbort, { once: true });
     const timeoutId = controller
       ? setTimeout(() => controller.abort(), this.timeout)
       : null;
 
     try {
       const rewardToken = await this.rewardTokenProvider();
+      if (signal?.aborted) throw new DOMException('Ads request cancelled', 'AbortError');
       const headers = { Accept: 'application/json' };
       if (rewardToken) headers['X-Wallet-Token'] = rewardToken;
       const response = await this.fetchFn(url.toString(), {
@@ -423,10 +427,12 @@ export default class AdsService {
       if (!response.ok) throw new Error(`Ads request failed: ${response.status}`);
 
       const data = this.#normalizeContract(await response.json());
+      if (signal?.aborted) throw new DOMException('Ads request cancelled', 'AbortError');
       if (!this.#isValidContract(data)) return null;
       return data;
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', onAbort);
     }
   }
 

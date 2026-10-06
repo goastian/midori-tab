@@ -1,4 +1,10 @@
+import { getJson, setJsonDebounced } from './StorageService.js';
+import { fetchJsonWithTimeout } from './fetchJsonWithTimeout.js';
+
 const API_BASE_URL = 'https://api.freenewsapi.io/v1/news';
+const NEWS_SNAPSHOT_KEY = 'midori_news_snapshots_v1';
+const NEWS_SNAPSHOT_MAX_ENTRIES = 4;
+const NEWS_SNAPSHOT_MAX_BYTES = 180_000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 18;
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -213,6 +219,36 @@ export class FreeNewsService {
     this.detailCache.clear();
   }
 
+  async getSnapshot(filters = {}) {
+    const snapshots = await getJson(NEWS_SNAPSHOT_KEY, {});
+    const entry = snapshots?.[canonicalCacheKey(filters)];
+    if (!entry?.value || !Array.isArray(entry.value.articles)) return null;
+    return {
+      ...entry.value,
+      articles: entry.value.articles.slice(0, NEWS_MAX_ARTICLES),
+      fromCache: true,
+      isStale: this.now() - entry.timestamp >= CACHE_TTL_MS,
+      fetchedAt: entry.timestamp,
+    };
+  }
+
+  async saveSnapshot(filters, value) {
+    if (normalizeNewsFilters(filters).cursor) return;
+    const stored = await getJson(NEWS_SNAPSHOT_KEY, {});
+    const snapshots = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+    const key = canonicalCacheKey(filters);
+    const entries = Object.entries({ ...snapshots, [key]: {
+      timestamp: this.now(),
+      value: { ...value, articles: value.articles.slice(0, 40) },
+    } }).sort(([, a], [, b]) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, NEWS_SNAPSHOT_MAX_ENTRIES);
+    while (new Blob([JSON.stringify(Object.fromEntries(entries))]).size > NEWS_SNAPSHOT_MAX_BYTES - 200 && entries.length) {
+      const last = entries[entries.length - 1][1];
+      if (last.value.articles.length) last.value.articles.pop();
+      else entries.pop();
+    }
+    setJsonDebounced(NEWS_SNAPSHOT_KEY, Object.fromEntries(entries), { delayMs: 750, maxBytes: NEWS_SNAPSHOT_MAX_BYTES });
+  }
+
   cancelQueuedArticleDetails() {
     this.detailGeneration += 1;
     for (const { controller } of this.detailRequests.values()) controller?.abort();
@@ -231,36 +267,16 @@ export class FreeNewsService {
   }
 
   async requestJson(url, { signal } = {}) {
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    let timedOut = false;
-    const timeoutId = controller ? globalThis.setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, REQUEST_TIMEOUT_MS) : null;
-    if (signal && controller) {
-      if (signal.aborted) controller.abort();
-      else signal.addEventListener('abort', () => controller.abort(), { once: true });
-    }
-
-    try {
-      const response = await this.fetchFn(url, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          'x-api-key': this.apiKey,
-        },
-        credentials: 'omit',
-        signal: controller?.signal,
-      });
-
-      if (!response.ok) throw new FreeNewsResponseError(response.status);
-      return response.json();
-    } catch (error) {
-      if (timedOut && error?.name === 'AbortError') error.isTimeout = true;
-      throw error;
-    } finally {
-      if (timeoutId) globalThis.clearTimeout(timeoutId);
-    }
+    const { response, payload } = await fetchJsonWithTimeout(url, {
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      signal,
+      fetchFn: this.fetchFn,
+      method: 'GET',
+      headers: { Accept: 'application/json', 'x-api-key': this.apiKey },
+      credentials: 'omit',
+    });
+    if (!response.ok) throw new FreeNewsResponseError(response.status);
+    return payload;
   }
 
   requestPayload(filters, options = {}) {
@@ -314,7 +330,14 @@ export class FreeNewsService {
 
     const requestedFilters = normalizeNewsFilters(filters);
     const cacheKey = canonicalCacheKey(requestedFilters);
-    const cached = this.cache.get(cacheKey);
+    let cached = this.cache.get(cacheKey);
+    if (!cached && !requestedFilters.cursor) {
+      const persisted = await this.getSnapshot(requestedFilters);
+      if (persisted) {
+        cached = { timestamp: persisted.fetchedAt, value: persisted };
+        this.cache.set(cacheKey, cached);
+      }
+    }
     const now = this.now();
     if (!force && cached && now - cached.timestamp < CACHE_TTL_MS) {
       return {
@@ -346,11 +369,13 @@ export class FreeNewsService {
           const result = { ...fallbackValue, filterFallback: true };
           this.cache.set(cacheKey, { timestamp: now, value: result });
           this.pruneCache();
+          void this.saveSnapshot(requestedFilters, result);
           return { ...result, fromCache: false, isStale: false, searchFallback: false };
         }
       }
       this.cache.set(cacheKey, { timestamp: now, value });
       this.pruneCache();
+      void this.saveSnapshot(requestedFilters, value);
       return { ...value, fromCache: false, isStale: false, searchFallback: false };
     } catch (error) {
       const fallbackFilters = { ...filters, query: '' };

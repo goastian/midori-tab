@@ -1,4 +1,5 @@
 import { getJson, setJsonDebounced } from './StorageService.js';
+import { fetchJsonWithTimeout } from './fetchJsonWithTimeout.js';
 
 const CACHE_KEY = 'midori_weather_cache_v1';
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -40,6 +41,12 @@ function getConditionKey(code) {
 }
 
 class WeatherService {
+  async getCachedForecast({ latitude, longitude, unit = 'metric' }) {
+    const cache = await readCache();
+    const entry = cache[`${roundCoord(latitude)}|${roundCoord(longitude)}|${unit}`];
+    return entry?.data ? { ...entry.data, fromCache: true, stale: Date.now() - entry.timestamp >= CACHE_TTL_MS } : null;
+  }
+
   async getForecast({ latitude, longitude, unit = 'metric', forceRefresh = false, signal = null }) {
     const lat = roundCoord(latitude);
     const lon = roundCoord(longitude);
@@ -61,25 +68,19 @@ class WeatherService {
     url.searchParams.set('temperature_unit', temperatureUnit);
 
     let response;
-    let timeoutId = null;
+    let payload;
     try {
-      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      timeoutId = controller ? globalThis.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS) : null;
-      if (signal && controller) {
-        if (signal.aborted) controller.abort();
-        else signal.addEventListener('abort', () => controller.abort(), { once: true });
-      }
-      response = await fetch(url.toString(), {
+      ({ response, payload } = await fetchJsonWithTimeout(url.toString(), {
         cache: forceRefresh ? 'reload' : 'default',
-        signal: controller?.signal,
-      });
+        signal,
+        timeoutMs: FETCH_TIMEOUT_MS,
+      }));
     } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw error;
       if (cache[cacheId]) {
         return { ...cache[cacheId].data, fromCache: true, stale: true };
       }
       throw error;
-    } finally {
-      if (timeoutId) globalThis.clearTimeout(timeoutId);
     }
 
     if (!response.ok) {
@@ -89,7 +90,6 @@ class WeatherService {
       throw new Error(`Weather request failed: ${response.status}`);
     }
 
-    const payload = await response.json();
     const current = payload.current || {};
     const daily = payload.daily || {};
 

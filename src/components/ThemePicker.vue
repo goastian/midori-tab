@@ -80,10 +80,15 @@
 import { defineAsyncComponent } from 'vue';
 import { getWidgetCopy } from '../i18n/widget-copy.js';
 import useThemeStore from '../stores/useThemeStore.js';
+import { EXTRA_PREDEFINED_THEMES } from '../themes/predefinedThemes.js';
 import useI18nStore from '../stores/useI18nStore.js';
 
 export default {
   name: 'ThemePicker',
+
+  created() {
+    this.themeStore.installPredefinedThemes(EXTRA_PREDEFINED_THEMES);
+  },
 
   components: {
     MarketplaceBrowser: defineAsyncComponent(() => import('./MarketplaceBrowser.vue')),

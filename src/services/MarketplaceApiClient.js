@@ -1,3 +1,5 @@
+import { fetchJsonWithTimeout } from './fetchJsonWithTimeout.js';
+
 const DEFAULT_TIMEOUT = 8000;
 
 function normalizeBaseUrl(rawBaseUrl) {
@@ -54,8 +56,8 @@ export default class MarketplaceApiClient {
     return Boolean(this.baseUrl);
   }
 
-  async getCatalog(params = {}) {
-    return this.#getJson('/catalog', params);
+  async getCatalog(params = {}, options = {}) {
+    return this.#getJson('/catalog', params, options);
   }
 
   async getAsset(slug) {
@@ -67,34 +69,18 @@ export default class MarketplaceApiClient {
     return buildUrl(this.baseUrl, `/assets/${encodeURIComponent(slug)}/download`, { version }).toString();
   }
 
-  async #getJson(path, params = {}) {
+  async #getJson(path, params = {}, options = {}) {
     if (!this.isConfigured()) {
       throw new Error('Marketplace API base URL is not configured.');
     }
 
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = controller
-      ? window.setTimeout(() => controller.abort(), this.timeout)
-      : null;
-
-    try {
-      const response = await fetch(buildUrl(this.baseUrl, path, params), {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
-        signal: controller?.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Marketplace request failed with status ${response.status}.`);
-      }
-
-      return response.json();
-    } finally {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
-    }
+    const { response, payload } = await fetchJsonWithTimeout(buildUrl(this.baseUrl, path, params), {
+      timeoutMs: this.timeout,
+      signal: options.signal,
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) throw new Error(`Marketplace request failed with status ${response.status}.`);
+    return payload;
   }
 }

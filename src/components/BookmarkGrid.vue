@@ -84,13 +84,14 @@
         >
           <span class="speed-dial-icon" aria-hidden="true">
             <img
-              v-if="!faviconFailed(bookmark)"
+              v-if="remoteImagesReady && faviconRequested(bookmark) && !faviconFailed(bookmark)"
               :src="getFaviconUrl(bookmark)"
               alt=""
-              loading="lazy"
+              loading="eager"
               decoding="async"
               referrerpolicy="no-referrer"
-              @error="markFaviconFailed(bookmark)"
+              @load="settleFavicon(bookmark, true)"
+              @error="settleFavicon(bookmark, false)"
             />
             <span v-else class="speed-dial-initial">{{ bookmarkInitial(bookmark) }}</span>
           </span>
@@ -268,6 +269,7 @@ import {
 import { createAdInteractionGuard } from '../services/AdInteractionGuard.js';
 import { observeElementSize } from '../composables/layoutResizeBus.js';
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
+import { cancelRemoteTask, scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
 import {
   getSpeedDialMetrics,
   requiresPaidDisclosure,
@@ -326,9 +328,15 @@ export default {
       adsStore: useAdsStore(),
       bookmarks: cloneDefaults(),
       bookmarksReady: false,
+      remoteImagesReady: Boolean(window.__midoriPerf?.marks?.['interaction-ready']),
+      perfMarkListener: null,
       categories: [...DEFAULT_CATEGORIES],
       activeTab: DEFAULT_CATEGORIES[0],
       failedFavicons: {},
+      readyFavicons: {},
+      loadingFavicons: {},
+      faviconSettlers: new Map(),
+      faviconTaskKeys: new Set(),
       layoutWidth: typeof window === 'undefined' ? 1080 : Math.max(0, window.innerWidth - 40),
       unobserveLayout: null,
       editorMode: '',
@@ -428,6 +436,7 @@ export default {
     },
   },
   watch: {
+    visibleBookmarks() { this.queueFavicons(); },
     showAds(enabled) {
       if (!enabled) {
         this.teardownAdObserver();
@@ -459,7 +468,14 @@ export default {
     },
   },
   mounted() {
-    void this.loadBookmarks().catch(() => undefined);
+    this.perfMarkListener = event => {
+      if (event.detail?.name === 'interaction-ready') {
+        this.remoteImagesReady = true;
+        this.queueFavicons();
+      }
+    };
+    window.addEventListener('midori:perf-mark', this.perfMarkListener);
+    void this.loadBookmarks().then(() => this.queueFavicons()).catch(() => undefined);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.handleAdPageVisibility);
     }
@@ -470,6 +486,11 @@ export default {
     });
   },
   beforeUnmount() {
+    window.removeEventListener('midori:perf-mark', this.perfMarkListener);
+    for (const key of this.faviconTaskKeys) cancelRemoteTask(key);
+    this.faviconTaskKeys.clear();
+    this.faviconSettlers.clear();
+    cancelRemoteTask('ads-decision');
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.handleAdPageVisibility);
     }
@@ -510,12 +531,46 @@ export default {
     getFaviconUrl(bookmark) {
       return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(this.bookmarkDomain(bookmark))}.ico`;
     },
+    faviconRequested(bookmark) {
+      const domain = this.bookmarkDomain(bookmark);
+      return Boolean(this.loadingFavicons[domain] || this.readyFavicons[domain]);
+    },
+    settleFavicon(bookmark, success) {
+      this.faviconSettlers.get(this.bookmarkDomain(bookmark))?.(success);
+    },
+    queueFavicons() {
+      if (!this.remoteImagesReady || document.visibilityState === 'hidden') return;
+      for (const bookmark of this.visibleBookmarks) {
+        const domain = this.bookmarkDomain(bookmark);
+        const key = `favicon:${domain}`;
+        if (!domain || this.readyFavicons[domain] || this.failedFavicons[domain] || this.faviconTaskKeys.has(key)) continue;
+        this.faviconTaskKeys.add(key);
+        void scheduleRemoteTask(key, signal => new Promise(resolve => {
+          let settled = false;
+          const finish = success => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            signal.removeEventListener('abort', onAbort);
+            this.faviconSettlers.delete(domain);
+            if (success) this.readyFavicons = { ...this.readyFavicons, [domain]: true };
+            else if (!signal.aborted) this.failedFavicons = { ...this.failedFavicons, [domain]: true };
+            this.loadingFavicons = { ...this.loadingFavicons, [domain]: false };
+            resolve(success);
+          };
+          const onAbort = () => finish(false);
+          const timeout = setTimeout(onAbort, 6000);
+          signal.addEventListener('abort', onAbort, { once: true });
+          if (signal.aborted) { finish(false); return; }
+          this.faviconSettlers.set(domain, finish);
+          this.loadingFavicons = { ...this.loadingFavicons, [domain]: true };
+        }), { priority: 0 }).then(() => {
+          this.faviconTaskKeys.delete(key);
+        });
+      }
+    },
     faviconFailed(bookmark) {
       return Boolean(this.failedFavicons[this.bookmarkDomain(bookmark)]);
-    },
-    markFaviconFailed(bookmark) {
-      const domain = this.bookmarkDomain(bookmark);
-      this.failedFavicons = { ...this.failedFavicons, [domain]: true };
     },
     normalizeBookmarkUrl(rawUrl) {
       const candidate = /^[a-z][a-z\d+.-]*:/i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
@@ -689,6 +744,7 @@ export default {
       }
     },
     handleAdPageVisibility() {
+      if (document.visibilityState === 'visible') this.queueFavicons();
       this.adViewability?.setPageVisible(
         typeof document === 'undefined' || document.visibilityState === 'visible',
       );
@@ -696,7 +752,9 @@ export default {
     async loadAdWhenVisible() {
       if (!this.showAds || this.adRequested || this.adsStore.hasAd) return;
       this.adRequested = true;
-      await this.adsStore.loadAd();
+      const completed = await scheduleRemoteTask('ads-decision', signal => this.adsStore.loadAd(false, { signal }), { priority: 1 });
+      if (!completed) this.adRequested = false;
+      if (!this.$el?.isConnected) return;
       this.adRequestComplete = true;
       if (!this.adsStore.hasAd) {
         this.teardownAdObserver();

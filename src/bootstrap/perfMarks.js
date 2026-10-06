@@ -38,6 +38,7 @@ export function mark(name) {
 
   try {
     window.performance.mark(name);
+    window.dispatchEvent(new CustomEvent('midori:perf-mark', { detail: { name, time: state.marks[name] } }));
   } catch {
     /* not supported */
   }

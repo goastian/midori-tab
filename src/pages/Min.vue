@@ -237,6 +237,8 @@ export default {
       reorderAnnouncement: '',
       viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
       renderGridWidgets: false,
+      stableFallback: null,
+      stableDisposed: false,
     };
   },
 
@@ -248,15 +250,23 @@ export default {
 
     this.deferGridWidgets();
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        perfMarks.mark('above-fold-stable');
-        if (!this.widgetsStore.enabled.search) perfMarks.mark('interaction-ready');
-      });
-    });
+    let settled = false;
+    const markStable = () => {
+      if (settled || this.stableDisposed) return;
+      settled = true;
+      clearTimeout(fallback);
+      this.stableFallback = null;
+      perfMarks.mark('above-fold-stable');
+      if (!this.widgetsStore.enabled.search) perfMarks.mark('interaction-ready');
+    };
+    const fallback = setTimeout(markStable, 1000);
+    this.stableFallback = fallback;
+    requestAnimationFrame(() => requestAnimationFrame(markStable));
   },
 
   beforeUnmount() {
+    this.stableDisposed = true;
+    if (this.stableFallback) clearTimeout(this.stableFallback);
     window.removeEventListener('midori:open-marketplace', this.handleOpenMarketplace);
     this.unsubViewportSize?.();
     this.widgetBoardObserver?.disconnect();

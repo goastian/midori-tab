@@ -161,7 +161,7 @@ export default {
 
   data() {
     return {
-      query: '',
+      query: window.__midoriBootSearch?.query || '',
       suggestions: [],
       activeIndex: -1,
       showSuggestions: false,
@@ -522,6 +522,14 @@ export default {
   mounted() {
     document.addEventListener('mousedown', this.onClickOutside);
     if (this.$refs.input) {
+      const boot = window.__midoriBootSearch;
+      if (boot?.focused) {
+        this.$refs.input.focus();
+        if (Number.isInteger(boot.selectionStart) && Number.isInteger(boot.selectionEnd)) {
+          this.$refs.input.setSelectionRange(boot.selectionStart, boot.selectionEnd);
+        }
+      }
+      window.__midoriBootSearch = null;
       perfMarks.mark('search-ready');
       perfMarks.mark('interaction-ready');
     }
