@@ -1,0 +1,9 @@
+:root {
+  color-scheme: light;
+  background-color: var(--color-bg, #eff8f3);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  background-color: var(--color-bg, #07150d);
+}

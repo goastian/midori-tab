@@ -18,10 +18,6 @@ import { createSafePersistencePlugin, migrateLegacyStores } from './bootstrap/mi
 
 async function bootstrap() {
   perfMarks.setup()
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => perfMarks.mark('shell-visible'), { once: true })
-  } else perfMarks.mark('shell-visible')
-
   applyInitialTheme()
 
   const unmigratedStores = await migrateLegacyStores()
@@ -48,12 +44,8 @@ async function bootstrap() {
   document.documentElement.setAttribute('data-theme', initialTheme)
   themeStore.applyTheme(initialTheme)
 
-  const bootInput = document.getElementById('midori-boot-search')
-  window.__midoriBootSearch = bootInput
-    ? { query: bootInput.value, focused: document.activeElement === bootInput,
-        selectionStart: bootInput.selectionStart, selectionEnd: bootInput.selectionEnd }
-    : null
   app.mount('#app')
+  perfMarks.mark('shell-visible')
   hydrateAsyncStores(pinia)
 
 }

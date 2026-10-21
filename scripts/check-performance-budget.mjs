@@ -35,14 +35,14 @@ const DEFAULT_CSS_BUDGET = 44;
 function isCriticalJSPreload(path) {
   return (
     path === '/index.js'
-    || path === '/boot-shell.js'
+    || path === '/boot-theme.js'
     || /^\/assets\/vendor-.*\.js$/.test(path)
     || /^\/assets\/i18n-en-.*\.js$/.test(path)
   );
 }
 
 function isCriticalCSSPreload(path) {
-  return path === '/boot-shell.css' || /^\/assets\/index-.*\.css$/.test(path);
+  return path === '/boot-theme.css' || /^\/assets\/index-.*\.css$/.test(path);
 }
 
 function parseBool(flag, argv) {
