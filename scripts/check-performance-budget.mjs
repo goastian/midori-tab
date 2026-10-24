@@ -14,12 +14,12 @@
  * Si no existe bundle-analysis.json o está más viejo que dist/index.html,
  * reconstruye con el analizador (ANALYZE_BUNDLE=1). Para umbrales numéricos
  * por defecto se usan los objetivos de la Fase 1 del plan (JS ≤ 165 KiB,
- * CSS ≤ 44 KiB). Con --strict también se declara fallo si el archivo de
- * análisis tiene que reconstruirse (útil en CI para exigir reproducibilidad).
+ * CSS ≤ 44 KiB). Con --strict, un análisis ausente o antiguo produce fallo
+ * sin reconstruir ni cambiar el destino del paquete (requerido en CI).
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -76,22 +76,28 @@ function main() {
     || statSync(ANALYSIS_FILE).mtimeMs < statSync(ENTRY_FILE).mtimeMs;
 
   if (analysisMissing || analysisStale) {
+    if (strict) {
+      console.error('[check-performance-budget] Falta análisis vigente del artefacto. Ejecuta ANALYZE_BUNDLE=1 con el build de su destino; --strict no reconstruye ni cambia el paquete.');
+      process.exit(1);
+    }
+    const manifest = JSON.parse(readFileSync(resolve(DIST_DIR, 'manifest.json'), 'utf8'));
+    const target = manifest.browser_specific_settings?.gecko?.id ? 'firefox' : 'chrome';
+    const sourceManifest = resolve(PROJECT_ROOT, 'manifest/manifest.json');
+    const originalManifest = readFileSync(sourceManifest);
     console.log('[check-performance-budget] Regenerando bundle-analysis (ANALYZE_BUNDLE=1)...');
     try {
-      execFileSync('npm', ['run', 'analyze:bundle'], {
+      execFileSync('npm', ['run', `build:${target}`], {
         cwd: PROJECT_ROOT,
         stdio: 'inherit',
+        env: { ...process.env, ANALYZE_BUNDLE: '1' },
       });
     } catch (err) {
       console.error('[check-performance-budget] El build de análisis falló.');
       console.error(err.stderr?.toString?.() || String(err));
-      process.exit(1);
-    }
-    if (strict) {
-      console.error(
-        '[check-performance-budget] Análisis irreproducible: hubo que reconstruirlo. ¿Ejecutaste analyze:bundle en el flujo de CI?',
-      );
-      process.exit(1);
+      process.exitCode = 1;
+      return;
+    } finally {
+      writeFileSync(sourceManifest, originalManifest);
     }
   }
 

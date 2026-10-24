@@ -35,8 +35,7 @@ test('omite red si no es Midori', async () => {
   const service = new MidoriUpdateService({ storage, client })
 
   const result = await service.checkForUpdate({
-    browserInfo: { isMidori: false },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: false, version: '1.0.0' },
     now: 10_000,
   })
 
@@ -65,14 +64,12 @@ test('usa cache diaria y evita segunda llamada de red en la misma ventana', asyn
   })
 
   const first = await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 1_000,
   })
 
   const second = await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 2_000,
   })
 
@@ -106,20 +103,17 @@ test('hace ping de nuevo al expirar la ventana fija de 30 minutos', async () => 
   })
 
   const first = await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 10_000,
   })
 
   const withinWindow = await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 10_500,
   })
 
   const afterWindow = await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 11_100,
   })
 
@@ -149,20 +143,17 @@ test('hace ping de nuevo al expirar la ventana fija incluso tras error de red', 
   })
 
   const first = await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 20_000,
   })
 
   const cachedError = await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 20_100,
   })
 
   const retry = await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 20_600,
   })
 
@@ -197,14 +188,12 @@ test('reutiliza ETag al expirar cache diaria y responde 304', async () => {
   })
 
   await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 1_000,
   })
 
   const nextDay = await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 1_000 + 24 * 60 * 60 * 1000 + 1,
   })
 
@@ -230,22 +219,19 @@ test('deferForToday bloquea la alerta hasta el siguiente dia', async () => {
   })
 
   await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 1_000,
   })
 
   service.deferForToday({ now: 2_000 })
 
   const sameDay = service.getEligibility({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 3_000,
   })
 
   const nextDay = service.getEligibility({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 2_000 + 24 * 60 * 60 * 1000 + 1,
   })
 
@@ -270,8 +256,7 @@ test('tolera cache corrupta y vuelve a calcular estado', async () => {
   const service = new MidoriUpdateService({ storage, client })
 
   const result = await service.checkForUpdate({
-    browserInfo: { isMidori: true },
-    currentVersion: '2.0.0',
+    browserInfo: { isMidori: true, version: '2.0.0' },
     now: 100,
   })
 
@@ -289,8 +274,7 @@ test('no muestra alerta cuando latestVersion es igual o prerelease', () => {
   }))
 
   const equalVersion = service.getEligibility({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 1,
   })
 
@@ -299,8 +283,7 @@ test('no muestra alerta cuando latestVersion es igual o prerelease', () => {
   }))
 
   const prereleaseVersion = service.getEligibility({
-    browserInfo: { isMidori: true },
-    currentVersion: '1.0.0',
+    browserInfo: { isMidori: true, version: '1.0.0' },
     now: 1,
   })
 

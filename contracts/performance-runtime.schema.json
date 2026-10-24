@@ -1,0 +1,438 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://midori-browser.org/schemas/newtab-performance-v3.json",
+  "title": "Midori New Tab runtime measurement v3: capability-aware integration evidence",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "engine",
+    "runtimeTarget",
+    "deviceClass",
+    "scenario",
+    "cacheState",
+    "profilePolicy",
+    "locale",
+    "layout",
+    "diagnostic",
+    "baselineEligible",
+    "samples",
+    "summary",
+    "gate",
+    "gateResults"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 3
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "engine": {
+      "enum": [
+        "firefox",
+        "chromium"
+      ]
+    },
+    "runtimeTarget": {
+      "type": "string",
+      "minLength": 1
+    },
+    "deviceClass": {
+      "enum": [
+        "desktop",
+        "android"
+      ]
+    },
+    "scenario": {
+      "enum": [
+        "default",
+        "stress"
+      ]
+    },
+    "cacheState": {
+      "enum": [
+        "cold",
+        "warm"
+      ]
+    },
+    "profilePolicy": {
+      "enum": [
+        "fresh-per-sample",
+        "reused-warmed"
+      ]
+    },
+    "locale": {
+      "type": "string",
+      "minLength": 2
+    },
+    "layout": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diagnostic": {
+      "type": "boolean"
+    },
+    "baselineEligible": {
+      "type": "boolean"
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "index",
+          "errors"
+        ],
+        "properties": {
+          "navigationStartEpochMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "measurementStartedEpochMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "bootStartMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "shellVisibleMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "rawShellMountedMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "interactionReadyMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "searchReadyMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "inputResponseMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "aboveFoldStableMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "idleCompleteMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "firstContentfulPaintMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "domContentLoadedMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "loadEventMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "captureDurationMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "longTasksMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "longTaskBlockingMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "longTaskBlockingBeforeInteractionMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cls": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "nodeCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "longTasks": {
+                "type": "boolean"
+              },
+              "layoutShift": {
+                "type": "boolean"
+              },
+              "visualStability": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": true
+          },
+          "visualStability": {
+            "type": "object",
+            "properties": {
+              "supported": {
+                "type": "boolean"
+              },
+              "stable": {
+                "type": "boolean"
+              },
+              "method": {
+                "type": "string"
+              },
+              "lastChangeMs": {
+                "$ref": "#/$defs/nullableMilliseconds"
+              },
+              "startedAtMs": {
+                "$ref": "#/$defs/nullableMilliseconds"
+              },
+              "inspectionMs": {
+                "$ref": "#/$defs/nullableMilliseconds"
+              },
+              "overflow": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": true
+          },
+          "buffersTruncated": {
+            "type": "boolean"
+          },
+          "networkBeforeInteraction": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unexpected": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pendingOrCancelled": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "background": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "coverage": {
+                "enum": [
+                  "page-and-background",
+                  "page-only",
+                  "unavailable"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "startupGraphViolations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "networkWindow": {
+            "type": "object"
+          },
+          "functional": {
+            "type": "object"
+          },
+          "resourceCounts": {
+            "type": "object"
+          },
+          "startupResources": {
+            "type": "array"
+          },
+          "startupResourceCoverage": {
+            "enum": ["available", "unavailable"]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "count",
+          "missing",
+          "min",
+          "max",
+          "p50",
+          "p75",
+          "p95"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missing": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "min": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "max": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "p50": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "p75": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "p95": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "gate": {
+      "enum": [
+        "passed",
+        "failed",
+        "unsupported"
+      ]
+    },
+    "gateResults": {
+      "type": "object",
+      "required": [
+        "status",
+        "violations",
+        "unsupportedMetrics",
+        "checks",
+        "budgets",
+        "requiredSamples"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "unsupported"
+          ]
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "metric",
+              "reason"
+            ]
+          }
+        },
+        "unsupportedMetrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "metric",
+              "reason",
+              "required"
+            ]
+          }
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "budgets": {
+          "type": "object"
+        },
+        "requiredSamples": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifact": {
+      "type": "object"
+    },
+    "browser": {
+      "type": "object"
+    },
+    "environment": {
+      "type": "object"
+    },
+    "instrumentation": {
+      "type": "object"
+    },
+    "failure": {}
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "nullableMilliseconds": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "diagnostic": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "baselineEligible": {
+            "const": false
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "scanned_at": "2026-08-19",
+  "framework": "Vue 3 + Vite 7",
+  "font_stack": "system-ui with JetBrains Mono fallback",
+  "palette": "Midori light/dark tokens",
+  "motion": "motion-cut",
+  "spacing": "4px-derived semantic scale",
+  "scope": "component",
+  "preserved": ["font stack", "palette", "spacing scale"]
+}

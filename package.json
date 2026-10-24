@@ -22,7 +22,8 @@
     "test:contracts": "node --test contracts/tests/*.test.mjs",
     "test:update": "node --test tests/**/*.test.mjs",
     "check:bundle": "node scripts/check-performance-budget.mjs",
-    "measure:newtab": "node scripts/measure-newtab.mjs"
+    "measure:newtab": "node scripts/measure-newtab.mjs",
+    "test:integration": "node scripts/integration-newtab.mjs"
   },
   "dependencies": {
     "@iconify/vue": "^5.0.0",

@@ -3,6 +3,9 @@
     <div class="background-skeleton" v-if="showImageBackground && !imageReady"></div>
     <Transition name="bg-fade">
       <img
+        ref="wallpaperElement"
+        :key="backgroundCrossOrigin || 'default'"
+        :crossorigin="backgroundCrossOrigin"
         :src="backgroundImage"
         :srcset="backgroundSrcSet || undefined"
         sizes="100vw"
@@ -12,6 +15,7 @@
         decoding="async"
         fetchpriority="high"
         @load="imageReady = true"
+        @error="retryBackgroundWithoutCors"
       />
     </Transition>
     <Minimalist />
@@ -58,12 +62,13 @@
 </template>
 
 <script>
-  import { defineAsyncComponent, markRaw, nextTick } from 'vue';
+  import { defineAsyncComponent, markRaw, nextTick, provide, shallowRef } from 'vue';
   import useI18nStore from './stores/useI18nStore.js';
   import useTabStore from './stores/useTabStore.js';
   import Minimalist from './pages/Min.vue';
   import useThemeStore from './stores/useThemeStore.js';
   import { cancelRemoteTask, scheduleRemoteTask } from './bootstrap/remoteTaskCoordinator.js';
+  import { WALLPAPER_ELEMENT } from './composables/useLogoContrast.js';
 
   const MIDORI_DOWNLOAD_URL = 'https://astian.org/midori-browser/download';
   const UPDATE_CHECK_WINDOW_MS = 10 * 60 * 1000;
@@ -71,11 +76,18 @@
   const UPDATE_FOREGROUND_DEBOUNCE_MS = 15 * 1000;
 
   export default {
+    setup() {
+      const wallpaperElement = shallowRef(null);
+      provide(WALLPAPER_ELEMENT, wallpaperElement);
+      return { wallpaperElement };
+    },
+
     data() {
       return {
         loaded: true,
         backgroundImage: "",
         backgroundSrcSet: "",
+        backgroundCorsFallback: false,
         imageReady: false,
         tabStore: useTabStore(),
         i18n: useI18nStore(),
@@ -120,6 +132,10 @@
     },
 
     computed: {
+      backgroundCrossOrigin() {
+        return !this.backgroundCorsFallback && this.isUnsplashImage(this.backgroundImage) ? 'anonymous' : undefined;
+      },
+
       showImageBackground() {
         return ['Unsplash', 'MarketplaceWallpaper', 'LocalFolder'].includes(this.tabStore.background?.type);
       },
@@ -299,6 +315,7 @@
           return;
         }
         this.imageReady = immediate;
+        this.backgroundCorsFallback = false;
         this.backgroundImage = nextUrl;
         this.backgroundSrcSet = nextSrcSet;
       },
@@ -362,11 +379,20 @@
         return typeof url === 'string' && /\/api\/v1\/assets\/[^/]+\/download(?:$|\?)/.test(url);
       },
 
+      isUnsplashImage(url) {
+        try { return new URL(url).hostname === 'images.unsplash.com'; } catch { return false; }
+      },
+
+      retryBackgroundWithoutCors() {
+        if (this.backgroundCrossOrigin) this.backgroundCorsFallback = true;
+      },
+
       async preloadImage(url, signal) {
         if (!url) return;
 
         await new Promise((resolve) => {
           const img = new Image();
+          if (this.isUnsplashImage(url)) img.crossOrigin = 'anonymous';
           img.decoding = 'async';
           let settled = false;
           const finish = () => {
