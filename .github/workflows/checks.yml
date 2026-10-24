@@ -1,0 +1,143 @@
+name: New Tab checks
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  firefox:
+    name: Midori Gecko integration and budgets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Gecko runtime dependencies
+        run: npx playwright install-deps firefox
+      - name: Install pinned Midori Gecko
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/midori-runtime"
+          curl --fail --location --retry 3 --proto '=https' --tlsv1.2 \
+            'https://github.com/goastian/midori-desktop/releases/download/v11.9.1/midori-11.9.1.linux-x86_64.tar.xz' \
+            --output "$RUNNER_TEMP/midori-runtime.tar.xz"
+          echo "48939bff61586040bda6e0fce3b8938da21ed5053ff9fcc316f2b840fd0ab963  $RUNNER_TEMP/midori-runtime.tar.xz" | sha256sum --check --strict
+          tar -xJf "$RUNNER_TEMP/midori-runtime.tar.xz" -C "$RUNNER_TEMP/midori-runtime"
+          midori_executable=$(find "$RUNNER_TEMP/midori-runtime" -type f -name midori -executable -print -quit)
+          test -n "$midori_executable"
+          echo "MIDORI_FIREFOX_EXECUTABLE=$midori_executable" >> "$GITHUB_ENV"
+      - name: Build complete Firefox extension with bundle analysis
+        id: build
+        env:
+          ANALYZE_BUNDLE: '1'
+        run: |
+          mkdir -p artifacts
+          npm run build:firefox 2>&1 | tee artifacts/firefox-build.log
+      - name: Integration in Midori Gecko
+        run: npm run test:integration -- --engine firefox 2>&1 | tee artifacts/firefox-integration.log
+      - name: Evaluate Gecko cold runtime budget
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run measure:newtab -- --engine firefox --cold --smoke --reps 1 --gate 2>&1 | tee artifacts/firefox-runtime.log
+      - name: Evaluate Gecko warm runtime budget
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run measure:newtab -- --engine firefox --warm --smoke --reps 1 --gate 2>&1 | tee artifacts/firefox-warm-runtime.log
+      - name: Enforce Firefox bundle budget
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run check:bundle -- --strict 2>&1 | tee artifacts/firefox-bundle.log
+      - name: Retain Gecko package and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: midori-gecko-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/
+            dist/
+          if-no-files-found: warn
+          retention-days: 14
+
+  chromium:
+    name: Chromium compatibility integration and budgets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build Chrome extension with bundle analysis
+        id: build
+        env:
+          ANALYZE_BUNDLE: '1'
+        run: |
+          mkdir -p artifacts
+          npm run build:chrome 2>&1 | tee artifacts/chromium-build.log
+      - name: Integration in Chromium
+        run: npm run test:integration -- --engine chromium 2>&1 | tee artifacts/chromium-integration.log
+      - name: Evaluate Chromium cold runtime budget
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run measure:newtab -- --engine chromium --cold --smoke --reps 1 --gate 2>&1 | tee artifacts/chromium-runtime.log
+      - name: Evaluate Chromium warm runtime budget
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run measure:newtab -- --engine chromium --warm --smoke --reps 1 --gate 2>&1 | tee artifacts/chromium-warm-runtime.log
+      - name: Enforce Chromium bundle budget
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run check:bundle -- --strict 2>&1 | tee artifacts/chromium-bundle.log
+      - name: Retain Chromium package and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromium-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/
+            dist/
+          if-no-files-found: warn
+          retention-days: 14
+
+  contracts:
+    name: Existing tests and contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Existing regression tests
+        run: |
+          mkdir -p artifacts
+          npm run test:update 2>&1 | tee artifacts/existing-tests.log
+      - name: Asset contracts
+        if: ${{ !cancelled() }}
+        run: npm run test:contracts 2>&1 | tee artifacts/contracts.log
+      - name: Contract examples and background syntax
+        if: ${{ !cancelled() }}
+        run: |
+          npm run validate:contracts 2>&1 | tee artifacts/contract-examples.log
+          node --check public/background.js
+      - name: Retain test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
