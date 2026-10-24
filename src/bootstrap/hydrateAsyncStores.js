@@ -1,4 +1,3 @@
-import useSpacesStore from '../stores/useSpacesStore.js';
 import useThemeStore from '../stores/useThemeStore.js';
 import useWidgetsStore from '../stores/useWidgetsStore.js';
 import perfMarks from './perfMarks.js';
@@ -21,27 +20,23 @@ export function hydrateAsyncStores(pinia) {
   scheduleIdle(async () => {
     const themeStore = useThemeStore(pinia);
     const widgetsStore = useWidgetsStore(pinia);
-    const spacesStore = useSpacesStore(pinia);
 
     await Promise.all([
       themeStore.hydrateAsyncState(),
       widgetsStore.hydrateAsyncState(),
-      spacesStore.hydrateAsyncState(),
     ]);
 
     themeStore.$persist();
     widgetsStore.$persist();
-    spacesStore.$persist();
 
     themeStore.$subscribe(() => themeStore.persistAsyncState(), { detached: true });
     widgetsStore.$subscribe(() => widgetsStore.persistAsyncState(), { detached: true });
-    spacesStore.$subscribe(() => spacesStore.persistAsyncState(), { detached: true });
 
     perfMarks.mark('idle-complete');
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('midori:async-stores-hydrated', {
-        detail: { stores: ['theme', 'widgets', 'spaces'] },
+        detail: { stores: ['theme', 'widgets'] },
       }));
     }
   });

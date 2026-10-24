@@ -8,6 +8,12 @@ import { fileURLToPath } from 'node:url';
 import { ROOT, artifactIdentity, buildExtension, closeContext, openContextWithRetry, parseOptions, runMeasurement } from './measure-newtab.mjs';
 import { runTransportIntegration } from './integration-transport.mjs';
 import { runUpdateIntegration } from './integration-updates.mjs';
+import { readBundleGraph } from './critical-requests.mjs';
+import { runEarlySearchIntegration } from '../tests/integration/early-search.mjs';
+import { instrumentFaviconFixture, runFaviconIntegration } from '../tests/integration/favicon-cache.mjs';
+import { runSpacesIntegration } from '../tests/integration/spaces.mjs';
+import { runSponsoredIntegration } from '../tests/integration/sponsored-runtime.mjs';
+import { runSmartSuggestionsIntegration } from '../tests/integration/smart-suggestions.mjs';
 
 const HELP = 'Usage: npm run test:integration -- [--engine firefox|chromium] [--build] [--dist PATH] [--output-dir PATH]';
 
@@ -134,6 +140,111 @@ export async function runIntegration(options) {
       cpSync(options.extensionPath, directory, { recursive: true });
       return directory;
     };
+
+    await check('early-html-search-and-vue-handoff', async () => {
+      return runEarlySearchIntegration({ engine: options.engine, extensionPath: options.extensionPath,
+        outputDir: join(options.outputDir, 'early-search') });
+    });
+
+    await check('disabled-search-still-reaches-dashboard-readiness', async () => {
+      const directory = copyExtension('disabled-search');
+      const html = readFileSync(join(directory, 'index.html'), 'utf8');
+      writeFileSync(join(directory, 'index.html'), html.replace('<head>', '<head><script src="/integration-disable-search.js"></script>'));
+      writeFileSync(join(directory, 'integration-disable-search.js'),
+        `localStorage.setItem('widgetsStore', JSON.stringify({enabled: {search: false, privacy: true}}));\n`);
+      const result = await runMeasurement(measurementOptions(options, directory, 'disabled-search'));
+      assert.equal(result.functionalPassed, true, 'Disabling search must leave the rest of the dashboard usable');
+      const sample = result.report.samples[0];
+      assert.equal(sample.functional.searchExpected, false);
+      assert.equal(sample.functional.searchEnabled, false, 'Neither the HTML shell nor Vue may render the disabled search field');
+      assert.equal(sample.earlySearchReadyMs, null, 'A disabled search must not publish invented readiness');
+      assert.equal(sample.inputResponseMs, null, 'No keyboard probe may target a disabled field');
+      assert.ok(Number.isFinite(sample.interactionReadyMs), 'Visible bookmarks must still complete the readiness barrier');
+      assert.equal(result.report.gateResults.violations.some(item => ['earlySearchReadyMs', 'searchReadyMs', 'inputResponseMs', 'search'].includes(item.metric)), false);
+      return describeMeasurement(result);
+    });
+
+    await check('favicon-cache-first-frame-and-category-reuse', async () => {
+      const directory = copyExtension('favicon-cache');
+      instrumentFaviconFixture(directory);
+      const faviconSession = await openContextWithRetry({ ...baseOptions, extensionPath: directory });
+      try { return await runFaviconIntegration(faviconSession, { outputDir: join(options.outputDir, 'favicon-cache') }); }
+      finally { await closeContext(faviconSession); }
+    });
+
+    await check('spaces-optional-load-toggle-persistence-and-reset', async () => {
+      const spacesSession = await openContextWithRetry(baseOptions);
+      try { return await runSpacesIntegration(spacesSession, { outputDir: join(options.outputDir, 'spaces') }); }
+      finally { await closeContext(spacesSession); }
+    });
+
+    await check('smart-suggestions-optional-load-cross-tab-and-dismiss', async () => {
+      const suggestionsSession = await openContextWithRetry(baseOptions);
+      try { return await runSmartSuggestionsIntegration(suggestionsSession, { outputDir: join(options.outputDir, 'smart-suggestions') }); }
+      finally { await closeContext(suggestionsSession); }
+    });
+
+    await check('sponsored-dials-deferred-load-viewability-and-native-click', async () => {
+      return runSponsoredIntegration({ engine: options.engine, extensionPath: options.extensionPath,
+        outputDir: join(options.outputDir, 'sponsored-runtime') });
+    });
+
+    await check('negative-dynamic-optional-feature-and-deduplicated-css', async () => {
+      const directory = copyExtension('optional-feature');
+      const bundle = readBundleGraph(directory);
+      const optional = [...bundle.values()].find(chunk => chunk.modules?.some(module => /\/NotesWidget\.vue(?:\?|$)/.test(module)));
+      assert.ok(optional, 'The actual Notes widget must have a deferred production chunk');
+      assert.notEqual(optional.fileName, 'index.js', 'An optional Notes widget must not be compiled into the entry');
+      const css = optional.css?.[0];
+      assert.ok(css, 'The actual deferred widget must provide CSS metadata');
+      const html = readFileSync(join(directory, 'index.html'), 'utf8');
+      assert.match(html, /src="\/index\.js"/);
+      const stylesheet = `<link rel="stylesheet" href="/${css}">`;
+      writeFileSync(join(directory, 'index.html'), html.replace('</head>', `${stylesheet}${stylesheet}</head>`)
+        .replace('src="/index.js"', 'src="/integration-graph-entry.js"'));
+      writeFileSync(join(directory, 'integration-graph-entry.js'),
+        `await import(${JSON.stringify(`./${optional.fileName}`)});\nawait import('./index.js');\n`);
+      const result = await runMeasurement(measurementOptions(options, directory, 'negative-optional-feature'));
+      assert.equal(result.functionalPassed, true, 'Loading an unused optional component must not break the page');
+      assert.equal(result.report.gate, 'failed');
+      assert.ok(hasViolation(result, 'startupGraph'), 'An actual optional widget imported dynamically before interaction must be rejected');
+      const sample = result.report.samples[0];
+      assert.equal(sample.startupResourceCoverage, 'available', 'Both engines must observe local resource loads');
+      const graph = sample.resourceGraphs.interaction;
+      assert.ok(graph.files.some(file => file.path === `/${optional.fileName}` && file.observations > 0), 'The browser must observe the dynamic import itself');
+      assert.equal(graph.files.filter(file => file.path === `/${css}`).length, 1, 'Repeated CSS links must count once');
+      assert.equal(graph.cssBytes, graph.files.filter(file => file.type === 'css' && !file.laboratory).reduce((total, file) => total + file.bytes, 0));
+      assert.equal(new Set(graph.files.map(file => file.path)).size, graph.files.length, 'Static imports, dynamic imports and preloads must share one resource set');
+      return { ...describeMeasurement(result), importedProductionChunk: optional.fileName, duplicatedStylesheet: css,
+        graph: { jsBytes: graph.jsBytes, cssBytes: graph.cssBytes, uniqueResources: graph.uniqueResources } };
+    });
+
+    await check('negative-post-readiness-resource-budget-is-rejected', async () => {
+      const directory = copyExtension('late-resource-budget');
+      const html = readFileSync(join(directory, 'index.html'), 'utf8');
+      assert.match(html, /src="\/index\.js"/);
+      writeFileSync(join(directory, 'index.html'), html.replace('src="/index.js"', 'src="/integration-late-entry.js"'));
+      writeFileSync(join(directory, 'integration-late-entry.js'), `
+        await import('./index.js');
+        function loadAfterReadiness() { setTimeout(() => import('./integration-large-resource.js'), 50); }
+        if (Number.isFinite(window.__midoriPerf?.marks?.['interaction-ready'])) loadAfterReadiness();
+        else window.addEventListener('midori:perf-mark', function ready(event) {
+          if (event.detail.name !== 'interaction-ready') return;
+          window.removeEventListener('midori:perf-mark', ready);
+          loadAfterReadiness();
+        });
+      `);
+      writeFileSync(join(directory, 'integration-large-resource.js'), `export const payload = ${JSON.stringify('budget-payload '.repeat(24_000))};\n`);
+      const result = await runMeasurement(measurementOptions(options, directory, 'negative-late-resource-budget'));
+      assert.equal(result.functionalPassed, true, 'The page must remain usable while the extra real module loads');
+      const sample = result.report.samples[0];
+      assert.equal(sample.startupResourceCoverage, 'available');
+      assert.equal(sample.resourceGraphs.interaction.files.some(file => file.path === '/integration-large-resource.js'), false, 'The fixture must actually load after the full readiness barrier');
+      assert.ok(sample.resourceGraphs.capture.files.some(file => file.path === '/integration-large-resource.js' && file.observations > 0), 'The browser must observe the late module request');
+      assert.ok(hasViolation(result, 'captureJsBytes'), 'Moving resource cost past readiness must still fail the complete-capture budget');
+      assert.equal(result.report.gate, 'failed');
+      return describeMeasurement(result);
+    });
 
     await check('negative-slow-startup-is-rejected', async () => {
       const directory = copyExtension('slow-startup');

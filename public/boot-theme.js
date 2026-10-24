@@ -9,6 +9,12 @@
       if (parsed?.version === 1) snapshot = parsed;
     }
   } catch { /* Use the default theme when storage is unavailable. */ }
+  if (!snapshot) {
+    try {
+      const raw = localStorage.getItem('tabStore');
+      if (raw && raw.length <= 16384) snapshot = JSON.parse(raw);
+    } catch { /* Legacy preferences may not be available. */ }
+  }
 
   let theme = snapshot?.theme === 'dark' ? 'dark' : 'light';
   if (snapshot?.autoTheme) theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

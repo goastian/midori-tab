@@ -55,7 +55,7 @@ jobs:
         run: npm run measure:newtab -- --engine firefox --warm --smoke --reps 1 --gate 2>&1 | tee artifacts/firefox-warm-runtime.log
       - name: Enforce Firefox bundle budget
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: npm run check:bundle -- --strict 2>&1 | tee artifacts/firefox-bundle.log
+        run: npm run check:bundle -- --strict --runtime-report dist/perf/firefox-default-cold-smoke.json 2>&1 | tee artifacts/firefox-bundle.log
       - name: Retain Gecko package and evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -98,7 +98,7 @@ jobs:
         run: npm run measure:newtab -- --engine chromium --warm --smoke --reps 1 --gate 2>&1 | tee artifacts/chromium-warm-runtime.log
       - name: Enforce Chromium bundle budget
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: npm run check:bundle -- --strict 2>&1 | tee artifacts/chromium-bundle.log
+        run: npm run check:bundle -- --strict --runtime-report dist/perf/chromium-default-cold-smoke.json 2>&1 | tee artifacts/chromium-bundle.log
       - name: Retain Chromium package and evidence
         if: always()
         uses: actions/upload-artifact@v4

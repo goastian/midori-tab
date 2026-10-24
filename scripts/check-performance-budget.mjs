@@ -1,160 +1,100 @@
 #!/usr/bin/env node
-
-/**
- * PERF-003 — Presupuesto de build.
- *
- * Valida que el bundle de producción cumpla los presupuestos del plan:
- *  - JS raw enlazado por dist/index.html (entry + modulepreload)
- *  - CSS raw enlazado por dist/index.html
- *  - Ningún chunk no crítico vuelve a los preloads del entry.
- *
- * Uso:
- *   node scripts/check-performance-budget.mjs [--js=165] [--css=44] [--strict]
- *
- * Si no existe bundle-analysis.json o está más viejo que dist/index.html,
- * reconstruye con el analizador (ANALYZE_BUNDLE=1). Para umbrales numéricos
- * por defecto se usan los objetivos de la Fase 1 del plan (JS ≤ 165 KiB,
- * CSS ≤ 44 KiB). Con --strict, un análisis ausente o antiguo produce fallo
- * sin reconstruir ni cambiar el destino del paquete (requerido en CI).
- */
-
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BUILD_BUDGETS, RESOURCE_GRAPH_BASELINE, htmlResources, readBundleGraph, resourceGraph } from './critical-requests.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = resolve(__dirname, '..');
-const DIST_DIR = resolve(PROJECT_ROOT, 'dist');
-const ANALYSIS_FILE = resolve(DIST_DIR, 'bundle-analysis.json');
-const ENTRY_FILE = resolve(DIST_DIR, 'index.html');
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const HELP = 'Usage: npm run check:bundle -- [--strict] [--dist PATH] [--runtime-report PATH] [--js=165] [--css=44]';
 
-const DEFAULT_JS_BUDGET = 165;
-const DEFAULT_CSS_BUDGET = 44;
-
-function isCriticalJSPreload(path) {
-  return (
-    path === '/index.js'
-    || path === '/boot-theme.js'
-    || /^\/assets\/vendor-.*\.js$/.test(path)
-    || /^\/assets\/i18n-en-.*\.js$/.test(path)
-  );
-}
-
-function isCriticalCSSPreload(path) {
-  return path === '/boot-theme.css' || /^\/assets\/index-.*\.css$/.test(path);
-}
-
-function parseBool(flag, argv) {
-  return argv.includes(flag);
-}
-
-function parseArg(name, defaultValue) {
-  const match = process.argv.slice(2).find((arg) => arg.startsWith(`--${name}=`));
-  if (!match) return defaultValue;
-  const value = Number(match.slice(`--${name}=`.length));
-  return Number.isFinite(value) && value > 0 ? value : defaultValue;
-}
-
-function readAnalysis() {
-  return JSON.parse(readFileSync(ANALYSIS_FILE, 'utf8'));
-}
-
-function main() {
-  const argv = process.argv.slice(2);
-  const strict = parseBool('--strict', argv);
-  const jsBudget = parseArg('js', DEFAULT_JS_BUDGET);
-  const cssBudget = parseArg('css', DEFAULT_CSS_BUDGET);
-
-  if (!existsSync(ENTRY_FILE)) {
-    console.error('[check-performance-budget] dist/index.html no existe. Ejecuta primero un build.');
-    process.exit(1);
+function parseOptions(args) {
+  const options = { directory: join(ROOT, 'dist'), js: BUILD_BUDGETS.jsBytes / 1024,
+    css: BUILD_BUDGETS.cssBytes / 1024, strict: false };
+  for (let i = 0; i < args.length; i += 1) {
+    const argument = args[i];
+    if (argument === '--strict') { options.strict = true; continue; }
+    if (argument === '--help') { options.help = true; continue; }
+    const [key, inline] = argument.split('=', 2);
+    const value = inline ?? args[++i];
+    const property = { '--dist': 'directory', '--runtime-report': 'runtimeReport', '--js': 'js', '--css': 'css' }[key];
+    if (!property || !value || value.startsWith('--')) throw new Error(`Invalid option ${argument}`);
+    options[property] = value;
   }
-
-  const analysisMissing = !existsSync(ANALYSIS_FILE);
-  const analysisStale = analysisMissing
-    || statSync(ANALYSIS_FILE).mtimeMs < statSync(ENTRY_FILE).mtimeMs;
-
-  if (analysisMissing || analysisStale) {
-    if (strict) {
-      console.error('[check-performance-budget] Falta análisis vigente del artefacto. Ejecuta ANALYZE_BUNDLE=1 con el build de su destino; --strict no reconstruye ni cambia el paquete.');
-      process.exit(1);
-    }
-    const manifest = JSON.parse(readFileSync(resolve(DIST_DIR, 'manifest.json'), 'utf8'));
-    const target = manifest.browser_specific_settings?.gecko?.id ? 'firefox' : 'chrome';
-    const sourceManifest = resolve(PROJECT_ROOT, 'manifest/manifest.json');
-    const originalManifest = readFileSync(sourceManifest);
-    console.log('[check-performance-budget] Regenerando bundle-analysis (ANALYZE_BUNDLE=1)...');
-    try {
-      execFileSync('npm', ['run', `build:${target}`], {
-        cwd: PROJECT_ROOT,
-        stdio: 'inherit',
-        env: { ...process.env, ANALYZE_BUNDLE: '1' },
-      });
-    } catch (err) {
-      console.error('[check-performance-budget] El build de análisis falló.');
-      console.error(err.stderr?.toString?.() || String(err));
-      process.exitCode = 1;
-      return;
-    } finally {
-      writeFileSync(sourceManifest, originalManifest);
-    }
+  for (const name of ['js', 'css']) {
+    options[name] = Number(options[name]);
+    if (!Number.isFinite(options[name]) || options[name] <= 0) throw new Error(`Invalid ${name} budget`);
   }
+  options.directory = resolve(options.directory);
+  return options;
+}
 
-  const analysis = readAnalysis();
-  const html = readFileSync(ENTRY_FILE, 'utf8');
-  const entryLinks = [...html.matchAll(/(?:href|src)="(\/[^"]+)"/g)]
-    .map((m) => m[1])
-    .filter((p) => /\.(js|css)$/.test(p));
-
-  const byFile = new Map(analysis.files.map((f) => ['/' + f.fileName, f]));
-
-  let jsBytes = 0;
-  let cssBytes = 0;
-  const violations = [];
-
-  for (const link of entryLinks) {
-    const file = byFile.get(link);
-    const bytes = file ? file.bytes : statSync(resolve(DIST_DIR, link.replace(/^\//, ''))).size;
-
-    if (link.endsWith('.js')) jsBytes += bytes;
-    else if (link.endsWith('.css')) cssBytes += bytes;
-
-    if (link.endsWith('.js') && !isCriticalJSPreload(link)) {
-      violations.push(`Chunk no crítico en preload JS: ${link}`);
-    }
-    if (link.endsWith('.css') && !isCriticalCSSPreload(link)) {
-      violations.push(`Chunk no crítico en preload CSS: ${link}`);
-    }
+function ensureAnalysis(options) {
+  const entry = join(options.directory, 'index.html');
+  if (!existsSync(entry)) throw new Error('Missing index.html; build the extension first');
+  const graph = join(options.directory, 'bundle-analysis.rollup.json');
+  const analysis = join(options.directory, 'bundle-analysis.json');
+  const stale = !existsSync(graph) || !existsSync(analysis)
+    || statSync(graph).mtimeMs < statSync(entry).mtimeMs || statSync(analysis).mtimeMs < statSync(entry).mtimeMs;
+  if (!stale) return;
+  if (options.strict || options.directory !== join(ROOT, 'dist')) {
+    throw new Error('Missing or stale bundle analysis; build this target with ANALYZE_BUNDLE=1. Strict/custom-dist checks never rebuild.');
   }
+  const manifest = JSON.parse(readFileSync(join(options.directory, 'manifest.json'), 'utf8'));
+  const target = manifest.browser_specific_settings?.gecko?.id ? 'firefox' : 'chrome';
+  const sourceManifest = join(ROOT, 'manifest/manifest.json');
+  const original = readFileSync(sourceManifest);
+  try {
+    execFileSync('npm', ['run', `build:${target}`], { cwd: ROOT, stdio: 'inherit', env: { ...process.env, ANALYZE_BUNDLE: '1' } });
+  } finally { writeFileSync(sourceManifest, original); }
+}
 
-  const jsKiB = jsBytes / 1024;
-  const cssKiB = cssBytes / 1024;
-
-  console.log('--- Presupuesto de build -------------------------------------------------');
-  console.log(`JS inicial enlazado : ${jsKiB.toFixed(2)} KiB  (presupuesto ≤ ${jsBudget} KiB)`);
-  console.log(`CSS inicial enlazado: ${cssKiB.toFixed(2)} KiB  (presupuesto ≤ ${cssBudget} KiB)`);
-
+export async function checkPerformanceBudget(options) {
+  ensureAnalysis(options);
+  const bundleGraph = readBundleGraph(options.directory);
+  const html = readFileSync(join(options.directory, 'index.html'), 'utf8');
+  const graph = resourceGraph({ directory: options.directory, documentUrl: 'https://extension.invalid/index.html',
+    resources: htmlResources(html), bundleGraph, source: 'html-and-transitive-static-imports' });
   const failures = [];
-
-  if (jsKiB > jsBudget) {
-    failures.push(`JS inicial ${jsKiB.toFixed(2)} KiB supera el presupuesto de ${jsBudget} KiB`);
-  }
-  if (cssKiB > cssBudget) {
-    failures.push(`CSS inicial ${cssKiB.toFixed(2)} KiB supera el presupuesto de ${cssBudget} KiB`);
-  }
-  failures.push(...violations);
-
-  if (failures.length) {
-    console.error('\n--- Fallos ---------------------------------------------------------------');
-    for (const failure of failures) {
-      console.error(`✗ ${failure}`);
+  const check = (label, measured, limits, startup = true) => {
+    console.log(`[check-performance-budget] ${label}: JS ${(measured.jsBytes / 1024).toFixed(2)} KiB / ${(limits.jsBytes / 1024).toFixed(2)}; CSS ${(measured.cssBytes / 1024).toFixed(2)} KiB / ${(limits.cssBytes / 1024).toFixed(2)}; ${measured.uniqueResources} unique files`);
+    if (measured.jsBytes > limits.jsBytes) failures.push(`${label}: JavaScript exceeds ${limits.jsBytes} bytes`);
+    if (measured.cssBytes > limits.cssBytes) failures.push(`${label}: CSS exceeds ${limits.cssBytes} bytes`);
+    if (startup) failures.push(...measured.violations.map(path => `${label}: optional startup feature ${path}`));
+    failures.push(...measured.missingResources.map(path => `${label}: missing requested file ${path}`));
+  };
+  check('HTML and static dependency closure', graph, { jsBytes: options.js * 1024, cssBytes: options.css * 1024 });
+  if (options.runtimeReport) {
+    const report = JSON.parse(readFileSync(resolve(options.runtimeReport), 'utf8'));
+    const { artifactIdentity } = await import('./measure-newtab.mjs');
+    if (report.artifact?.sha256 !== artifactIdentity(options.directory).sha256) failures.push('Runtime report does not describe this exact package');
+    if (!report.samples?.length) failures.push('Runtime report contains no samples');
+    for (const sample of report.samples || []) {
+      const interaction = sample.resourceGraphs?.interaction;
+      const vue = sample.resourceGraphs?.vue;
+      const capture = sample.resourceGraphs?.capture;
+      if (sample.startupResourceCoverage !== 'available' || !interaction || !vue || !capture) {
+        failures.push(`Sample ${sample.index}: runtime resource observation is incomplete`);
+        continue;
+      }
+      check(`Sample ${sample.index}, requests through interaction (A1 regression ceiling)`, interaction, RESOURCE_GRAPH_BASELINE.interaction);
+      check(`Sample ${sample.index}, requests through Vue mount (A1 regression ceiling)`, vue, RESOURCE_GRAPH_BASELINE.interaction);
+      check(`Sample ${sample.index}, complete capture (A1 regression ceiling)`, capture, RESOURCE_GRAPH_BASELINE.capture, false);
     }
-    process.exit(1);
+  } else {
+    console.log('[check-performance-budget] Dynamic startup imports require the runtime gate or --runtime-report; this result covers the static graph only.');
   }
-
-  console.log('\n✔ Presupuesto cumplido.');
-  process.exit(0);
+  if (failures.length) throw new Error([...new Set(failures)].join('\n'));
+  console.log('[check-performance-budget] Resource budgets passed.');
+  return graph;
 }
 
-main();
+async function main() {
+  const options = parseOptions(process.argv.slice(2));
+  if (options.help) { console.log(HELP); return; }
+  await checkPerformanceBudget(options);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(error => { console.error(`[check-performance-budget] ${error.message}`); process.exitCode = 1; });
+}

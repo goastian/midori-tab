@@ -93,10 +93,46 @@ async function connect(port, process, log) {
   throw new Error(`Marionette did not start on loopback port ${port}: ${log()}`);
 }
 
-function installObservers({ addonId, origin }) {
+function observeLocalLoads({ origin, channel }) {
+  const contract = '@midori.org/newtab-resource-observer;1';
+  const classId = Components.ID('{4b796eb3-f091-48ad-947f-c4504a97e9d9}');
+  const registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
+  const policy = {
+    QueryInterface: ChromeUtils.generateQI(['nsIContentPolicy', 'nsIFactory']),
+    createInstance(iid) { return this.QueryInterface(iid); },
+    shouldLoad(uri, info) {
+      if (uri.spec.startsWith(origin)) {
+        const documentUrl = info.loadingDocument?.documentURI || info.loadingPrincipal?.URI?.spec || '';
+        Services.cpmm.sendAsyncMessage(channel, { type: 'load', record: {
+          url: uri.spec.split(/[?#]/)[0], documentUrl: documentUrl.split(/[?#]/)[0],
+          startEpochMs: Date.now(), contentType: info.externalContentPolicyType,
+          scope: documentUrl.includes('_generated_background_page.html') ? 'background' : 'page',
+        } });
+      }
+      return Ci.nsIContentPolicy.ACCEPT;
+    },
+    shouldProcess() { return Ci.nsIContentPolicy.ACCEPT; },
+  };
+  try {
+    registrar.registerFactory(classId, 'Midori integration resource observer', contract, policy);
+    Services.catMan.addCategoryEntry('content-policy', contract, contract, false, true);
+    Services.cpmm.addMessageListener(`${channel}:flush`, message => {
+      Services.cpmm.sendAsyncMessage(channel, { type: 'flushed', token: message.data.token });
+    });
+    Services.cpmm.addMessageListener(`${channel}:dispose`, () => {
+      Services.catMan.deleteCategoryEntry('content-policy', contract, false);
+      registrar.unregisterFactory(classId, policy);
+    });
+    Services.cpmm.sendAsyncMessage(channel, { type: 'ready' });
+  } catch (error) {
+    Services.cpmm.sendAsyncMessage(channel, { type: 'error', error: String(error) });
+  }
+}
+
+function installObservers({ addonId, origin, resourceObserverSource }) {
   const errors = [];
   const requests = new Map();
-  const state = { active: false, addonId, origin, errors, requests, sequence: 0, errorOffset: 0 };
+  const state = { active: false, addonId, origin, errors, requests, resources: [], sequence: 0, errorOffset: 0 };
   function redactUrl(value) {
     const url = new URL(value);
     url.search = '';
@@ -152,14 +188,47 @@ function installObservers({ addonId, origin }) {
   Services.obs.addObserver(observer, 'http-on-modify-request');
   Services.obs.addObserver(observer, 'http-on-stop-request');
   Services.console.registerListener(listener);
+  const channel = 'Midori:Integration:ResourceLoad';
+  const processListener = message => {
+    if (message.data.type === 'error') state.resourceObserverError = message.data.error;
+    if (message.data.type === 'load' && state.active) {
+      if (state.resources.length >= 10_000) state.resourceObserverError = 'Local resource observation buffer overflow';
+      else state.resources.push(message.data.record);
+    }
+  };
+  Services.ppmm.addMessageListener(channel, processListener);
+  const processScript = `data:application/javascript,${encodeURIComponent(`(${resourceObserverSource})(${JSON.stringify({ origin, channel })});`)}`;
+  Services.ppmm.loadProcessScript(processScript, true);
+  state.flushResources = () => new Promise((done, reject) => {
+    const token = Services.uuid.generateUUID().toString();
+    const expected = new Set(Array.from({ length: Services.ppmm.childCount }, (_, index) => Services.ppmm.getChildAt(index)));
+    const timeout = setTimeout(() => {
+      Services.ppmm.removeMessageListener(channel, receive);
+      reject(new Error('Local resource observers did not acknowledge all browser processes'));
+    }, 5000);
+    function receive(message) {
+      if (message.data.type !== 'flushed' || message.data.token !== token) return;
+      expected.delete(message.target);
+      if (expected.size) return;
+      clearTimeout(timeout);
+      Services.ppmm.removeMessageListener(channel, receive);
+      if (state.resourceObserverError) reject(new Error(state.resourceObserverError));
+      else done();
+    }
+    Services.ppmm.addMessageListener(channel, receive);
+    Services.ppmm.broadcastAsyncMessage(`${channel}:flush`, { token });
+  });
   state.dispose = () => {
     Services.obs.removeObserver(observer, 'http-on-modify-request');
     Services.obs.removeObserver(observer, 'http-on-stop-request');
     Services.console.unregisterListener(listener);
+    Services.ppmm.broadcastAsyncMessage(`${channel}:dispose`);
+    Services.ppmm.removeDelayedProcessScript(processScript);
+    Services.ppmm.removeMessageListener(channel, processListener);
   };
   window.__midoriHarness = state;
   return { source: 'gecko-http-observer', scopes: ['page', 'background', 'extension'],
-    protocols: ['http:', 'https:'], localExtensionResources: 'not-observed',
+    protocols: ['http:', 'https:'], localExtensionResources: 'native-content-policy-loads',
     filtering: 'extension loading or triggering principal', cancelledRequests: true, responseBytes: 'when available' };
 }
 
@@ -220,6 +289,15 @@ export async function openGeckoSession({ extensionPath, executablePath = process
     });
     return response.value;
   }
+  async function chromeEvaluateAsync(fn) {
+    await commandContext('chrome');
+    const response = await client.send('WebDriver:ExecuteAsyncScript', {
+      script: `const done = arguments[arguments.length - 1]; Promise.resolve().then(${fn.toString()}).then(value => done({ value }), error => done({ error: String(error) }));`,
+      args: [], sandbox: 'midori-harness', newSandbox: false,
+    });
+    if (response.value.error) throw new Error(response.value.error);
+    return response.value.value;
+  }
   async function close() {
     if (closed) return;
     closed = true;
@@ -262,7 +340,7 @@ export async function openGeckoSession({ extensionPath, executablePath = process
       throw new Error(`Failed to install complete Firefox extension: ${installed.value.error || JSON.stringify(installed.value)}`);
     }
     const origin = `moz-extension://${installed.value.hostname}/`;
-    const coverage = await serial(() => chromeEvaluate(installObservers, { addonId, origin }));
+    const coverage = await serial(() => chromeEvaluate(installObservers, { addonId, origin, resourceObserverSource: observeLocalLoads.toString() }));
     async function drainErrors(page) {
       const found = await chromeEvaluate(() => {
         const state = window.__midoriHarness;
@@ -365,20 +443,24 @@ export async function openGeckoSession({ extensionPath, executablePath = process
     };
     const network = {
       coverage,
-      start: () => serial(() => chromeEvaluate(() => {
+      start: () => serial(() => chromeEvaluateAsync(async () => {
         const state = window.__midoriHarness;
+        await state.flushResources();
         state.requests.clear();
+        state.resources = [];
         state.sequence = 0;
         state.observerError = null;
         state.active = true;
         return { startEpochMs: Date.now() };
       })),
-      stop: () => serial(() => chromeEvaluate(() => {
+      stop: () => serial(() => chromeEvaluateAsync(async () => {
         const state = window.__midoriHarness;
+        await state.flushResources();
         state.active = false;
         if (state.observerError) throw new Error(`HTTP observer failed: ${state.observerError}`);
         return [...state.requests.values()];
       })),
+      resources: () => serial(() => chromeEvaluate(() => window.__midoriHarness.resources)),
     };
     return { context, url: `${origin}index.html`, profile, network,
       metadata: { transport: 'marionette', executablePath: resolve(executablePath), application,

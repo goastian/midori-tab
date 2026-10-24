@@ -5,6 +5,7 @@
         ref="input"
         v-model="query"
         :placeholder="placeholder"
+        :aria-label="searchLabel"
         class="search-input"
         role="combobox"
         aria-autocomplete="list"
@@ -115,6 +116,7 @@ import useI18nStore from '../stores/useI18nStore.js';
 import { fetchSuggestions } from '../services/DuckDuckGoSuggestService.js';
 import { buildMidoriSearchUrl } from '../utils/searchUrl.js';
 import perfMarks from '../bootstrap/perfMarks.js';
+import { handoffEarlySearch } from '../bootstrap/earlySearch.js';
 import DashboardIcon from './icons/DashboardIcon.vue';
 
 const ASTIANGO_BANGS_DIRECTORY_URL = 'https://astiango.com/bangs';
@@ -150,6 +152,7 @@ export default {
   components: {
     DashboardIcon,
   },
+  emits: ['ready'],
 
   props: {
     /** How to open search results: 'Self Tab' | 'New Tab' */
@@ -522,8 +525,10 @@ export default {
   mounted() {
     document.addEventListener('mousedown', this.onClickOutside);
     if (this.$refs.input) {
-      perfMarks.mark('search-ready');
-      perfMarks.mark('interaction-ready');
+      handoffEarlySearch(this, () => {
+        perfMarks.mark('search-ready');
+        this.$emit('ready');
+      });
     }
   },
 
@@ -536,74 +541,6 @@ export default {
 </script>
 
 <style scoped>
-.search-box {
-  width: 100%;
-  background: var(--surface-island, #0F1520);
-  border: 1px solid var(--color-border-strong, rgba(126,196,168,0.22));
-  border-radius: var(--nova-panel-radius, 14px);
-  padding: var(--nova-segment-padding, 4px);
-  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
-  transition: border-color var(--transition-fast, 0.1s ease), box-shadow var(--transition-fast, 0.1s ease);
-  position: relative;
-}
-
-.search-box:focus-within {
-  border-color: var(--color-primary, #04A469);
-  box-shadow: 0 0 0 3px var(--color-accent-border, rgba(4,164,105,0.2));
-}
-
-.search-inner {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  min-height: var(--nova-search-height, 48px);
-  background: var(--surface-control, #060A10);
-  border-radius: var(--nova-island-radius, 12px);
-  padding: 0.25rem 0.35rem 0.25rem 0.75rem;
-  position: relative;
-}
-
-.search-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--color-text, #C4F0E0);
-  font-size: 0.95rem;
-  padding: 0.5rem;
-  font-family: inherit;
-  min-width: 0;
-}
-
-.search-input::placeholder {
-  color: var(--color-text-muted, #5A9A82);
-}
-
-.search-input:focus,
-.search-input:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-
-.search-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  background: var(--color-primary, #04A469);
-  border: none;
-  border-radius: var(--nova-control-radius, 8px);
-  color: white;
-  cursor: pointer;
-  transition: background var(--transition-fast, 0.1s ease);
-}
-
-.search-btn:hover {
-  background: var(--color-primary-hover, #4de0b2);
-}
-
 .suggestions-dropdown {
   position: absolute;
   top: calc(100% + 4px);

@@ -66,7 +66,8 @@ export class FaviconService {
       if (!response) return null;
       const blob = await response.blob();
       if (!blob.size || blob.size > MAX_ICON_BYTES || !blob.type.startsWith('image/')) return null;
-      return { blob, stale: this.now() - Number(response.headers.get('x-midori-fetched-at') || 0) > MAX_AGE_MS };
+      const fetchedAt = Number(response.headers.get('x-midori-fetched-at') || 0);
+      return { blob, fetchedAt, stale: this.now() - fetchedAt > MAX_AGE_MS };
     } catch {
       return null;
     }

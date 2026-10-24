@@ -1,562 +1,137 @@
 <template>
   <div class="viewport" :class="{ 'bg-cl' : tabStore.effectiveTheme !== 'light' }">
-    <div class="background-skeleton" v-if="showImageBackground && !imageReady"></div>
-    <Transition name="bg-fade">
-      <img
-        ref="wallpaperElement"
-        :key="backgroundCrossOrigin || 'default'"
-        :crossorigin="backgroundCrossOrigin"
-        :src="backgroundImage"
-        :srcset="backgroundSrcSet || undefined"
-        sizes="100vw"
-        class="background"
-        v-if="showImageBackground && backgroundImage"
-        v-show="imageReady"
-        decoding="async"
-        fetchpriority="high"
-        @load="imageReady = true"
-        @error="retryBackgroundWithoutCors"
-      />
-    </Transition>
     <Minimalist />
     <aside v-if="storageError" class="storage-error" role="alert">
       <span>{{ i18n.locale === 'es' ? 'No se pudieron guardar los cambios. Libera espacio y vuelve a intentarlo.' : 'Changes could not be saved. Free storage space and try again.' }}</span>
       <button type="button" :aria-label="i18n.locale === 'es' ? 'Cerrar aviso' : 'Dismiss notice'" @click="storageError = false">×</button>
     </aside>
-    <div class="credits" v-if="showCredits">
-      <span class="credits__label">Photo</span> by
-      <a :href="imageAuthorLink" target="_blank" rel="noopener noreferrer">{{ imageAuthor }}</a>
-      on <a :href="imageLink" target="_blank" rel="noopener noreferrer">{{ imageLabel }}</a>
-    </div>
+    <WallpaperLayer v-if="featuresReady && showImageBackground" />
     <SettingsModal v-if="tabStore.state" />
-    <SmartSuggestions v-if="renderSmartSuggestions" />
+    <SmartSuggestions v-if="renderSmartSuggestions" ref="smartSuggestions" />
     <OmniLauncher
       v-if="renderOmniLauncher"
       :enable-global-triggers="false"
     />
 
-    <Teleport to="body">
-      <Transition name="update-toast">
-        <aside
-            v-if="updateNotice.visible"
-          class="update-toast"
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          <div class="update-toast__badge">Midori</div>
-          <h3 class="update-toast__title">{{ updateTitle }}</h3>
-          <p class="update-toast__message">{{ updateMessage }}</p>
-          <div class="update-toast__actions">
-            <button type="button" class="update-toast__button update-toast__button--primary" @click="handleDownloadUpdate">
-              {{ i18n.$t('updateNotice.download') }}
-            </button>
-            <button type="button" class="update-toast__button update-toast__button--secondary" @click="deferUpdateForToday">
-              {{ i18n.$t('updateNotice.defer') }}
-            </button>
-          </div>
-        </aside>
-      </Transition>
-    </Teleport>
+    <MidoriUpdateNotice v-if="featuresReady" />
   </div>
 </template>
 
 <script>
-  import { defineAsyncComponent, markRaw, nextTick, provide, shallowRef } from 'vue';
-  import useI18nStore from './stores/useI18nStore.js';
-  import useTabStore from './stores/useTabStore.js';
-  import Minimalist from './pages/Min.vue';
-  import useThemeStore from './stores/useThemeStore.js';
-  import { cancelRemoteTask, scheduleRemoteTask } from './bootstrap/remoteTaskCoordinator.js';
-  import { WALLPAPER_ELEMENT } from './composables/useLogoContrast.js';
+import { defineAsyncComponent, nextTick, provide, shallowRef } from 'vue';
+import useI18nStore from './stores/useI18nStore.js';
+import useTabStore from './stores/useTabStore.js';
+import Minimalist from './pages/Min.vue';
+import { WALLPAPER_ELEMENT } from './composables/useLogoContrast.js';
 
-  const MIDORI_DOWNLOAD_URL = 'https://astian.org/midori-browser/download';
-  const UPDATE_CHECK_WINDOW_MS = 10 * 60 * 1000;
-  const UPDATE_ERROR_RETRY_INTERVAL_MS = 2 * 60 * 1000;
-  const UPDATE_FOREGROUND_DEBOUNCE_MS = 15 * 1000;
+function hasSavedSuggestions() {
+  try {
+    const raw = localStorage.getItem('suggestionsStore');
+    if (!raw) return false;
+    if (raw.length > 65536) return true;
+    const state = JSON.parse(raw);
+    if (!state || !Array.isArray(state.habits)) return true;
+    return state.enabled !== false && state.habits.length > 0;
+  } catch { return true; }
+}
 
-  export default {
-    setup() {
-      const wallpaperElement = shallowRef(null);
-      provide(WALLPAPER_ELEMENT, wallpaperElement);
-      return { wallpaperElement };
-    },
-
-    data() {
-      return {
-        loaded: true,
-        backgroundImage: "",
-        backgroundSrcSet: "",
-        backgroundCorsFallback: false,
-        imageReady: false,
-        tabStore: useTabStore(),
-        i18n: useI18nStore(),
-        refreshWallpaperListener: null,
-        backgroundChangedListener: null,
-        renderSmartSuggestions: false,
-        renderOmniLauncher: false,
-        omniKeydownListener: null,
-        omniRuntimeMessageListener: null,
-        imageAuthor: "",
-        imageAuthorLink: "",
-        imageLink: "",
-        marketplaceBlobUrl: '',
-        localBlobUrl: '',
-        autoTheme: null,
-        updateForegroundListener: null,
-        lastForegroundUpdateCheckAt: 0,
-        updateBrowserInfoPromise: null,
-        updateCheckInFlight: false,
-        updateService: null,
-        updateServicePromise: null,
-        updateNotice: {
-          visible: false,
-          latestVersion: '',
-        },
-        storageError: Boolean(window.__midoriStorageError),
-        storageErrorListener: null,
-        backgroundRequestId: 0,
-        backgroundController: null,
-        wallpaperVisibilityListener: null,
-        deferredMountHandle: null,
-        deferredMountKind: '',
-        disposed: false,
-      }
-    },
-
-    components: {
-      Minimalist,
-      SettingsModal: defineAsyncComponent(() => import('./components/SettingsModal.vue')),
-      SmartSuggestions: defineAsyncComponent(() => import('./components/SmartSuggestions.vue')),
-      OmniLauncher: defineAsyncComponent(() => import('./omni/components/OmniLauncher.vue')),
-    },
-
-    computed: {
-      backgroundCrossOrigin() {
-        return !this.backgroundCorsFallback && this.isUnsplashImage(this.backgroundImage) ? 'anonymous' : undefined;
-      },
-
-      showImageBackground() {
+export default {
+  setup() {
+    const wallpaperElement = shallowRef(null);
+    provide(WALLPAPER_ELEMENT, wallpaperElement);
+    return { wallpaperElement };
+  },
+  components: {
+    Minimalist,
+    SettingsModal: defineAsyncComponent(() => import('./components/SettingsModal.vue')),
+    SmartSuggestions: defineAsyncComponent(() => import('./components/SmartSuggestions.vue')),
+    OmniLauncher: defineAsyncComponent(() => import('./omni/components/OmniLauncher.vue')),
+    WallpaperLayer: defineAsyncComponent(() => import('./components/WallpaperLayer.vue')),
+    MidoriUpdateNotice: defineAsyncComponent(() => import('./components/MidoriUpdateNotice.vue')),
+  },
+  data() {
+    return {
+      tabStore: useTabStore(), i18n: useI18nStore(),
+      featuresReady: false, renderSmartSuggestions: false, renderOmniLauncher: false,
+      omniKeydownListener: null, omniRuntimeMessageListener: null, autoTheme: null,
+      storageError: Boolean(window.__midoriStorageError), storageErrorListener: null,
+      suggestionsStorageListener: null,
+      deferredMountHandle: null, deferredMountKind: '', interactionListener: null, disposed: false,
+    };
+  },
+  computed: { showImageBackground() {
         return ['Unsplash', 'MarketplaceWallpaper', 'LocalFolder'].includes(this.tabStore.background?.type);
-      },
-
-      showCredits() {
-        return Boolean(this.showImageBackground && this.imageAuthor && this.imageAuthorLink && this.imageLink);
-      },
-
-      imageLabel() {
-        return this.tabStore.background?.type === 'MarketplaceWallpaper' ? 'Marketplace' : 'Unsplash';
-      },
-
-      updateTitle() {
-        return this.i18n.$t('updateNotice.title');
-      },
-
-      updateMessage() {
-        const template = this.i18n.$t('updateNotice.message');
-        return String(template).replace('{version}', this.updateNotice.latestVersion || '');
-      },
-    },
-
-    async mounted() {
-      this.storageErrorListener = () => { this.storageError = true; };
-      window.addEventListener('midori:storage-error', this.storageErrorListener);
-      this.loadSettings();
-      this.scheduleInitialBackground();
-      this.setupWallpaperRefresh();
-      this.setupDeferredMounts();
-      this.setupOmniLazyTriggers();
-      this.setupUpdateForegroundChecks();
-
-      // Apply active theme colors
-      const themeStore = useThemeStore();
-      themeStore.applyTheme(this.tabStore.theme);
-
-      // Auto Theme
-      if (this.tabStore.autoTheme) {
-        const { useAutoTheme } = await import('./composables/useAutoTheme.js');
-        if (this.disposed) return;
-        this.autoTheme = useAutoTheme();
-        this.autoTheme.start();
+      } },
+  async mounted() {
+    this.storageErrorListener = () => { this.storageError = true; };
+    window.addEventListener('midori:storage-error', this.storageErrorListener);
+    this.suggestionsStorageListener = event => {
+      if (event.storageArea === localStorage && (event.key === 'suggestionsStore' || event.key === null)) {
+        void this.refreshSmartSuggestions();
+      }
+    };
+    window.addEventListener('storage', this.suggestionsStorageListener);
+    this.tabStore.loadSettings();
+    this.setupDeferredMounts();
+    this.setupOmniLazyTriggers();
+    if (this.tabStore.autoTheme) {
+      const { useAutoTheme } = await import('./composables/useAutoTheme.js');
+      if (this.disposed) return;
+      this.autoTheme = useAutoTheme();
+      this.autoTheme.start();
+    }
+  },
+  beforeUnmount() {
+    this.disposed = true;
+    if (this.deferredMountHandle !== null) {
+      if (this.deferredMountKind === 'idle') window.cancelIdleCallback?.(this.deferredMountHandle);
+      else clearTimeout(this.deferredMountHandle);
+    }
+    if (this.interactionListener) window.removeEventListener('midori:perf-mark', this.interactionListener);
+    if (this.storageErrorListener) window.removeEventListener('midori:storage-error', this.storageErrorListener);
+    if (this.suggestionsStorageListener) window.removeEventListener('storage', this.suggestionsStorageListener);
+    this.autoTheme?.stop();
+    if (this.omniKeydownListener) window.removeEventListener('keydown', this.omniKeydownListener);
+    if (this.omniRuntimeMessageListener) {
+      try { chrome.runtime.onMessage.removeListener(this.omniRuntimeMessageListener); } catch { /* Not an extension context. */ }
+    }
+  },
+  methods: {
+    async refreshSmartSuggestions() {
+      if (!this.featuresReady || this.disposed) return;
+      const store = this.$refs.smartSuggestions?.suggestionsStore;
+      store?.$hydrate?.();
+      this.renderSmartSuggestions = hasSavedSuggestions();
+      if (!store) {
+        await nextTick();
+        this.$refs.smartSuggestions?.suggestionsStore?.$hydrate?.();
       }
     },
-
-    beforeUnmount() {
-      this.disposed = true;
-      if (this.deferredMountHandle !== null) {
-        if (this.deferredMountKind === 'idle') window.cancelIdleCallback?.(this.deferredMountHandle);
-        else clearTimeout(this.deferredMountHandle);
-        this.deferredMountHandle = null;
-      }
-      if (this.storageErrorListener) window.removeEventListener('midori:storage-error', this.storageErrorListener);
-      cancelRemoteTask('wallpaper');
-      cancelRemoteTask('update');
-      cancelRemoteTask('unsplash-metadata');
-      this.backgroundRequestId += 1;
-      this.backgroundController?.abort();
-      if (this.wallpaperVisibilityListener) document.removeEventListener('visibilitychange', this.wallpaperVisibilityListener);
-      // Limpiar event listeners
-      if (this.refreshWallpaperListener) {
-        window.removeEventListener('midori:refresh-wallpaper', this.refreshWallpaperListener);
-      }
-      if (this.backgroundChangedListener) {
-        window.removeEventListener('midori:background-changed', this.backgroundChangedListener);
-      }
-      // Detener auto theme
-      if (this.autoTheme) {
-        this.autoTheme.stop();
-      }
-      if (this.updateForegroundListener) {
-        window.removeEventListener('focus', this.updateForegroundListener);
-        document.removeEventListener('visibilitychange', this.updateForegroundListener);
-        this.updateForegroundListener = null;
-      }
-      if (this.omniKeydownListener) {
-        window.removeEventListener('keydown', this.omniKeydownListener);
-        this.omniKeydownListener = null;
-      }
-      if (this.omniRuntimeMessageListener) {
-        try {
-          chrome.runtime.onMessage.removeListener(this.omniRuntimeMessageListener);
-        } catch (_) { /* noop */ }
-        this.omniRuntimeMessageListener = null;
-      }
-      this.releaseMarketplaceBlobUrl();
-      this.releaseLocalBlobUrl();
-    },
-
-    methods: {
-      scheduleInitialBackground() {
-        const kind = this.tabStore.background?.type;
-        if (kind === 'Unsplash' || kind === 'MarketplaceWallpaper') {
-          void scheduleRemoteTask('wallpaper', signal => this.load({ signal }), { priority: 0 });
-          this.wallpaperVisibilityListener = () => {
-            if (document.visibilityState === 'visible' && !this.backgroundImage) {
-              void scheduleRemoteTask('wallpaper', signal => this.load({ signal }), { priority: 0 });
-            }
-          };
-          document.addEventListener('visibilitychange', this.wallpaperVisibilityListener);
-        } else void this.load();
-      },
-      loadSettings() {
-        this.tabStore.loadSettings();
-      },
-
-      async load({ signal } = {}) {
-        this.backgroundController?.abort();
-        const controller = new AbortController();
-        this.backgroundController = controller;
-        const abort = () => controller.abort();
-        signal?.addEventListener('abort', abort, { once: true });
-        if (signal?.aborted) controller.abort();
-        try {
-          return await this.loadBackground({ signal: controller.signal });
-        } finally {
-          signal?.removeEventListener('abort', abort);
-          if (this.backgroundController === controller) this.backgroundController = null;
-        }
-      },
-
-      async loadBackground({ signal } = {}) {
-        const requestId = ++this.backgroundRequestId;
-        if (this.tabStore.background?.type === 'MarketplaceWallpaper') {
-          const background = this.tabStore.background;
-          this.releaseLocalBlobUrl();
-          await this.loadMarketplaceWallpaper(background, signal, requestId);
-          if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
-          this.imageAuthor = background.authorName || '';
-          this.imageAuthorLink = background.authorUrl || '';
-          this.imageLink = background.sourceUrl || background.imageUrl || '';
-          return;
-        }
-
-        this.releaseMarketplaceBlobUrl();
-
-        if (this.tabStore.background?.type === 'LocalFolder') {
-          await this.loadLocalWallpaper(requestId, signal);
-          return;
-        }
-
-        this.releaseLocalBlobUrl();
-
-        if (this.tabStore.background?.type !== 'Unsplash') {
-          this.applyBackgroundImage('', '');
-          this.imageAuthor = '';
-          this.imageAuthorLink = '';
-          this.imageLink = '';
-          return;
-        }
-
-        try {
-          const { default: UnsService } = await import('./services/UnsService.js');
-          if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
-          const uns = new UnsService();
-          await uns.setImagen({ signal });
-          if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
-          await this.preloadImage(uns.getUrl(), signal);
-          if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
-          this.applyBackgroundImage(uns.getUrl(), uns.getSrcSet?.() || '');
-          this.imageAuthor = uns.getAuthor();
-          this.imageAuthorLink = uns.getAuthorLink();
-          this.imageLink = uns.getImageLink();
-        } catch (e) {
-          if (e?.name !== 'AbortError') console.error("Error al cargar la imagen de fondo:", e);
-        }
-      },
-
-      applyBackgroundImage(url, srcSet = '', options = {}) {
-        const nextUrl = url || '';
-        const nextSrcSet = srcSet || '';
-        const immediate = Boolean(options.immediate);
-        if (this.backgroundImage === nextUrl && this.backgroundSrcSet === nextSrcSet) {
-          if (immediate && !this.imageReady) {
-            this.imageReady = true;
-          }
-          return;
-        }
-        this.imageReady = immediate;
-        this.backgroundCorsFallback = false;
-        this.backgroundImage = nextUrl;
-        this.backgroundSrcSet = nextSrcSet;
-      },
-
-      releaseMarketplaceBlobUrl() {
-        if (this.marketplaceBlobUrl && this.marketplaceBlobUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(this.marketplaceBlobUrl);
-        }
-        this.marketplaceBlobUrl = '';
-      },
-
-      releaseLocalBlobUrl() {
-        if (this.localBlobUrl && this.localBlobUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(this.localBlobUrl);
-        }
-        this.localBlobUrl = '';
-      },
-
-      async loadLocalWallpaper(requestId, signal) {
-        this.imageAuthor = '';
-        this.imageAuthorLink = '';
-        this.imageLink = '';
-
-        const previousBlobUrl = this.localBlobUrl;
-        try {
-          const { default: LocalWallpaperService } = await import('./services/LocalWallpaperService.js');
-          const service = new LocalWallpaperService();
-          await service.setImagen();
-          const url = service.getUrl();
-          if (signal?.aborted || requestId !== this.backgroundRequestId) {
-            if (url.startsWith('blob:')) URL.revokeObjectURL(url);
-            return;
-          }
-          if (url) {
-            this.localBlobUrl = url;
-            await this.preloadImage(url, signal);
-            if (signal?.aborted || requestId !== this.backgroundRequestId) {
-              URL.revokeObjectURL(url);
-              if (this.localBlobUrl === url) this.localBlobUrl = previousBlobUrl;
-              return;
-            }
-            this.applyBackgroundImage(url, '');
-          } else {
-            this.localBlobUrl = '';
-            this.applyBackgroundImage('', '');
-          }
-        } catch (error) {
-          console.warn('Local wallpaper load failed', error);
-          if (!signal?.aborted && requestId === this.backgroundRequestId) {
-            this.localBlobUrl = '';
-            this.applyBackgroundImage('', '');
-          }
-        } finally {
-          if (previousBlobUrl && previousBlobUrl !== this.localBlobUrl && previousBlobUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(previousBlobUrl);
-          }
-        }
-      },
-
-      isMarketplaceDownloadUrl(url) {
-        return typeof url === 'string' && /\/api\/v1\/assets\/[^/]+\/download(?:$|\?)/.test(url);
-      },
-
-      isUnsplashImage(url) {
-        try { return new URL(url).hostname === 'images.unsplash.com'; } catch { return false; }
-      },
-
-      retryBackgroundWithoutCors() {
-        if (this.backgroundCrossOrigin) this.backgroundCorsFallback = true;
-      },
-
-      async preloadImage(url, signal) {
-        if (!url) return;
-
-        await new Promise((resolve) => {
-          const img = new Image();
-          if (this.isUnsplashImage(url)) img.crossOrigin = 'anonymous';
-          img.decoding = 'async';
-          let settled = false;
-          const finish = () => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timeout);
-            signal?.removeEventListener('abort', onAbort);
-            img.onload = null;
-            img.onerror = null;
-            resolve();
-          };
-          const onAbort = () => { img.src = ''; finish(); };
-          if (signal?.aborted) { resolve(); return; }
-          const timeout = setTimeout(onAbort, 8000);
-          signal?.addEventListener('abort', onAbort, { once: true });
-          img.onload = finish;
-          img.onerror = finish;
-          img.src = url;
-        });
-      },
-
-      async resolveMarketplaceDownloadImage(downloadUrl, assetSlug, signal) {
-        try {
-          const { fetchBlobWithTimeout } = await import('./services/fetchJsonWithTimeout.js');
-          if (typeof caches !== 'undefined') {
-            const cache = await caches.open('midori-marketplace-wallpapers-v1');
-            const request = new Request(downloadUrl, { method: 'GET', mode: 'cors', credentials: 'omit' });
-            let response = await cache.match(request);
-            const cached = Boolean(response);
-            let blob;
-
-            if (!response) {
-              ({ response, payload: blob } = await fetchBlobWithTimeout(request, { signal, timeoutMs: 8000 }));
-            }
-
-            if (!response?.ok) {
-              return '';
-            }
-
-            const responseContentType = response.headers?.get('content-type') || '';
-            if (!responseContentType.includes('image/')) {
-              return '';
-            }
-
-            blob ||= await response.blob();
-            if (!blob || !blob.type?.startsWith('image/') || blob.size > 8 * 1024 * 1024 || signal?.aborted) {
-              await cache.delete(request);
-              return '';
-            }
-            try {
-              if (cached) await cache.delete(request);
-              await cache.put(request, new Response(blob, { headers: { 'content-type': blob.type } }));
-              const keys = await cache.keys();
-              for (const old of keys.slice(0, Math.max(0, keys.length - 8))) await cache.delete(old);
-            } catch (error) {
-              console.warn('Marketplace wallpaper cache unavailable', error);
-            }
-            return URL.createObjectURL(blob);
-          }
-
-          const { response, payload: blob } = await fetchBlobWithTimeout(downloadUrl, {
-            mode: 'cors', credentials: 'omit', signal, timeoutMs: 8000,
-          });
-          if (!response.ok) {
-            return '';
-          }
-
-          if (!blob || !blob.type?.startsWith('image/') || blob.size > 8 * 1024 * 1024 || signal?.aborted) {
-            return '';
-          }
-
-          return URL.createObjectURL(blob);
-        } catch (error) {
-          if (error?.name !== 'AbortError' && !signal?.aborted) console.warn('Marketplace wallpaper fallback failed', { assetSlug, error });
-          return '';
-        }
-      },
-
-      async loadMarketplaceWallpaper(background, signal, requestId) {
-        const previewUrl = background?.previewUrl || '';
-        const sourceUrl = background?.imageUrl || background?.downloadUrl || '';
-        const srcSet = background?.imageSrcSet || '';
-
-        if (previewUrl && !signal?.aborted && requestId === this.backgroundRequestId) {
-          this.applyBackgroundImage(previewUrl, '', { immediate: true });
-          this.releaseMarketplaceBlobUrl();
-        }
-
-        if (!sourceUrl) {
-          if (!previewUrl) {
-            this.applyBackgroundImage('', '');
-            this.releaseMarketplaceBlobUrl();
-          }
-          return;
-        }
-
-        let resolvedUrl = sourceUrl;
-        if (this.isMarketplaceDownloadUrl(sourceUrl)) {
-          resolvedUrl = await this.resolveMarketplaceDownloadImage(sourceUrl, background?.assetSlug || '', signal);
-        }
-
-        if (signal?.aborted || requestId !== this.backgroundRequestId) {
-          if (resolvedUrl?.startsWith('blob:')) URL.revokeObjectURL(resolvedUrl);
-          return;
-        }
-
-        if (!resolvedUrl) {
-          if (!previewUrl) {
-            this.applyBackgroundImage('', '');
-            this.releaseMarketplaceBlobUrl();
-          }
-          return;
-        }
-
-        await this.preloadImage(resolvedUrl, signal);
-        if (signal?.aborted || requestId !== this.backgroundRequestId) {
-          if (resolvedUrl.startsWith('blob:')) URL.revokeObjectURL(resolvedUrl);
-          return;
-        }
-        this.applyBackgroundImage(resolvedUrl, resolvedUrl.startsWith('blob:') ? '' : srcSet);
-        if (resolvedUrl.startsWith('blob:')) {
-          const previous = this.marketplaceBlobUrl;
-          this.marketplaceBlobUrl = resolvedUrl;
-          if (previous && previous !== resolvedUrl) URL.revokeObjectURL(previous);
-        }
-      },
-
-      setupDeferredMounts() {
-        const enable = async () => {
+    setupDeferredMounts() {
+      const schedule = () => {
+        if (this.interactionListener) window.removeEventListener('midori:perf-mark', this.interactionListener);
+        this.interactionListener = null;
+        const enable = () => {
           this.deferredMountHandle = null;
           if (this.disposed) return;
-          this.renderSmartSuggestions = true;
-          if (!(await this.getUpdateBrowserInfo()).isMidori || this.disposed) {
-            return;
-          }
-          await this.syncUpdateNoticeFromCache();
-          if (this.disposed) return;
-          if (await this.shouldRevalidateMidoriUpdate()) {
-            await this.scheduleUpdateCheck();
-          }
+          this.featuresReady = true;
+          this.renderSmartSuggestions = hasSavedSuggestions();
         };
-        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        if ('requestIdleCallback' in window) {
           this.deferredMountKind = 'idle';
           this.deferredMountHandle = window.requestIdleCallback(enable, { timeout: 1000 });
         } else {
           this.deferredMountKind = 'timeout';
-          this.deferredMountHandle = setTimeout(enable, 400);
+          this.deferredMountHandle = setTimeout(enable, 0);
         }
-      },
-
-      setupWallpaperRefresh() {
-        const listener = () => {
-          if (['Unsplash', 'LocalFolder'].includes(this.tabStore.background?.type)) {
-            this.load();
-          }
-        };
-        this.refreshWallpaperListener = listener;
-        window.addEventListener('midori:refresh-wallpaper', listener);
-
-        this.backgroundChangedListener = () => this.load();
-        window.addEventListener('midori:background-changed', this.backgroundChangedListener);
-      },
-
-      setupOmniLazyTriggers() {
+      };
+      if (Number.isFinite(window.__midoriPerf?.marks?.['interaction-ready'])) schedule();
+      else {
+        this.interactionListener = event => { if (event.detail?.name === 'interaction-ready') schedule(); };
+        window.addEventListener('midori:perf-mark', this.interactionListener);
+      }
+    },
+    setupOmniLazyTriggers() {
         const openOmni = async ({ toggle = false } = {}) => {
           if (this.disposed) return;
           this.renderOmniLauncher = true;
@@ -594,171 +169,13 @@
         try {
           chrome.runtime.onMessage.addListener(runtimeMessageListener);
         } catch (_) { /* not in extension context */ }
-      },
-
-      setupUpdateForegroundChecks() {
-        const listener = async () => {
-          if (document.visibilityState === 'hidden') {
-            return;
-          }
-
-          const now = Date.now();
-          if (now - this.lastForegroundUpdateCheckAt < UPDATE_FOREGROUND_DEBOUNCE_MS) {
-            return;
-          }
-
-          this.lastForegroundUpdateCheckAt = now;
-          if (!(await this.getUpdateBrowserInfo()).isMidori || this.disposed || document.visibilityState === 'hidden') {
-            return;
-          }
-          await this.syncUpdateNoticeFromCache(now);
-          if (await this.shouldRevalidateMidoriUpdate(now)) {
-            await this.scheduleUpdateCheck({ now });
-          }
-        };
-
-        this.updateForegroundListener = listener;
-        window.addEventListener('focus', listener);
-        document.addEventListener('visibilitychange', listener);
-      },
-
-      getUpdateBrowserInfo() {
-        if (!this.updateBrowserInfoPromise) {
-          this.updateBrowserInfoPromise = import('./utils/midoriBrowserInfo.js')
-            .then(({ getMidoriBrowserInfo }) => getMidoriBrowserInfo())
-            .catch(() => ({ isMidori: false, version: '' }));
-        }
-        return this.updateBrowserInfoPromise;
-      },
-
-      getUpdateService() {
-        if (!this.updateServicePromise) {
-          this.updateServicePromise = import('./services/MidoriUpdateService.js')
-            .then(({ default: MidoriUpdateService }) => {
-              this.updateService = markRaw(new MidoriUpdateService({
-                checkIntervalMs: UPDATE_CHECK_WINDOW_MS,
-                errorRetryIntervalMs: UPDATE_ERROR_RETRY_INTERVAL_MS,
-              }));
-              return this.updateService;
-            });
-        }
-        return this.updateServicePromise;
-      },
-
-      applyUpdateResult(result) {
-        if (result.eligible) {
-          this.updateNotice = {
-            visible: true,
-            latestVersion: result.latestVersion || '',
-          };
-          return;
-        }
-
-        this.updateNotice = {
-          visible: false,
-          latestVersion: result.latestVersion || '',
-        };
-      },
-
-      async syncUpdateNoticeFromCache(now = Date.now()) {
-        const browserInfo = await this.getUpdateBrowserInfo();
-        if (!browserInfo.isMidori) {
-          this.updateNotice.visible = false;
-          return null;
-        }
-
-        const updateService = await this.getUpdateService();
-        const state = updateService.getCachedState();
-        const result = updateService.getEligibility({
-          browserInfo,
-          state,
-          now,
-        });
-        this.applyUpdateResult(result);
-        return { state, result };
-      },
-
-      async shouldRevalidateMidoriUpdate(now = Date.now()) {
-        const browserInfo = await this.getUpdateBrowserInfo();
-        if (!browserInfo.isMidori) {
-          return false;
-        }
-
-        const updateService = await this.getUpdateService();
-        const state = updateService.getCachedState();
-        const lastCheckedAt = Number(state.lastCheckedAt) || 0;
-        if (!lastCheckedAt) {
-          return true;
-        }
-
-        const activeWindowMs = state.lastResult === 'error'
-          ? UPDATE_ERROR_RETRY_INTERVAL_MS
-          : UPDATE_CHECK_WINDOW_MS;
-        return now - lastCheckedAt >= activeWindowMs;
-      },
-
-      async checkMidoriUpdate(options = {}) {
-        if (this.updateCheckInFlight) {
-          return;
-        }
-
-        const browserInfo = await this.getUpdateBrowserInfo();
-        if (!browserInfo.isMidori || document.visibilityState === 'hidden' || options.signal?.aborted) {
-          return;
-        }
-
-        this.updateCheckInFlight = true;
-        try {
-          const updateService = await this.getUpdateService();
-          const result = await updateService.checkForUpdate({
-            browserInfo,
-            now: options.now,
-            force: options.force,
-            signal: options.signal,
-          });
-
-          if (!options.signal?.aborted && document.visibilityState !== 'hidden') this.applyUpdateResult(result);
-        } catch (error) {
-          if (error?.name !== 'AbortError' && !options.signal?.aborted) console.warn('Midori update check failed:', error);
-        } finally {
-          this.updateCheckInFlight = false;
-        }
-      },
-
-      async scheduleUpdateCheck(options = {}) {
-        if (this.disposed || !(await this.getUpdateBrowserInfo()).isMidori) return false;
-        return scheduleRemoteTask('update', signal => this.checkMidoriUpdate({ ...options, signal }), {
-          priority: 0,
-          notBeforeMs: 5000,
-        });
-      },
-
-      async deferUpdateForToday() {
-        this.updateNotice.visible = false;
-        const updateService = await this.getUpdateService();
-        updateService.deferForToday();
-      },
-
-      async handleDownloadUpdate() {
-        try {
-          const extensionApi = typeof browser !== 'undefined' ? browser : (typeof chrome !== 'undefined' ? chrome : null);
-          if (extensionApi?.tabs?.create) {
-            await extensionApi.tabs.create({ url: MIDORI_DOWNLOAD_URL });
-          } else {
-            window.open(MIDORI_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
-          }
-        } catch (error) {
-          window.open(MIDORI_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
-        } finally {
-          await this.deferUpdateForToday();
-        }
-      },
-
-    }
-  }
+      }
+  },
+};
 </script>
 
 <style scoped>
+
 .storage-error {
   position: fixed;
   left: 50%;
@@ -809,206 +226,4 @@
   background: rgba(232, 237, 235, 0.08);
 }
 
-.container {
-  width: 100%;
-  min-height: 100vh;
-  padding: 1rem 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.header {
-  width: 100%;
-  height: 10%;
-  display: flex;
-  justify-content: end;
-  align-items: center;
-}
-
-.main {
-  height: 80%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.background-skeleton {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -3;
-  pointer-events: none;
-  background: linear-gradient(110deg, #0c1219 30%, #162028 50%, #0c1219 70%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-.background {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -3;
-  object-fit: cover;
-  pointer-events: none;
-}
-
-.bg-fade-enter-active {
-  transition: opacity 0.4s ease;
-}
-.bg-fade-enter-from {
-  opacity: 0;
-}
-
-.credits {
-  position: fixed;
-  bottom: 0.75rem;
-  left: 0.75rem;
-  font-size: .75rem;
-  color: var(--color-text-muted, #7A9B8D);
-  background-color: var(--surface-island, #0F1520);
-  border: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  padding: .35rem .55rem;
-  border-radius: var(--nova-control-radius, 8px);
-  z-index: 3;
-  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
-}
-
-.credits__label {
-  color: var(--color-text, #C4F0E0);
-  font-weight: 600;
-}
-
-.credits a {
-  color: var(--color-text-secondary, #7EC4A8);
-  text-decoration: underline;
-}
-
-.logo {
-  width: 300px;
-}
-
-.update-toast {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  width: min(92vw, 360px);
-  z-index: 50;
-  background: var(--surface-island, rgba(0, 61, 47, 0.94));
-  border: 1px solid var(--color-border-strong, rgba(126, 196, 168, 0.45));
-  border-radius: var(--nova-panel-radius, 14px);
-  box-shadow: var(--shadow-floating, 0 8px 24px rgba(0, 0, 0, 0.18));
-  padding: 0.9rem 0.95rem;
-  color: #e6fff7;
-}
-
-.update-toast__badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  background: rgba(0, 184, 148, 0.18);
-  border: 1px solid rgba(0, 184, 148, 0.35);
-  margin-bottom: 0.55rem;
-}
-
-.update-toast__title {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 650;
-}
-
-.update-toast__message {
-  margin: 0.5rem 0 0;
-  font-size: 0.84rem;
-  line-height: 1.35;
-  color: rgba(230, 255, 247, 0.92);
-}
-
-.update-toast__actions {
-  margin-top: 0.8rem;
-  display: flex;
-  gap: 0.55rem;
-}
-
-.update-toast__button {
-  flex: 1;
-  border-radius: var(--nova-control-radius, 8px);
-  border: 1px solid transparent;
-  padding: 0.5rem 0.65rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
-}
-
-.update-toast__button:hover {
-  transform: translateY(-1px);
-}
-
-.update-toast__button:focus-visible {
-  outline: 2px solid var(--midori-300);
-  outline-offset: 2px;
-}
-
-.update-toast__button--primary {
-  background: #00b894;
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #08261f;
-}
-
-.update-toast__button--secondary {
-  background: rgba(2, 20, 15, 0.45);
-  border-color: rgba(126, 196, 168, 0.45);
-  color: #dafbf0;
-}
-
-.update-toast-enter-active,
-.update-toast-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
-}
-
-.update-toast-enter-from,
-.update-toast-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-@media (max-width: 600px) {
-  .update-toast {
-    top: auto;
-    bottom: 0.8rem;
-    left: 0.8rem;
-    right: 0.8rem;
-    width: auto;
-  }
-}
-
-@media (max-width: 1200px) {
-  .credits {
-    position: relative;
-    bottom: auto;
-    left: auto;
-    display: table;
-    max-width: calc(100% - 1.5rem);
-    margin: 0 0.75rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
 </style>

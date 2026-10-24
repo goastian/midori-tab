@@ -2,7 +2,7 @@
   <div class="dashboard">
     <div class="dashboard-toolbar">
       <div class="dashboard-spaces">
-        <SpaceSwitcher />
+        <SpaceSwitcher v-if="spacesEnabled" @ready="$emit('ready')" />
       </div>
 
       <!-- Astian Apps + Settings share one reserved toolbar area. -->
@@ -47,14 +47,20 @@
 <script>
 import { defineAsyncComponent } from 'vue';
 import Logo from '../Logo.vue';
-import SpaceSwitcher from '../SpaceSwitcher.vue';
+
+function readSpacesEnabled() {
+  try {
+    const raw = localStorage.getItem('spacesStore');
+    return Boolean(raw && raw.length <= 300_000 && JSON.parse(raw).enabled === true);
+  } catch { return false; }
+}
 
 export default {
   name: 'DashboardShell',
   components: {
     DashboardIcon: defineAsyncComponent(() => import('../icons/DashboardIcon.vue')),
     Logo,
-    SpaceSwitcher,
+    SpaceSwitcher: defineAsyncComponent(() => import('../SpaceSwitcher.vue')),
   },
   props: {
     i18n: {
@@ -70,7 +76,16 @@ export default {
       default: false,
     },
   },
-  emits: ['open-settings', 'toggle-quick-settings', 'toggle-apps-menu'],
+  emits: ['ready', 'open-settings', 'toggle-quick-settings', 'toggle-apps-menu'],
+  data() { return { spacesEnabled: readSpacesEnabled() }; },
+  mounted() {
+    window.addEventListener('midori:spaces-enabled', this.updateSpacesEnabled);
+    if (!this.spacesEnabled) this.$emit('ready');
+  },
+  beforeUnmount() { window.removeEventListener('midori:spaces-enabled', this.updateSpacesEnabled); },
+  methods: {
+    updateSpacesEnabled(event) { this.spacesEnabled = event.detail.enabled; },
+  },
 };
 </script>
 
@@ -201,7 +216,7 @@ export default {
   justify-content: center;
 }
 
-:global([data-density='compact']) .dashboard {
+[data-density='compact'] .dashboard {
   --dashboard-gutter: clamp(0.75rem, 3vw, 1.25rem);
   padding:
     max(0.65rem, env(safe-area-inset-top, 0px))

@@ -6,10 +6,11 @@
     @open-settings="toggleQuickSettings"
     @toggle-quick-settings="toggleQuickSettings"
     @toggle-apps-menu="showAppsMenu = !showAppsMenu"
+    @ready="shellReady = true; markInteractionReady()"
   >
     <section v-if="widgetsStore.enabled.search" class="dash-search">
       <Suspense>
-        <SearchBox :searchTarget="tab.openLink" />
+        <SearchBox :searchTarget="tab.openLink" @ready="searchReady = true; markInteractionReady()" />
         <template #fallback>
           <div class="async-placeholder async-placeholder--search"></div>
         </template>
@@ -28,6 +29,7 @@
           :title-mode="tab.speedDialTitleMode"
           :show-delete-button="tab.showSpeedDialDeleteButton"
           :show-add-button="tab.showAddSpeedDialButton"
+          @ready="bookmarksReady = true; markInteractionReady()"
         />
         <template #fallback>
           <div class="async-placeholder async-placeholder--sponsored"></div>
@@ -237,6 +239,9 @@ export default {
       reorderAnnouncement: '',
       viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
       renderGridWidgets: false,
+      shellReady: false,
+      searchReady: false,
+      bookmarksReady: false,
       stableFallback: null,
       stableDisposed: false,
     };
@@ -249,6 +254,7 @@ export default {
     });
 
     this.deferGridWidgets();
+    this.markInteractionReady();
 
     let settled = false;
     const markStable = () => {
@@ -257,7 +263,7 @@ export default {
       clearTimeout(fallback);
       this.stableFallback = null;
       perfMarks.mark('above-fold-stable');
-      if (!this.widgetsStore.enabled.search) perfMarks.mark('interaction-ready');
+      this.markInteractionReady();
     };
     const fallback = setTimeout(markStable, 1000);
     this.stableFallback = fallback;
@@ -313,11 +319,16 @@ export default {
   },
 
   methods: {
+    markInteractionReady() {
+      const searchReady = !this.widgetsStore.enabled.search || this.searchReady;
+      const bookmarksReady = !(this.tab.showSpeedDials || this.tab.showAds) || this.bookmarksReady;
+      if (this.shellReady && searchReady && bookmarksReady) {
+        requestAnimationFrame(() => perfMarks.mark('interaction-ready'));
+      }
+    },
     deferGridWidgets() {
-      // PERF-108: los widgets opcionales se montan después de que
-      // search-ready haya ocurrido (Min.vue se monta después de SearchBox),
-      // o al acercarse al viewport, lo que ocurra primero. SearchBox y los
-      // speed dials ya arrancaron en el camino crítico.
+      // Mount configured widgets near the viewport or during idle. Async search
+      // and bookmarks can still be loading; the resource graph counts all of them.
       const reveal = () => { this.renderGridWidgets = true; };
 
       if (typeof window !== 'undefined' && 'IntersectionObserver' in window) {
@@ -553,7 +564,7 @@ export default {
   min-height: 36rem;
 }
 
-:global([data-density='compact']) .dash-sponsored {
+[data-density='compact'] .dash-sponsored {
   max-width: var(--dashboard-content-width, 45rem);
 }
 

@@ -45,6 +45,7 @@ async function bootstrap() {
   themeStore.applyTheme(initialTheme)
 
   app.mount('#app')
+  perfMarks.mark('vue-ready')
   perfMarks.mark('shell-visible')
   hydrateAsyncStores(pinia)
 

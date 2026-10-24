@@ -264,7 +264,64 @@
             "type": "array"
           },
           "startupResourceCoverage": {
-            "enum": ["available", "unavailable"]
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          },
+          "earlySearchReadyMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "vueReadyMs": {
+            "$ref": "#/$defs/nullableMilliseconds"
+          },
+          "criticalJsBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "criticalCssBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "resourceGraphs": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "htmlJsBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "htmlCssBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "captureJsBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "captureCssBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
           }
         },
         "additionalProperties": true
@@ -405,7 +462,10 @@
     "instrumentation": {
       "type": "object"
     },
-    "failure": {}
+    "failure": {},
+    "resourceBudgetReference": {
+      "type": "object"
+    }
   },
   "additionalProperties": true,
   "$defs": {

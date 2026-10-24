@@ -101,3 +101,115 @@ export function createVisualStabilityTracker() {
     },
   };
 }
+
+export function createPerformanceCapture({ marks, captureStartMs, publish }) {
+  const captureDurationMs = 5000;
+  const maxEntries = 1000;
+  const longTasks = [];
+  const layoutShifts = [];
+  const capabilities = { longTasks: false, layoutShift: false, visualStability: true };
+  const listeners = { added: 0, removed: 0, counting: false };
+  const visualTracker = createVisualStabilityTracker();
+  const observerInstalledAtMs = performance.now();
+  let buffersTruncated = false;
+  let captureEndMs = null;
+  let visualResult = null;
+  let nodeCount = null;
+  let nativeAdd;
+  let nativeRemove;
+
+  function append(target, entry) {
+    if (target.length < maxEntries) target.push(entry);
+    else buffersTruncated = true;
+  }
+  const recordLongTask = entry => append(longTasks, { startMs: entry.startTime, durationMs: entry.duration });
+  const recordLayoutShift = entry => {
+    if (!entry.hadRecentInput) append(layoutShifts, { startMs: entry.startTime, value: entry.value });
+  };
+  function observe(type, capability, record) {
+    if (!window.PerformanceObserver?.supportedEntryTypes?.includes(type)) return null;
+    try {
+      const observer = new PerformanceObserver(list => list.getEntries().forEach(record));
+      observer.observe({ type, buffered: true });
+      capabilities[capability] = true;
+      return observer;
+    } catch { return null; }
+  }
+  const longTaskObserver = observe('longtask', 'longTasks', recordLongTask);
+  const layoutShiftObserver = observe('layout-shift', 'layoutShift', recordLayoutShift);
+
+  function cumulativeLayoutShift() {
+    let maximum = 0;
+    let sum = 0;
+    let first = 0;
+    let previous = 0;
+    for (const entry of [...layoutShifts].sort((a, b) => a.startMs - b.startMs)) {
+      if (!sum || entry.startMs - previous >= 1000 || entry.startMs - first >= 5000) {
+        first = entry.startMs;
+        sum = 0;
+      }
+      sum += entry.value;
+      previous = entry.startMs;
+      maximum = Math.max(maximum, sum);
+    }
+    return maximum;
+  }
+
+  function snapshot() {
+    const ready = Math.max(marks['shell-visible'] || 0, marks['interaction-ready'] || 0);
+    const sum = (entries, blocking) => entries.reduce((total, entry) => total + (blocking ? Math.max(0, entry.durationMs - 50) : entry.durationMs), 0);
+    return {
+      captureComplete: captureEndMs !== null, captureEndMs, observerInstalledAtMs,
+      captureDurationMs: captureEndMs === null ? null : captureEndMs - captureStartMs,
+      capabilities: { ...capabilities },
+      longTasks: { supported: capabilities.longTasks, count: capabilities.longTasks ? longTasks.length : null,
+        totalMs: capabilities.longTasks ? sum(longTasks, false) : null,
+        blockingMs: capabilities.longTasks ? sum(longTasks, true) : null,
+        beforeInteractionBlockingMs: capabilities.longTasks ? sum(longTasks.filter(entry => entry.startMs < ready), true) : null,
+        records: longTasks.map(entry => ({ ...entry })) },
+      cls: capabilities.layoutShift ? cumulativeLayoutShift() : null,
+      layoutShiftRecords: layoutShifts.map(entry => ({ ...entry })),
+      visualStability: visualResult || visualTracker.snapshot(), buffersTruncated, nodes: nodeCount,
+      listeners: { ...listeners },
+      browser: { userAgent: navigator.userAgent, hardwareConcurrency: navigator.hardwareConcurrency ?? null,
+        deviceMemory: navigator.deviceMemory ?? null, saveData: navigator.connection?.saveData ?? null,
+        effectiveType: navigator.connection?.effectiveType ?? null },
+    };
+  }
+
+  function collect() {
+    if (captureEndMs !== null || performance.now() - captureStartMs < captureDurationMs) return;
+    for (const entry of longTaskObserver?.takeRecords() || []) recordLongTask(entry);
+    for (const entry of layoutShiftObserver?.takeRecords() || []) recordLayoutShift(entry);
+    visualResult = visualTracker.stop();
+    if (visualResult.stable) marks['above-fold-stable'] = visualResult.lastChangeMs;
+    nodeCount = document.querySelectorAll('*').length;
+    captureEndMs = performance.now();
+    clearTimeout(timer);
+    longTaskObserver?.disconnect();
+    layoutShiftObserver?.disconnect();
+    if (listeners.counting) {
+      EventTarget.prototype.addEventListener = nativeAdd;
+      EventTarget.prototype.removeEventListener = nativeRemove;
+    }
+    publish();
+    window.dispatchEvent(new CustomEvent('midori:perf-report', { detail: window.__midoriPerf }));
+  }
+  const timer = setTimeout(collect, Math.max(1, captureDurationMs + 1 - (performance.now() - captureStartMs)));
+
+  function enableListenerCounting() {
+    if (listeners.counting || captureEndMs !== null) return;
+    listeners.counting = true;
+    nativeAdd = EventTarget.prototype.addEventListener;
+    nativeRemove = EventTarget.prototype.removeEventListener;
+    EventTarget.prototype.addEventListener = function (...args) {
+      listeners.added += 1;
+      return nativeAdd.apply(this, args);
+    };
+    EventTarget.prototype.removeEventListener = function (...args) {
+      listeners.removed += 1;
+      return nativeRemove.apply(this, args);
+    };
+  }
+  return { snapshot, collect, enableListenerCounting };
+}

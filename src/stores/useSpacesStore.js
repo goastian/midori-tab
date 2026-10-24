@@ -27,6 +27,8 @@ const DEFAULT_SPACES = [
   },
 ];
 const SPACES_ASYNC_STATE_KEY = 'midori_spaces_async_state_v1';
+const hydrations = new WeakMap();
+const initialized = new WeakSet();
 
 function sanitizeSpaces(spaces) {
   if (!Array.isArray(spaces)) return DEFAULT_SPACES.map(s => ({ ...s }));
@@ -52,11 +54,12 @@ function readLegacySpacesState() {
   }
 }
 
-const useSpacesStore = defineStore('spacesStore', {
+const createSpacesStore = defineStore('spacesStore', {
   state: () => ({
     spaces: DEFAULT_SPACES.map(s => ({ ...s })),
     activeSpaceId: 'personal',
     enabled: false,
+    hydrated: false,
   }),
 
   getters: {
@@ -138,23 +141,27 @@ const useSpacesStore = defineStore('spacesStore', {
       this.spaces = DEFAULT_SPACES.map(s => ({ ...s }));
       this.activeSpaceId = 'personal';
       this.enabled = false;
+      this.hydrated = true;
       this.persistAsyncState();
     },
 
-    async hydrateAsyncState() {
-      const initialSpaces = snapshotHydration(this.spaces);
-      const legacy = readLegacySpacesState();
-      const asyncState = await getJson(SPACES_ASYNC_STATE_KEY, null);
-      const spaces = sanitizeSpaces(asyncState?.spaces || legacy.spaces || this.spaces);
-
-      this.spaces = reconcileHydration(initialSpaces, this.spaces, spaces.length ? spaces : DEFAULT_SPACES.map(s => ({ ...s })));
-      if (!this.spaces.some(space => space.id === this.activeSpaceId)) {
-        this.activeSpaceId = this.spaces[0]?.id || 'personal';
-      }
-      if (this.enabled) {
-        this.applySpace(this.activeSpace);
-      }
-      this.persistAsyncState();
+    hydrateAsyncState() {
+      if (hydrations.has(this)) return hydrations.get(this);
+      const pending = (async () => {
+        const initialSpaces = snapshotHydration(this.spaces);
+        const legacy = readLegacySpacesState();
+        const asyncState = await getJson(SPACES_ASYNC_STATE_KEY, null);
+        if (this.hydrated) return;
+        const spaces = sanitizeSpaces(asyncState?.spaces || legacy.spaces || this.spaces);
+        this.spaces = reconcileHydration(initialSpaces, this.spaces, spaces.length ? spaces : DEFAULT_SPACES.map(s => ({ ...s })));
+        if (!this.spaces.some(space => space.id === this.activeSpaceId)) this.activeSpaceId = this.spaces[0]?.id || 'personal';
+        if (this.enabled) this.applySpace(this.activeSpace);
+        this.hydrated = true;
+        this.$persist();
+        this.persistAsyncState();
+      })();
+      hydrations.set(this, pending);
+      return pending;
     },
 
     persistAsyncState() {
@@ -170,5 +177,24 @@ const useSpacesStore = defineStore('spacesStore', {
     pick: ['activeSpaceId', 'enabled'],
   },
 });
+
+function useSpacesStore(...args) {
+  const store = createSpacesStore(...args);
+  if (!initialized.has(store)) {
+    initialized.add(store);
+    store.hydrated = false;
+    let enabled = store.enabled;
+    store.$subscribe((_mutation, state) => {
+      if (state.enabled !== enabled) {
+        enabled = state.enabled;
+        window.dispatchEvent(new CustomEvent('midori:spaces-enabled', { detail: { enabled } }));
+      }
+      if (state.hydrated) store.persistAsyncState();
+    }, { detached: true, flush: 'sync' });
+    void store.hydrateAsyncState().catch(error => console.error('[Midori] Could not restore spaces', error));
+  }
+  return store;
+}
+Object.assign(useSpacesStore, createSpacesStore);
 
 export default useSpacesStore;

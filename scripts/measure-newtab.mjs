@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { openGeckoSession } from './gecko-transport.mjs';
 import { buildRuntimeReport, visibleInteractionReady } from './perf-report.mjs';
-import { criticalResourceViolations } from './critical-requests.mjs';
+import { htmlResources, readBundleGraph, resourceGraph } from './critical-requests.mjs';
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const VIEWPORT = { width: 1280, height: 800 };
@@ -50,7 +50,7 @@ export function buildExtension(engine) {
   const original = readFileSync(manifestPath);
   try {
     const target = engine === 'firefox' ? 'firefox' : 'chrome';
-    const execution = { cwd: ROOT, stdio: 'inherit', env: { ...process.env } };
+    const execution = { cwd: ROOT, stdio: 'inherit', env: { ...process.env, ANALYZE_BUNDLE: '1' } };
     execFileSync(process.execPath, ['build-manifest.js', `manifest/${target}.json`], execution);
     const generatedManifest = readFileSync(manifestPath, 'utf8');
     execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], execution);
@@ -91,11 +91,18 @@ export function artifactIdentity(directory) {
 
 function chromiumNetwork(context) {
   const requests = new Map();
+  const resources = new Map();
   let active = false;
   let sequence = 0;
   const pendingSizes = new Set();
   context.on('request', request => {
-    if (!active || !/^https?:/.test(request.url())) return;
+    if (!active) return;
+    if (request.url().startsWith('chrome-extension:')) {
+      resources.set(request, { url: request.url(), startEpochMs: Date.now(), kind: request.resourceType(),
+        scope: request.serviceWorker() ? 'background' : 'page' });
+      return;
+    }
+    if (!/^https?:/.test(request.url())) return;
     let scope = 'page';
     let documentUrl = '';
     const worker = request.serviceWorker();
@@ -106,6 +113,7 @@ function chromiumNetwork(context) {
       startEpochMs: started > 0 ? started : Date.now(), endEpochMs: null, state: 'pending', bytes: null });
   });
   context.on('requestfinished', request => {
+    if (resources.has(request) && request.timing().startTime > 0) resources.get(request).startEpochMs = request.timing().startTime;
     const record = requests.get(request);
     if (!record) return;
     if (request.timing().startTime > 0) record.startEpochMs = request.timing().startTime;
@@ -122,8 +130,10 @@ function chromiumNetwork(context) {
     record.state = /abort|cancel/i.test(request.failure()?.errorText || '') ? 'cancelled' : 'failed';
   });
   return {
-    coverage: { source: 'playwright-browser-context', scopes: ['page', 'background'], cancelledRequests: true },
-    start: async () => { requests.clear(); sequence = 0; active = true; return { startEpochMs: Date.now() }; },
+    coverage: { source: 'playwright-browser-context', scopes: ['page', 'background'], cancelledRequests: true,
+      localExtensionResources: 'browser-context-requests' },
+    start: async () => { requests.clear(); resources.clear(); sequence = 0; active = true; return { startEpochMs: Date.now() }; },
+    resources: async () => [...resources.values()],
     stop: async () => {
       active = false;
       await Promise.all([...pendingSizes]);
@@ -202,6 +212,7 @@ export async function measureSession(session, index, options) {
   const page = await session.context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   let requests = [];
+  let localResources = [];
   let data = {};
   let functional = { searchEnabled: false, inputTyped: false };
   let inputResponseMs = null;
@@ -216,16 +227,23 @@ export async function measureSession(session, index, options) {
       const perf = window.__midoriPerf;
       const navigation = performance.getEntriesByType('navigation')[0];
       const fcp = performance.getEntriesByType('paint').find(entry => entry.name === 'first-contentful-paint');
-      const ready = perf?.marks?.['interaction-ready'];
       const resources = performance.getEntriesByType('resource');
-      const startupResources = resources.filter(entry => entry.startTime <= ready).map(entry => entry.name);
-      return { perf, start: performance.timeOrigin, origin: location.href, startupResources, resourceTimingEntries: resources.length,
+      const resourceTimings = resources.map(entry => ({ url: entry.name, startTime: entry.startTime, kind: entry.initiatorType }));
+      const early = performance.getEntriesByName('early-search-ready')[0];
+      const widgetState = JSON.parse(localStorage.getItem('widgetsStore') || '{}');
+      return { perf, start: performance.timeOrigin, origin: location.href, resourceTimings,
+        earlySearchReadyMs: early?.startTime ?? window.__midoriEarlySearch?.readyAt ?? null,
         fcp: fcp?.startTime ?? null, dcl: navigation?.domContentLoadedEventEnd ?? null, load: navigation?.loadEventEnd ?? null,
         searchEnabled: Boolean(document.querySelector('.search-input')),
-        widgetState: JSON.parse(localStorage.getItem('widgetsStore') || '{}') };
+        searchExpected: (widgetState.enabled?.search ?? widgetState.search ?? true) !== false,
+        widgetState,
+        spacesEnabled: JSON.parse(localStorage.getItem('spacesStore') || '{}').enabled === true };
     });
+    if (data.perf?.instrumentationError) errors.push(`Laboratory instrumentation failed: ${data.perf.instrumentationError}`);
     requests = await session.network.stop();
+    localResources = await session.network.resources?.() || [];
     networkWindow.endEpochMs = Date.now();
+    functional.searchExpected = data.searchExpected;
     if (data.searchEnabled) {
       await page.evaluate(() => {
         window.__midoriInputProbe = new Promise(resolveProbe => {
@@ -246,17 +264,22 @@ export async function measureSession(session, index, options) {
       });
       await page.fill('.search-input', 'midori integration');
       inputResponseMs = await page.evaluate(() => window.__midoriInputProbe);
-      functional = { searchEnabled: true, inputTyped: await page.evaluate(() => {
+      functional = { searchEnabled: true, searchExpected: data.searchExpected, inputTyped: await page.evaluate(() => {
         const input = document.querySelector('.search-input');
         return input?.value === 'midori integration' && document.activeElement === input;
       }) };
       if (!functional.inputTyped) errors.push('Native keyboard input did not reach the search field');
-    } else if (options.layout === 'default') errors.push('Default layout did not render its search field');
+    } else if (data.searchExpected) errors.push('The enabled search widget did not render its search field');
+    if (data.searchEnabled && !data.searchExpected) errors.push('The disabled search widget rendered a search field');
     if (options.screenshotPath) await page.screenshot({ path: options.screenshotPath });
     if (options.scenario === 'stress' && !data.widgetState?.enabled?.rss) errors.push('Stress widget fixture was not applied');
   } catch (error) { errors.push(error.message); }
   finally {
-    if (!networkWindow.endEpochMs) { requests = await session.network.stop(); networkWindow.endEpochMs = Date.now(); }
+    if (!networkWindow.endEpochMs) {
+      requests = await session.network.stop();
+      localResources = await session.network.resources?.() || [];
+      networkWindow.endEpochMs = Date.now();
+    }
     await page.close();
   }
   const perf = data.perf || {};
@@ -274,9 +297,37 @@ export async function measureSession(session, index, options) {
   const beforeInteraction = requests.filter(request => interactionReadyMs !== null && request.startEpochMs < data.start + interactionReadyMs);
   const networkCoverage = session.network.coverage?.scopes?.includes('background')
     && session.network.coverage?.scopes?.includes('page') ? 'page-and-background' : 'page-only';
+  let graphs = null;
+  let startupResourceCoverage = 'unavailable';
+  try {
+    const bundleGraph = readBundleGraph(options.extensionPath);
+    const native = localResources.filter(resource => resource.scope !== 'background');
+    const resources = [...native, ...(data.resourceTimings || [])];
+    const source = native.length ? session.network.coverage.localExtensionResources : 'resource-timing';
+    const enabledWidgets = { privacy: true, ...data.widgetState?.enabled };
+    const graphOptions = { directory: options.extensionPath, documentUrl: session.url, resources,
+      navigationStart: data.start, laboratory: true, bundleGraph, source, enabledWidgets, spacesEnabled: data.spacesEnabled === true };
+    const html = htmlResources(readFileSync(join(options.extensionPath, 'index.html'), 'utf8'));
+    graphs = {
+      html: resourceGraph({ ...graphOptions, resources: html, navigationStart: 0, source: 'html-and-transitive-static-imports' }),
+      earlySearch: resourceGraph({ ...graphOptions, cutoff: data.earlySearchReadyMs ?? 0 }),
+      interaction: resourceGraph({ ...graphOptions, cutoff: interactionReadyMs ?? 0 }),
+      vue: resourceGraph({ ...graphOptions, cutoff: marks['vue-ready'] ?? interactionReadyMs ?? 0 }),
+      capture: resourceGraph(graphOptions),
+    };
+    const observedPaths = new Set(graphs.capture.files.filter(file => file.observations > 0).map(file => file.path));
+    const requiredPaths = graphs.html.files.filter(file => file.kinds.some(kind => kind === 'script' || kind === 'stylesheet')).map(file => file.path);
+    startupResourceCoverage = requiredPaths.length && requiredPaths.every(path => observedPaths.has(path)) ? 'available' : 'unavailable';
+    graphs.coverage = { source, nativeObservationCount: native.length, resourceTimingCount: data.resourceTimings?.length || 0,
+      requiredPaths, missingObservedPaths: requiredPaths.filter(path => !observedPaths.has(path)),
+      featurePolicy: { enabledWidgets, spacesEnabled: data.spacesEnabled === true },
+      semantics: source === 'native-content-policy-loads' ? 'native loader attempts; bytes are unique on-disk package bytes, not HTTP transfer bytes' : 'native resource requests; bytes are unique on-disk package bytes',
+      staticClosure: 'Static module and CSS dependencies are included even if satisfied from the module cache.' };
+  } catch (error) { errors.push(`Resource graph: ${error.message}`); }
   return {
     index, navigationStartEpochMs: data.start ?? null, measurementStartedEpochMs: networkWindow.startEpochMs,
     bootStartMs: marks['boot-start'] ?? null, rawShellMountedMs, shellVisibleMs, interactionReadyMs,
+    earlySearchReadyMs: data.earlySearchReadyMs ?? null, vueReadyMs: marks['vue-ready'] ?? null,
     paintCoverage: Number.isFinite(data.fcp) ? 'first-contentful-paint' : 'unavailable',
     searchReadyMs: marks['search-ready'] ?? null, aboveFoldStableMs: marks['above-fold-stable'] ?? null, idleCompleteMs: marks['idle-complete'] ?? null,
     firstContentfulPaintMs: data.fcp ?? null, domContentLoadedMs: data.dcl ?? null, loadEventMs: data.load ?? null,
@@ -292,9 +343,12 @@ export async function measureSession(session, index, options) {
       unattributed: beforeInteraction.filter(request => !['page', 'background'].includes(request.scope)).length, coverage: networkCoverage },
     networkWindow, networkCoverage: session.network.coverage,
     requests: requests.map(request => ({ ...request, url: safeUrl(request.url, session.url), documentUrl: safeUrl(request.documentUrl, session.url) })),
-    startupGraphViolations: criticalResourceViolations(data.startupResources || [], session.url, { laboratory: true }),
-    startupResources: (data.startupResources || []).map(url => safeUrl(url, session.url)),
-    startupResourceCoverage: data.resourceTimingEntries > 0 ? 'available' : 'unavailable',
+    resourceGraphs: graphs,
+    startupGraphViolations: graphs?.interaction.violations || [],
+    startupResources: graphs?.interaction.files.map(file => file.path) || [], startupResourceCoverage,
+    criticalJsBytes: graphs?.interaction.jsBytes ?? null, criticalCssBytes: graphs?.interaction.cssBytes ?? null,
+    htmlJsBytes: graphs?.html.jsBytes ?? null, htmlCssBytes: graphs?.html.cssBytes ?? null,
+    captureJsBytes: graphs?.capture.jsBytes ?? null, captureCssBytes: graphs?.capture.cssBytes ?? null,
     inputResponseMs, inputResponseMethod: 'trusted-input-event-to-two-animation-frames',
     functional, errors: [...new Set(errors)],
   };

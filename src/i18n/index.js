@@ -24,8 +24,8 @@ export const localeLoaders = {
   it: () => import('./locales/it.js'),
 };
 
-// Load the initial language before mounting the UI. Keeping every locale,
-// including English, async removes translations from the New Tab critical path.
+// Vue awaits the selected locale; the independent HTML search is already usable.
+// Only the selected language is loaded, and its bytes belong to the runtime graph.
 export const locales = {};
 
 export function normalizeLocale(code) {

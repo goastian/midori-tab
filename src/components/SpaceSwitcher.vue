@@ -1,6 +1,6 @@
 <template>
   <Transition name="slide-down">
-    <div v-if="spacesStore.enabled" class="space-switcher-bar">
+    <div v-if="spacesStore.enabled && spacesStore.hydrated" class="space-switcher-bar">
       <button
         v-for="space in spacesStore.spaces"
         :key="space.id"
@@ -22,10 +22,16 @@ import useSpacesStore from '../stores/useSpacesStore.js';
 
 export default {
   name: 'SpaceSwitcher',
+  emits: ['ready'],
   data() {
     return {
       spacesStore: useSpacesStore(),
     };
+  },
+  async mounted() {
+    await this.spacesStore.hydrateAsyncState();
+    await this.$nextTick();
+    this.$emit('ready');
   },
   methods: {
     switchTo(id) {

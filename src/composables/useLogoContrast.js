@@ -34,8 +34,8 @@ function paintPageBackground(context, rect) {
 
 export function useLogoContrast(logo) {
   const wallpaper = inject(WALLPAPER_ELEMENT, ref(null));
-  const tone = ref('light');
-  const needsOutline = ref(true);
+  const tone = ref(document.documentElement.dataset.theme === 'dark' ? 'light' : 'green');
+  const needsOutline = ref(false);
   let frame = null;
   let source = '';
   let previousTone = null;

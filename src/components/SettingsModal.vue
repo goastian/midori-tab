@@ -188,7 +188,8 @@ export default {
       }
     },
 
-    toggleSpaces() {
+    async toggleSpaces() {
+      await this.spacesStore.hydrateAsyncState();
       this.spacesStore.enabled = !this.spacesStore.enabled;
     },
 

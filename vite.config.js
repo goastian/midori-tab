@@ -1,5 +1,6 @@
 import { viteStaticCopy } from 'vite-plugin-static-copy'
-import { defineConfig } from "vite";
+import { defineConfig, transformWithEsbuild } from "vite";
+import { minify } from 'terser';
 import vue from "@vitejs/plugin-vue";
 import { resolve } from 'path'
 import { brotliCompressSync, gzipSync } from 'zlib'
@@ -9,6 +10,24 @@ import { relative, join } from 'path'
 import { APP_VERSION } from './version.config.js'
 
 const SHOULD_ANALYZE_BUNDLE = process.env.ANALYZE_BUNDLE === '1';
+
+function minifyBootAssets() {
+  return {
+    name: 'midori-minify-boot-assets',
+    apply: 'build',
+    async writeBundle({ dir }) {
+      for (const name of ['boot-theme.js', 'boot-search.js', 'boot-theme.css']) {
+        const path = resolve(dir, name);
+        const source = readFileSync(path, 'utf8');
+        const result = name.endsWith('.css')
+          ? await transformWithEsbuild(source, name, { loader: 'css', minify: true, sourcemap: false, target: ['firefox109', 'chrome109'] })
+          : await minify(source, { module: false, ecma: 2022, compress: { passes: 2 }, format: { comments: false } });
+        if (!result.code) throw new Error(`Minification produced an empty boot asset: ${name}`);
+        writeFileSync(path, result.code);
+      }
+    },
+  };
+}
 
 function formatBytes(bytes) {
   return `${(bytes / 1024).toFixed(2)} KiB`;
@@ -56,9 +75,10 @@ function createBundleAnalyzerPlugin() {
           brotliBytes: brotliCompressSync(typeof content === 'string' ? content : Buffer.from(content || '')).length,
           imports: item.type === 'chunk' ? item.imports : [],
           dynamicImports: item.type === 'chunk' ? item.dynamicImports : [],
-          modules: item.type === 'chunk' ? Object.keys(item.modules) : [],
+          css: item.type === 'chunk' ? [...(item.viteMetadata?.importedCss || [])] : [],
+          modules: item.type === 'chunk' ? Object.keys(item.modules).map((id) => relative(__dirname, id).replace(/\\/g, '/')) : [],
           moduleBytes: item.type === 'chunk' ? Object.fromEntries(
-            Object.entries(item.modules).map(([modId, m]) => [modId.replace('/home/ponchale/Development/astian-ads/midori-tab/',''), m.renderedLength]),
+            Object.entries(item.modules).map(([modId, m]) => [relative(__dirname, modId).replace(/\\/g, '/'), m.renderedLength]),
           ) : {},
           isEntry: item.type === 'chunk' ? item.isEntry : false,
         };
@@ -148,6 +168,7 @@ function manualChunks(id) {
 export default defineConfig({
   plugins: [
     vue(),
+    minifyBootAssets(),
     viteStaticCopy({
       targets: [
         {

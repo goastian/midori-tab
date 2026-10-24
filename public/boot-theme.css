@@ -7,3 +7,136 @@
   color-scheme: dark;
   background-color: var(--color-bg, #07150d);
 }
+
+html { font-size: 16px; }
+body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+:root[data-theme="light"] {
+  --color-primary: #0eae5b;
+  --color-primary-hover: #0a914c;
+  --color-text: #142a24;
+  --color-text-muted: #617a72;
+  --color-border-strong: rgba(20, 42, 36, 0.32);
+  --color-accent-border: rgba(14, 174, 91, 0.22);
+  --surface-island: rgba(247, 251, 248, 0.96);
+  --surface-control: rgba(255, 255, 255, 0.86);
+}
+:root[data-theme="dark"] {
+  --color-primary: #29c58b;
+  --color-primary-hover: #48d4a1;
+  --color-text: #eaf3f2;
+  --color-text-muted: #86a69c;
+  --color-border-strong: rgba(234, 243, 242, 0.28);
+  --color-accent-border: rgba(41, 197, 139, 0.26);
+  --surface-island: rgba(14, 23, 20, 0.94);
+  --surface-control: rgba(255, 255, 255, 0.045);
+}
+.early-dashboard, .early-dashboard * { box-sizing: border-box; }
+.early-dashboard {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: max(1.25rem, env(safe-area-inset-top, 0px)) clamp(0.75rem, 3vw, 2rem) 0;
+  pointer-events: none;
+}
+.early-dashboard .search-box { max-width: 640px; margin: 0; pointer-events: auto; }
+.early-dashboard::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgba(8, 13, 20, 0.16);
+}
+[data-theme="light"] .early-dashboard::before { background: rgba(232, 237, 235, 0.08); }
+[data-early-search="pending"] #app .viewport::after { visibility: hidden; }
+.early-toolbar { display: none; }
+.early-header { width: 100%; min-height: 4.25rem; display: flex; align-items: center; justify-content: center; }
+.early-logo-container { width: 100%; padding: 0.1rem 0.2rem; display: flex; align-items: center; justify-content: center; }
+.early-logo { width: 14rem; max-width: 100%; height: auto; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.18)); }
+[data-theme="dark"] .early-logo { filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
+[data-early-search="pending"] #app .dash-header,
+[data-early-search="pending"] #app .dash-search { visibility: hidden; }
+[data-density="compact"] .early-dashboard {
+  gap: 0.9rem;
+  padding-top: max(0.65rem, env(safe-area-inset-top, 0px));
+  padding-inline: clamp(0.75rem, 3vw, 1.25rem);
+}
+@media (max-width: 1330px) { html { font-size: 14px; } }
+@media (max-width: 700px) {
+  .early-dashboard { gap: 0.75rem; padding-inline: clamp(0.75rem, 4vw, 1rem); }
+  .early-toolbar { display: block; height: 48px; width: 100%; }
+  .early-dashboard--spaces .early-toolbar { height: calc(48px + 0.6rem + 44px); }
+  .early-header { min-height: clamp(2.75rem, 14vw, 4rem); }
+  .early-logo { width: min(56vw, 13rem); }
+}
+.search-box, .search-box * { box-sizing: border-box; }
+.search-box {
+  width: 100%;
+  background: var(--surface-island, #0F1520);
+  border: 1px solid var(--color-border-strong, rgba(126,196,168,0.22));
+  border-radius: var(--nova-panel-radius, 14px);
+  padding: var(--nova-segment-padding, 4px);
+  box-shadow: var(--shadow-flat, 0 1px 3px rgba(0,0,0,0.14));
+  transition: border-color var(--transition-fast, 0.1s ease), box-shadow var(--transition-fast, 0.1s ease);
+  position: relative;
+}
+
+.search-box:focus-within {
+  border-color: var(--color-primary, #04A469);
+  box-shadow: 0 0 0 3px var(--color-accent-border, rgba(4,164,105,0.2));
+}
+
+.search-inner {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: var(--nova-search-height, 48px);
+  background: var(--surface-control, #060A10);
+  border-radius: var(--nova-island-radius, 12px);
+  padding: 0.25rem 0.35rem 0.25rem 0.75rem;
+  position: relative;
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text, #C4F0E0);
+  font-size: 0.95rem;
+  padding: 0.5rem;
+  font-family: inherit;
+  min-width: 0;
+}
+
+.search-input::placeholder {
+  color: var(--color-text-muted, #5A9A82);
+}
+
+.search-input:focus,
+.search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  background: var(--color-primary, #04A469);
+  border: none;
+  border-radius: var(--nova-control-radius, 8px);
+  color: white;
+  cursor: pointer;
+  transition: background var(--transition-fast, 0.1s ease);
+}
+
+.search-btn:hover {
+  background: var(--color-primary-hover, #4de0b2);
+}

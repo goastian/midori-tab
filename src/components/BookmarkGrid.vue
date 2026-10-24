@@ -107,18 +107,18 @@
       </article>
 
       <article
-        v-if="showAds && (!adRequestComplete || adsStore.hasAd)"
+        v-if="showAds && (!adRequestComplete || hasAd)"
         ref="sponsoredCard"
         class="speed-dial-card sponsored-card"
         :class="{
-          'sponsored-card--pending': !adsStore.hasAd,
+          'sponsored-card--pending': !hasAd,
           'sponsored-card--disclosed': requiresDisclosure,
         }"
         :role="requiresDisclosure ? 'complementary' : undefined"
         :aria-label="sponsoredAriaLabel"
-        :aria-hidden="!adsStore.hasAd"
+        :aria-hidden="!hasAd"
       >
-        <template v-if="adsStore.hasAd">
+        <template v-if="hasAd">
           <span v-if="requiresDisclosure" class="sponsored-badge" :title="sponsoredBadge">{{ sponsoredBadge }}</span>
           <button
             v-if="requiresDisclosure"
@@ -260,16 +260,12 @@
 
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
-import useAdsStore from '../stores/useAdsStore.js';
-import {
-  AD_VIEWABILITY_THRESHOLD,
-  createAdViewabilityTracker,
-} from '../services/AdViewability.js';
-import { createAdInteractionGuard } from '../services/AdInteractionGuard.js';
 import { observeElementSize } from '../composables/layoutResizeBus.js';
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
 import { cancelRemoteTask, scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
 import faviconService from '../services/FaviconService.js';
+import { faviconDisplayUrl, readFaviconSnapshot, writeFaviconSnapshot } from '../services/faviconSnapshot.js';
+import { readBookmarkSnapshot, writeBookmarkSnapshot } from '../bootstrap/bookmarkSnapshot.js';
 import {
   getSpeedDialMetrics,
   requiresPaidDisclosure,
@@ -308,6 +304,7 @@ export default {
   name: 'BookmarkGrid',
   components: { DashboardIcon },
   emits: [
+    'ready',
     'sponsored-impression',
     'sponsored-click',
     'sponsored-feedback',
@@ -325,18 +322,24 @@ export default {
     showAddButton: { type: Boolean, default: true },
   },
   data() {
+    const snapshot = readBookmarkSnapshot();
+    const favicons = readFaviconSnapshot();
     return {
       i18n: useI18nStore(),
-      adsStore: useAdsStore(),
-      bookmarks: cloneDefaults(),
+      adsStore: null,
+      adRuntime: null,
+      adRuntimeLoading: false,
+      bookmarks: snapshot ? { [snapshot.activeTab]: snapshot.items } : cloneDefaults(),
       bookmarksReady: false,
+      bookmarkSaveGeneration: 0,
+      bookmarkSavePending: false,
       remoteImagesReady: Boolean(window.__midoriPerf?.marks?.['interaction-ready']),
       perfMarkListener: null,
-      categories: [...DEFAULT_CATEGORIES],
-      activeTab: DEFAULT_CATEGORIES[0],
+      categories: snapshot?.categories || [...DEFAULT_CATEGORIES],
+      activeTab: snapshot?.activeTab || DEFAULT_CATEGORIES[0],
       failedFavicons: {},
-      faviconUrls: {},
-      staleFavicons: {},
+      faviconUrls: favicons.urls,
+      staleFavicons: favicons.stale,
       faviconGeneration: 0,
       faviconCacheLoading: false,
       faviconsDisposed: false,
@@ -353,7 +356,7 @@ export default {
       adRequestComplete: false,
       adObserver: null,
       adViewability: null,
-      clickGuard: createAdInteractionGuard(),
+      clickGuard: null,
       iconFailed: false,
       showTransparency: false,
       feedbackPending: false,
@@ -395,9 +398,8 @@ export default {
         gridTemplateColumns: `repeat(${this.effectiveColumns}, minmax(0, 1fr))`,
       };
     },
-    ad() {
-      return this.adsStore.currentAd || {};
-    },
+    hasAd() { return Boolean(this.adsStore?.hasAd); },
+    ad() { return this.adsStore?.currentAd || {}; },
     requiresDisclosure() {
       return requiresPaidDisclosure(this.ad);
     },
@@ -411,7 +413,7 @@ export default {
       return String(this.ad.title || 'A').trim().charAt(0).toUpperCase() || 'A';
     },
     sponsoredAriaLabel() {
-      if (!this.adsStore.hasAd) return undefined;
+      if (!this.hasAd) return undefined;
       if (!this.requiresDisclosure) return this.ad.title || undefined;
       const label = this.i18n.$t('ads.label') || 'Sponsored content';
       return this.ad.title ? `${label}: ${this.ad.title}` : label;
@@ -441,26 +443,27 @@ export default {
   },
   watch: {
     visibleBookmarks() { void this.primeFavicons(); },
+    activeTab() {
+      if (this.bookmarksReady && !this.bookmarkSavePending) writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
+    },
     showAds(enabled) {
       if (!enabled) {
+        cancelRemoteTask('ads-decision');
         this.teardownAdObserver();
         this.teardownPerformanceObserver();
         return;
       }
-      if (!this.adsStore.hasAd) {
+      if (!this.hasAd) {
         this.adRequested = false;
         this.adRequestComplete = false;
       }
-      this.$nextTick(() => {
-        this.setupPerformanceObserver();
-        this.setupAdObserver();
-      });
+      void this.ensureAdRuntime();
     },
     'adsStore.currentAd'(ad) {
       this.iconFailed = false;
       this.showTransparency = false;
       this.feedbackState = '';
-      this.clickGuard.reset();
+      this.clickGuard?.reset();
       if (this.showAds && ad) {
         this.$nextTick(() => {
           this.setupAdObserver();
@@ -476,18 +479,23 @@ export default {
       if (event.detail?.name === 'interaction-ready') {
         this.remoteImagesReady = true;
         this.queueFavicons();
+        void this.ensureAdRuntime();
       }
     };
     window.addEventListener('midori:perf-mark', this.perfMarkListener);
     this.remoteImagesReady = Boolean(window.__midoriPerf?.marks?.['interaction-ready']);
-    void this.loadBookmarks().then(() => this.primeFavicons()).catch(() => undefined);
+    void this.loadBookmarks().catch(() => undefined).then(async () => {
+      const favicons = this.primeFavicons();
+      await this.$nextTick();
+      if (!this.faviconsDisposed) this.$emit('ready');
+      await favicons;
+    }).catch(error => console.warn('[Midori] Could not restore cached favicons', error));
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.handleAdPageVisibility);
     }
     this.$nextTick(() => {
       this.setupLayoutObserver();
-      this.setupPerformanceObserver();
-      this.setupAdObserver();
+      void this.ensureAdRuntime();
     });
   },
   beforeUnmount() {
@@ -533,15 +541,18 @@ export default {
       return String(bookmark?.title || '?').trim().charAt(0).toUpperCase() || '?';
     },
     bookmarkDomain(bookmark) {
-      try { return bookmark.domain || new URL(bookmark.url).hostname; } catch (_) { return ''; }
+      try { return new URL(`https://${bookmark.domain || new URL(bookmark.url).hostname}`).hostname.toLowerCase(); } catch (_) { return ''; }
     },
     async primeFavicons() {
       if (!this.bookmarksReady || this.faviconsDisposed) return;
       const generation = ++this.faviconGeneration;
       this.faviconCacheLoading = true;
       const domains = new Set(this.visibleBookmarks.map(bookmark => this.bookmarkDomain(bookmark)).filter(Boolean));
-      for (const [domain, url] of Object.entries(this.faviconUrls)) {
-        if (!domains.has(domain)) {
+      const retained = Object.keys(this.faviconUrls).filter(domain => !domains.has(domain));
+      while (retained.length && retained.length + domains.size > 32) {
+        const domain = retained.shift();
+        if (domain) {
+          const url = this.faviconUrls[domain];
           URL.revokeObjectURL(url);
           delete this.faviconUrls[domain];
           delete this.staleFavicons[domain];
@@ -554,8 +565,11 @@ export default {
         if (this.faviconUrls[domain]) return;
         const cached = await faviconService.readCached(domain);
         if (!cached || this.faviconsDisposed || generation !== this.faviconGeneration || this.faviconUrls[domain]) return;
-        this.faviconUrls[domain] = URL.createObjectURL(cached.blob);
+        const url = await faviconDisplayUrl(cached.blob).catch(() => null);
+        if (!url || this.faviconsDisposed || generation !== this.faviconGeneration || this.faviconUrls[domain]) return;
+        this.faviconUrls[domain] = url;
         this.staleFavicons[domain] = cached.stale;
+        writeFaviconSnapshot(domain, url, cached.fetchedAt);
       }));
       if (generation === this.faviconGeneration) {
         this.faviconCacheLoading = false;
@@ -572,10 +586,15 @@ export default {
         void scheduleRemoteTask(key, async signal => {
           try {
             const icon = await faviconService.loadIcon(domain, { signal });
+            const url = icon.blob ? await faviconDisplayUrl(icon.blob) : icon.url;
+            const decoded = new Image();
+            decoded.src = url;
+            await decoded.decode();
             if (signal.aborted || this.faviconsDisposed || !this.visibleBookmarks.some(item => this.bookmarkDomain(item) === domain)) return false;
             const previous = this.faviconUrls[domain];
-            this.faviconUrls[domain] = icon.blob ? URL.createObjectURL(icon.blob) : icon.url;
+            this.faviconUrls[domain] = url;
             this.staleFavicons[domain] = false;
+            if (icon.blob) writeFaviconSnapshot(domain, url, Date.now());
             if (previous) URL.revokeObjectURL(previous);
             return true;
           } catch (error) {
@@ -595,6 +614,7 @@ export default {
       URL.revokeObjectURL(this.faviconUrls[domain]);
       delete this.faviconUrls[domain];
       this.failedFavicons[domain] = true;
+      writeFaviconSnapshot(domain, null);
       void faviconService.remove(domain);
     },
     normalizeBookmarkUrl(rawUrl) {
@@ -697,20 +717,27 @@ export default {
         getJson(STORAGE_KEY, null, { strictRead: true }),
         getJson(CATEGORIES_KEY, null, { strictRead: true }),
       ]);
-      if (savedBookmarks && typeof savedBookmarks === 'object' && !Array.isArray(savedBookmarks)) {
-        this.bookmarks = savedBookmarks;
-      }
-      if (Array.isArray(savedCategories) && savedCategories.length) {
-        this.categories = savedCategories.filter(category => typeof category === 'string' && category.trim());
-      }
+      this.bookmarks = savedBookmarks && typeof savedBookmarks === 'object' && !Array.isArray(savedBookmarks)
+        ? savedBookmarks : cloneDefaults();
+      this.categories = Array.isArray(savedCategories) && savedCategories.length
+        ? savedCategories.filter(category => typeof category === 'string' && category.trim()) : [...DEFAULT_CATEGORIES];
       if (!this.categories.length) this.categories = [...DEFAULT_CATEGORIES];
       this.activeTab = this.categories.includes(this.activeTab) ? this.activeTab : this.categories[0];
       this.bookmarksReady = true;
+      writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
     },
     saveBookmarksDebounced() {
       if (!this.bookmarksReady) return;
-      setJsonDebounced(STORAGE_KEY, this.bookmarks, { delayMs: 700, maxBytes: 350_000 });
-      setJsonDebounced(CATEGORIES_KEY, this.categories, { delayMs: 700, maxBytes: 32_000 });
+      const generation = ++this.bookmarkSaveGeneration;
+      this.bookmarkSavePending = true;
+      void Promise.all([
+        setJsonDebounced(STORAGE_KEY, this.bookmarks, { delayMs: 700, maxBytes: 350_000 }),
+        setJsonDebounced(CATEGORIES_KEY, this.categories, { delayMs: 700, maxBytes: 32_000 }),
+      ]).then(() => {
+        if (generation !== this.bookmarkSaveGeneration) return;
+        this.bookmarkSavePending = false;
+        writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
+      }).catch(() => { if (generation === this.bookmarkSaveGeneration) this.bookmarkSavePending = false; });
     },
     async flushBookmarks() {
       if (!this.bookmarksReady) return;
@@ -718,10 +745,32 @@ export default {
         flushDebounced(STORAGE_KEY, this.bookmarks, { maxBytes: 350_000 }),
         flushDebounced(CATEGORIES_KEY, this.categories, { maxBytes: 32_000 }),
       ]);
+      writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
+    },
+    async ensureAdRuntime() {
+      if (!this.showAds || !this.remoteImagesReady || this.adRuntimeLoading || this.faviconsDisposed || document.visibilityState === 'hidden') return;
+      this.adRuntimeLoading = true;
+      try {
+        if (!this.adRuntime) {
+          const runtime = await import('../services/bookmarkAdsRuntime.js');
+          if (this.faviconsDisposed) return;
+          this.adRuntime = runtime;
+          this.clickGuard = runtime.createAdInteractionGuard();
+          this.adsStore = runtime.useAdsStore();
+        }
+        await this.$nextTick();
+        if (!this.showAds || this.faviconsDisposed) return;
+        this.setupPerformanceObserver();
+        this.setupAdObserver();
+      } catch (error) {
+        this.adRequestComplete = true;
+        console.warn('[Midori] Could not load sponsored shortcuts', error);
+      } finally { this.adRuntimeLoading = false; }
     },
     setupAdObserver() {
       this.teardownAdObserver();
-      if (!this.showAds) return;
+      if (!this.showAds || !this.adRuntime || !this.adsStore) return;
+      const { AD_VIEWABILITY_THRESHOLD, createAdViewabilityTracker } = this.adRuntime;
       const element = this.$refs.sponsoredCard;
       if (!element) return;
 
@@ -772,13 +821,14 @@ export default {
       if (document.visibilityState === 'visible') {
         this.failedFavicons = {};
         void this.primeFavicons();
+        void this.ensureAdRuntime();
       }
       this.adViewability?.setPageVisible(
         typeof document === 'undefined' || document.visibilityState === 'visible',
       );
     },
     async loadAdWhenVisible() {
-      if (!this.showAds || this.adRequested || this.adsStore.hasAd) return;
+      if (!this.showAds || !this.adsStore || this.adRequested || this.hasAd) return;
       this.adRequested = true;
       const completed = await scheduleRemoteTask('ads-decision', signal => this.adsStore.loadAd(false, { signal }), { priority: 1 });
       if (!completed) this.adRequested = false;
@@ -790,11 +840,11 @@ export default {
       }
     },
     dismissSponsored() {
-      void this.adsStore.dismiss();
+      void this.adsStore?.dismiss();
       this.showTransparency = false;
     },
     async submitFeedback(relevant) {
-      if (!this.requiresDisclosure || this.feedbackPending || this.feedbackState === 'sent') return;
+      if (!this.adsStore || !this.requiresDisclosure || this.feedbackPending || this.feedbackState === 'sent') return;
       this.feedbackPending = true;
       const accepted = await this.adsStore.submitFeedback(relevant);
       this.feedbackPending = false;
@@ -802,8 +852,8 @@ export default {
       if (accepted) this.$emit('sponsored-feedback', { ad: this.ad, relevant });
     },
     openSponsored(event) {
-      const clickedAd = this.adsStore.currentAd;
-      if (!clickedAd) return;
+      const clickedAd = this.adsStore?.currentAd;
+      if (!clickedAd || !this.clickGuard) return;
       const intent = this.clickGuard.evaluate({ keyboard: event?.detail === 0 });
       if (!intent.allowed) {
         void this.adsStore.trackClientEvent('accidental_click_guard', {
@@ -817,7 +867,7 @@ export default {
       }
     },
     setupPerformanceObserver() {
-      if (this.performanceObserver || typeof PerformanceObserver === 'undefined') return;
+      if (!this.showAds || !this.adRuntime || this.performanceObserver || typeof PerformanceObserver === 'undefined') return;
       try {
         this.performanceObserver = new PerformanceObserver((list) => {
           const root = this.$refs.sponsoredCard;
@@ -844,7 +894,7 @@ export default {
       }, 2000);
     },
     reportPerformance() {
-      if (this.performanceReported || !this.adsStore.hasAd) return;
+      if (this.performanceReported || !this.hasAd) return;
       this.performanceReported = true;
       void this.adsStore.trackClientEvent('client_performance', {
         request_latency_ms: Math.max(0, Math.round(this.adsStore.requestLatencyMs || 0)),
@@ -1222,7 +1272,7 @@ export default {
 }
 
 .sponsored-skeleton {
-  min-height: var(--dial-height);
+  min-height: calc(var(--dial-height) - 2px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1235,7 +1285,6 @@ export default {
   height: var(--dial-icon-size);
   background: var(--surface-control, rgba(34, 75, 61, 0.1));
   border-radius: 10px;
-  animation: skeleton-pulse 1.2s ease-in-out infinite alternate;
 }
 
 .sponsored-skeleton span + span {
@@ -1434,10 +1483,6 @@ input:focus-visible {
 .editor-fade-leave-active { transition: opacity 170ms ease; }
 .editor-fade-enter-from,
 .editor-fade-leave-to { opacity: 0; }
-
-@keyframes skeleton-pulse {
-  to { opacity: 0.45; }
-}
 
 @media (max-width: 600px) {
   .bookmark-grid {

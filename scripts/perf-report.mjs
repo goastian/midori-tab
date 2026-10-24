@@ -2,12 +2,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
+import { BUILD_BUDGETS, RESOURCE_GRAPH_BASELINE } from './critical-requests.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const schema = JSON.parse(readFileSync(resolve(ROOT, 'contracts/performance-runtime.schema.json')));
 const validate = new Ajv2020({ validateFormats: false }).compile(schema);
-const CORE_METRICS = ['bootStartMs', 'shellVisibleMs', 'interactionReadyMs', 'idleCompleteMs', 'captureDurationMs'];
-const SUMMARY_METRICS = [...CORE_METRICS, 'searchReadyMs', 'inputResponseMs', 'aboveFoldStableMs', 'firstContentfulPaintMs', 'domContentLoadedMs', 'loadEventMs', 'longTasksMs', 'longTaskBlockingMs', 'longTaskBlockingBeforeInteractionMs', 'cls', 'nodeCount'];
+const CORE_METRICS = ['bootStartMs', 'shellVisibleMs', 'vueReadyMs', 'interactionReadyMs', 'idleCompleteMs', 'captureDurationMs'];
+const RESOURCE_METRICS = ['htmlJsBytes', 'htmlCssBytes', 'criticalJsBytes', 'criticalCssBytes', 'captureJsBytes', 'captureCssBytes'];
+const SUMMARY_METRICS = [...CORE_METRICS, 'earlySearchReadyMs', 'searchReadyMs', 'inputResponseMs', 'aboveFoldStableMs', 'firstContentfulPaintMs', 'domContentLoadedMs', 'loadEventMs', 'longTasksMs', 'longTaskBlockingMs', 'longTaskBlockingBeforeInteractionMs', 'cls', 'nodeCount', ...RESOURCE_METRICS];
 
 export function percentile(values, percentage) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -27,12 +29,19 @@ export function runtimeBudgets(meta) {
   return {
     shellVisibleMs: cold ? 350 : (mobile ? 220 : 120),
     interactionReadyMs: cold ? 650 : (mobile ? 400 : 250),
+    vueReadyMs: cold ? 650 : (mobile ? 400 : 250),
     inputResponseMs: 100,
     ...(cold ? {} : { aboveFoldStableMs: mobile ? 900 : 600 }),
     cls: 0.05,
     longTaskBlockingBeforeInteractionMs: mobile ? 80 : 25,
     networkBeforeInteraction: 0,
     captureDurationMinimumMs: 5000,
+    htmlJsBytes: BUILD_BUDGETS.jsBytes,
+    htmlCssBytes: BUILD_BUDGETS.cssBytes,
+    criticalJsBytes: RESOURCE_GRAPH_BASELINE.interaction.jsBytes,
+    criticalCssBytes: RESOURCE_GRAPH_BASELINE.interaction.cssBytes,
+    captureJsBytes: RESOURCE_GRAPH_BASELINE.capture.jsBytes,
+    captureCssBytes: RESOURCE_GRAPH_BASELINE.capture.cssBytes,
   };
 }
 
@@ -73,6 +82,7 @@ export function evaluateRuntimeGate(meta, samples, { diagnostic = false, minimum
     }
     if (sample.errors?.length) fail('errors', 'page-or-measurement-errors', { sampleIndex, detail: sample.errors });
     if (sample.interactionReadyMs < sample.shellVisibleMs) fail('interactionReadyMs', 'before-visible-shell', { sampleIndex });
+    if (sample.interactionReadyMs < sample.vueReadyMs) fail('interactionReadyMs', 'before-vue-mount', { sampleIndex });
     if (sample.captureDurationMs < budgets.captureDurationMinimumMs) fail('captureDurationMs', 'capture-too-short', { sampleIndex, actual: sample.captureDurationMs, limit: budgets.captureDurationMinimumMs });
     if (sample.buffersTruncated) fail('buffers', 'measurement-buffer-overflow', { sampleIndex });
     if (!sample.visualStability?.supported) {
@@ -89,10 +99,19 @@ export function evaluateRuntimeGate(meta, samples, { diagnostic = false, minimum
       fail('networkBeforeInteraction', 'automatic-http-before-interaction', { sampleIndex, actual: network.unexpected, limit: 0 });
     }
     if (sample.startupGraphViolations?.length) fail('startupGraph', 'unexpected-startup-resources', { sampleIndex, detail: sample.startupGraphViolations });
-    if (sample.startupResourceCoverage === 'unavailable') unsupported('startupGraph', 'resource-timing-unavailable', sampleIndex);
+    if (sample.startupResourceCoverage !== 'available') unsupported('startupGraph', 'local-resource-observation-incomplete', sampleIndex, true);
+    for (const phase of ['html', 'interaction', 'vue', 'capture']) {
+      const graph = sample.resourceGraphs?.[phase];
+      if (!graph) fail('startupGraph', 'missing-resource-graph', { sampleIndex, phase });
+      if (graph?.missingResources?.length) fail('startupGraph', 'missing-requested-files', { sampleIndex, phase, detail: graph.missingResources });
+    }
+    for (const metric of RESOURCE_METRICS) {
+      if (!Number.isInteger(sample[metric])) fail(metric, 'missing-measurement', { sampleIndex });
+      if (sample[metric] > budgets[metric]) fail(metric, 'requested-graph-exceeds-budget', { sampleIndex, actual: sample[metric], limit: budgets[metric] });
+    }
     if (sample.functional?.searchEnabled) {
       if (!sample.functional.inputTyped) fail('search', 'input-not-functional', { sampleIndex });
-      for (const metric of ['searchReadyMs', 'inputResponseMs']) {
+      for (const metric of ['earlySearchReadyMs', 'searchReadyMs', 'inputResponseMs']) {
         if (!Number.isFinite(sample[metric])) fail(metric, 'missing-measurement', { sampleIndex });
       }
     }
@@ -110,7 +129,7 @@ export function evaluateRuntimeGate(meta, samples, { diagnostic = false, minimum
       }
     }
   }
-  for (const metric of ['shellVisibleMs', 'interactionReadyMs', 'inputResponseMs', 'aboveFoldStableMs', 'cls', 'longTaskBlockingBeforeInteractionMs']) {
+  for (const metric of ['shellVisibleMs', 'vueReadyMs', 'interactionReadyMs', 'inputResponseMs', 'aboveFoldStableMs', 'cls', 'longTaskBlockingBeforeInteractionMs', ...RESOURCE_METRICS]) {
     if (budgets[metric] === undefined) continue;
     const actual = summary[metric].p95;
     const limit = budgets[metric];
@@ -129,6 +148,7 @@ export function buildRuntimeReport(meta, samples, options = {}) {
     ...meta,
     schemaVersion: 3,
     generatedAt: new Date().toISOString(),
+    resourceBudgetReference: RESOURCE_GRAPH_BASELINE,
     diagnostic,
     baselineEligible: !diagnostic && samples.length >= 30
       && !result.violations.some(item => ['missing-measurement', 'capture-too-short', 'measurement-failed', 'page-or-measurement-errors', 'duplicate-index', 'measurement-buffer-overflow', 'visual-tracker-overflow', 'supported-metric-not-recorded', 'unsupported-metric-must-be-null'].includes(item.reason))
