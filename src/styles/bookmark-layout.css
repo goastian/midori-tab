@@ -56,6 +56,11 @@
   position: relative;
 }
 
+.bookmark-grid .speed-dial-card--conflict .speed-dial-link {
+  outline: 1px dashed currentColor;
+  outline-offset: -4px;
+}
+
 .bookmark-grid .speed-dial-link {
   width: 100%;
   min-height: var(--dial-height);

@@ -19,6 +19,8 @@ export const DEFAULT_BOOKMARKS = {
   ],
 };
 
+/** Default shortcuts with stable ids, so every New Tab agrees on them before anything is saved. */
 export function cloneDefaults() {
-  return JSON.parse(JSON.stringify(DEFAULT_BOOKMARKS));
+  return Object.fromEntries(Object.entries(DEFAULT_BOOKMARKS).map(([category, items]) => [category,
+    items.map((item, index) => ({ ...item, id: `default-${category}-${index}`, rev: 1 }))]));
 }

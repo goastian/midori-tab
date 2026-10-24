@@ -12,11 +12,24 @@ const CANCEL = '.editor-button--secondary';
 const ADD_BOOKMARK = '.speed-dial-card--add .speed-dial-link';
 const EDIT_BOOKMARK = '.card-actions .card-action-btn:first-child';
 
-async function canonicalState(page) {
-  return page.evaluate(async () => {
+const IDENTITY = ['id', 'rev', 'updatedAt'];
+
+async function canonicalState(page, { identity = false } = {}) {
+  const state = await page.evaluate(async () => {
     const stored = await (globalThis.browser || globalThis.chrome).storage.local.get(['midori_bookmarks', 'midori_bookmark_categories']);
     return { bookmarks: stored.midori_bookmarks?.value, categories: stored.midori_bookmark_categories?.value };
   });
+  if (identity || !state.bookmarks) return state;
+  const strip = item => Object.fromEntries(Object.entries(item).filter(([key]) => !IDENTITY.includes(key)));
+  return { ...state, bookmarks: Object.fromEntries(Object.entries(state.bookmarks).map(([name, list]) => [name, list.map(strip)])) };
+}
+
+async function assertIdentity(page) {
+  const { bookmarks } = await canonicalState(page, { identity: true });
+  const ids = Object.values(bookmarks).flat().map(item => item.id);
+  assert.ok(ids.every(id => typeof id === 'string' && id), 'Every stored shortcut must have a stable id');
+  assert.equal(new Set(ids).size, ids.length, 'Shortcut ids must be unique');
+  return ids;
 }
 
 async function waitForSavedState(page, expected) {
@@ -89,7 +102,12 @@ export async function runBookmarkEditorIntegration(session, { extensionPath, out
       && Number.isFinite(window.__midoriPerf?.marks?.['idle-complete']) && !document.querySelector('.tab-add')?.disabled);
     await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 750)));
     const initialState = { bookmarks: { Fixture: [original] }, categories: ['Fixture'] };
-    assert.deepEqual(await canonicalState(page), initialState);
+    await page.waitForFunction(async () => {
+      const stored = await (globalThis.browser || globalThis.chrome).storage.local.get('midori_bookmarks');
+      return stored.midori_bookmarks?.value?.Fixture?.[0]?.id;
+    }, null, { timeout: 10_000 });
+    assert.deepEqual(await canonicalState(page), initialState, 'Migration to ids must keep the content');
+    report.ids = await assertIdentity(page);
     report.beforeClick = await observeBeforeClick(session, page);
     assert.equal(await page.evaluate(() => Boolean(document.querySelector('.dial-editor'))), false);
     assert.ok(editorResources.every(path => !report.beforeClick.paths.includes(path)),
@@ -168,6 +186,9 @@ export async function runBookmarkEditorIntegration(session, { extensionPath, out
     await page.waitForFunction(() => !document.querySelector('.dial-editor'));
     const updatedState = { bookmarks: { Fixture: [original], Work: [updated] }, categories: ['Fixture', 'Work'] };
     await waitForSavedState(page, updatedState);
+    const idsBefore = report.ids;
+    report.ids = await assertIdentity(page);
+    assert.ok(idsBefore.includes(report.ids[0]), 'The id of the pre-existing shortcut survives migration and edits');
     report.cases.push({ id: 'edit-cancel-preserves-original-and-save-updates-existing-item', passed: true });
     if (outputDir) await page.screenshot({ path: join(outputDir, 'bookmark-edited.png') });
 

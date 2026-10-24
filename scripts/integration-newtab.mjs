@@ -19,6 +19,7 @@ import { runSponsoredIntegration } from '../tests/integration/sponsored-runtime.
 import { runSmartSuggestionsIntegration } from '../tests/integration/smart-suggestions.mjs';
 import { runResizeLayoutIntegration } from '../tests/integration/resize-layout.mjs';
 import { runWallpaperPrewarmIntegration } from '../tests/integration/wallpaper-prewarm.mjs';
+import { instrumentStorageFaultFixture, runWidgetDataSafetyIntegration } from '../tests/integration/widget-data-safety.mjs';
 
 const HELP = 'Usage: npm run test:integration -- [--engine firefox|chromium] [--build] [--dist PATH] [--output-dir PATH]';
 
@@ -193,6 +194,17 @@ export async function runIntegration(options) {
       const faviconSession = await openContextWithRetry({ ...baseOptions, extensionPath: directory });
       try { return await runFaviconIntegration(faviconSession, { outputDir: join(options.outputDir, 'favicon-cache') }); }
       finally { await closeContext(faviconSession); }
+    });
+
+    await check('widget-data-safety-hydration-hide-close-conflicts-statuses-and-undo', async () => {
+      const directory = copyExtension('widget-data-safety');
+      instrumentStorageFaultFixture(directory);
+      const safetySession = await openContextWithRetry({ ...baseOptions, extensionPath: directory });
+      const outputDir = join(options.outputDir, 'widget-data-safety');
+      try {
+        const result = await runWidgetDataSafetyIntegration(safetySession, { outputDir });
+        return { report: join(outputDir, 'widget-data-safety.json'), passed: result.passed, cases: result.cases.map(item => item.id) };
+      } finally { await closeContext(safetySession); }
     });
 
     await check('bookmark-editor-deferred-load-and-persistent-editing', async () => {

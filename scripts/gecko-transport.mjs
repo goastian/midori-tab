@@ -429,6 +429,15 @@ export async function openGeckoSession({ extensionPath, executablePath = process
           if (path) writeFileSync(path, bytes);
           return bytes;
         });
+        // Real key events: `keys` may contain WebDriver special keys, `modifier` is held while they are pressed.
+        page.pressKeys = (keys, { modifier } = {}) => serial(async () => {
+          await commandContext('content', handle);
+          const actions = [...(modifier ? [{ type: 'keyDown', value: modifier }] : []),
+            ...[...keys].flatMap(key => [{ type: 'keyDown', value: key }, { type: 'keyUp', value: key }]),
+            ...(modifier ? [{ type: 'keyUp', value: modifier }] : [])];
+          await client.send('WebDriver:PerformActions', { actions: [{ type: 'key', id: 'keyboard', actions }] });
+          await client.send('WebDriver:ReleaseActions');
+        });
         page.setWindowRect = rect => serial(async () => {
           await commandContext('content', handle);
           return client.send('WebDriver:SetWindowRect', rect);

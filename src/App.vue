@@ -63,8 +63,9 @@ export default {
         return ['Unsplash', 'MarketplaceWallpaper', 'LocalFolder'].includes(this.tabStore.background?.type);
       } },
   async mounted() {
-    this.storageErrorListener = () => { this.storageError = true; };
+    this.storageErrorListener = () => { this.storageError = Boolean(window.__midoriStorageError); };
     window.addEventListener('midori:storage-error', this.storageErrorListener);
+    window.addEventListener('midori:storage-recovered', this.storageErrorListener);
     this.suggestionsStorageListener = event => {
       if (event.storageArea === localStorage && (event.key === 'suggestionsStore' || event.key === null)) {
         void this.refreshSmartSuggestions();
@@ -88,7 +89,8 @@ export default {
       else clearTimeout(this.deferredMountHandle);
     }
     if (this.interactionListener) window.removeEventListener('midori:perf-mark', this.interactionListener);
-    if (this.storageErrorListener) window.removeEventListener('midori:storage-error', this.storageErrorListener);
+    window.removeEventListener('midori:storage-error', this.storageErrorListener);
+    window.removeEventListener('midori:storage-recovered', this.storageErrorListener);
     if (this.suggestionsStorageListener) window.removeEventListener('storage', this.suggestionsStorageListener);
     this.autoTheme?.stop();
     if (this.omniKeydownListener) window.removeEventListener('keydown', this.omniKeydownListener);

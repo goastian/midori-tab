@@ -2,6 +2,7 @@
   <div class="todo-widget">
     <div class="todo-header" :class="{ 'todo-header--managed': managed }">
       <span v-if="!managed" class="todo-title">✅ {{ copy.title }}</span>
+      <SaveStatus :storage="storage" :copy="safety" @retry="retry" />
       <span class="todo-count">{{ doneCount }}/{{ items.length }}</span>
     </div>
 
@@ -17,27 +18,36 @@
     </div>
 
     <ul class="todo-list" v-if="items.length">
-      <li v-for="(item, idx) in items" :key="idx" class="todo-item" :class="{ done: item.done }">
-        <button class="todo-check" :disabled="!ready" @click="toggleItem(idx)">
+      <li v-for="item in items" :key="item.id" class="todo-item" :class="{ done: item.done }" :data-id="item.id">
+        <button class="todo-check" :disabled="!ready" @click="toggleItem(item.id)">
           <span v-if="item.done">✓</span>
         </button>
         <span class="todo-text">{{ item.text }}</span>
-        <button class="todo-delete" :disabled="!ready" @click="removeItem(idx)">×</button>
+        <span v-if="item.conflictOf" class="todo-conflict">{{ safety.conflictCopy }}</span>
+        <button class="todo-delete" :disabled="!ready" :aria-label="`${safety.remove}: ${item.text}`" @click="removeItem(item.id)">×</button>
       </li>
     </ul>
     <p v-else class="todo-empty">{{ copy.empty }}</p>
+    <UndoToast :entry="undo" :copy="safety" @undo="undoLast" @dismiss="dismissUndo" />
   </div>
 </template>
 
 <script>
-import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
+import { createSyncedRecord } from '../services/syncedRecord.js';
+import { newId, touchItem } from '../services/itemIds.js';
+import { mergeById } from '../services/listMerge.js';
+import { createUndoBuffer } from '../services/undoBuffer.js';
+import { normalizeTodos } from '../services/widgetData.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import { getWidgetCopy } from '../i18n/widget-copy.js';
+import SaveStatus from './SaveStatus.vue';
+import UndoToast from './UndoToast.vue';
 
 const STORAGE_KEY = 'midori_todos';
 
 export default {
   name: 'TodoWidget',
+  components: { SaveStatus, UndoToast },
 
   props: {
     managed: { type: Boolean, default: false },
@@ -46,7 +56,8 @@ export default {
   data() {
     return {
       items: [],
-      ready: false,
+      storage: { load: 'idle', save: 'idle', error: null },
+      undo: null,
       newTask: '',
       i18n: useI18nStore(),
     };
@@ -56,56 +67,84 @@ export default {
     copy() {
       return getWidgetCopy(this.i18n.locale).todoWidget;
     },
+    safety() {
+      return getWidgetCopy(this.i18n.locale).dataSafety;
+    },
+    ready() {
+      return this.storage.load === 'ready';
+    },
     doneCount() {
       return this.items.filter(i => i.done).length;
     },
   },
 
+  created() {
+    this.record = createSyncedRecord({
+      key: STORAGE_KEY,
+      maxBytes: 160_000,
+      delayMs: 700,
+      empty: () => [],
+      normalize: normalizeTodos,
+      merge: (base, local, remote) => mergeById(base, local, remote),
+      getValue: () => this.items,
+      setValue: value => { this.items = value; },
+      onState: state => { this.storage = state; },
+    });
+    this.undoBuffer = createUndoBuffer(entry => { this.undo = entry; });
+  },
+
+  mounted() {
+    void this.record.load();
+  },
+
+  beforeUnmount() {
+    void this.record.flush();
+    this.record.dispose();
+    this.undoBuffer.clear();
+  },
+
   methods: {
-    async load() {
-      const saved = await getJson(STORAGE_KEY, [], { strictRead: true });
-      this.items = Array.isArray(saved) ? saved : [];
-      this.ready = true;
+    retry() {
+      void this.record.retry();
     },
 
-    saveDebounced() {
-      if (!this.ready) return;
-      setJsonDebounced(STORAGE_KEY, this.items, { delayMs: 700, maxBytes: 160_000 });
+    undoLast() {
+      this.undoBuffer.undo();
     },
 
-    flush() {
-      if (!this.ready) return Promise.resolve();
-      return flushDebounced(STORAGE_KEY, this.items, { maxBytes: 160_000 }).catch(() => undefined);
+    dismissUndo() {
+      this.undoBuffer.clear();
     },
 
     addTask() {
       if (!this.ready) return;
       const text = this.newTask.trim();
       if (!text) return;
-      this.items.push({ text, done: false });
+      this.items.push({ id: newId(), text, done: false, rev: 1, updatedAt: Date.now() });
       this.newTask = '';
-      this.saveDebounced();
+      void this.record.touch();
     },
 
-    toggleItem(idx) {
-      if (!this.ready) return;
-      this.items[idx].done = !this.items[idx].done;
-      this.saveDebounced();
+    toggleItem(id) {
+      const index = this.items.findIndex(item => item.id === id);
+      if (!this.ready || index < 0) return;
+      this.items.splice(index, 1, touchItem({ ...this.items[index], done: !this.items[index].done }));
+      void this.record.touch();
     },
 
-    removeItem(idx) {
-      if (!this.ready) return;
-      this.items.splice(idx, 1);
-      this.saveDebounced();
+    removeItem(id) {
+      const index = this.items.findIndex(item => item.id === id);
+      if (!this.ready || index < 0) return;
+      const [removed] = this.items.splice(index, 1);
+      this.undoBuffer.push({ label: removed.text, restore: () => this.restoreItem(removed, index) });
+      void this.record.touch();
     },
-  },
 
-  mounted() {
-    void this.load().catch(() => undefined);
-  },
-
-  beforeUnmount() {
-    this.flush();
+    restoreItem(item, index) {
+      if (!this.ready || this.items.some(entry => entry.id === item.id)) return;
+      this.items.splice(Math.min(index, this.items.length), 0, item);
+      void this.record.touch();
+    },
   },
 };
 </script>
@@ -138,7 +177,21 @@ export default {
   color: var(--color-text, #C4F0E0);
 }
 
+.todo-conflict {
+  flex-shrink: 0;
+  padding: 0.05rem 0.4rem;
+  border: 1px dashed var(--color-border-hover, rgba(126, 196, 168, 0.4));
+  border-radius: 10rem;
+  font-size: 0.62rem;
+  color: var(--color-text-muted, #5A9A82);
+}
+
+.todo-header {
+  gap: 0.5rem;
+}
+
 .todo-count {
+  margin-left: auto;
   font-size: 0.7rem;
   color: var(--color-text-muted, #5A9A82);
   background: var(--color-accent-bg, rgba(4,164,105,0.08));
@@ -260,7 +313,8 @@ export default {
   flex-shrink: 0;
 }
 
-.todo-item:hover .todo-delete {
+.todo-item:hover .todo-delete,
+.todo-delete:focus-visible {
   opacity: 1;
 }
 

@@ -50,8 +50,9 @@
     >
       <article
         v-for="(bookmark, index) in visibleBookmarks"
-        :key="`${activeTab}-${bookmark.url}-${index}`"
+        :key="bookmark.id"
         class="speed-dial-card"
+        :class="{ 'speed-dial-card--conflict': bookmark.conflictOf }"
       >
         <div v-if="showDeleteButton" class="card-actions">
           <button
@@ -60,7 +61,7 @@
             type="button"
             :title="i18n.$t('bookmarks.edit')"
             :aria-label="`${i18n.$t('bookmarks.edit')}: ${bookmark.title}`"
-            @click="openBookmarkEditor(index)"
+            @click="openBookmarkEditor(bookmark.id)"
           >
             <DashboardIcon name="edit" :size="13" :stroke-width="1.8" aria-hidden="true" />
           </button>
@@ -70,7 +71,7 @@
             type="button"
             :title="i18n.$t('bookmarks.delete')"
             :aria-label="`${i18n.$t('bookmarks.delete')}: ${bookmark.title}`"
-            @click="pendingBookmarkDelete = index"
+            @click="pendingBookmarkDelete = bookmark.id"
           >
             <DashboardIcon name="trash" :size="13" :stroke-width="1.8" aria-hidden="true" />
           </button>
@@ -97,11 +98,11 @@
           <span class="speed-dial-title" :title="bookmark.title">{{ bookmark.title }}</span>
         </a>
 
-        <div v-if="pendingBookmarkDelete === index" class="card-confirmation" role="alert">
+        <div v-if="pendingBookmarkDelete === bookmark.id" class="card-confirmation" role="alert">
           <span>{{ i18n.$t('bookmarks.deleteConfirm') }}</span>
           <div>
-            <button type="button" @click="pendingBookmarkDelete = -1">{{ i18n.$t('bookmarks.cancel') }}</button>
-            <button type="button" class="is-danger" @click="confirmDeleteBookmark(index)">{{ i18n.$t('bookmarks.delete') }}</button>
+            <button type="button" @click="pendingBookmarkDelete = ''">{{ i18n.$t('bookmarks.cancel') }}</button>
+            <button type="button" class="is-danger" @click="confirmDeleteBookmark(bookmark.id)">{{ i18n.$t('bookmarks.delete') }}</button>
           </div>
         </div>
       </article>
@@ -198,12 +199,13 @@
     <BookmarkEditor
       v-if="editorMode"
       :mode="editorMode"
-      :bookmark="editingIndex >= 0 ? currentBookmarks[editingIndex] : null"
+      :bookmark="currentBookmarks.find(bookmark => bookmark.id === editingId) || null"
       :categories="categories"
       :normalize-url="normalizeBookmarkUrl"
       @close="closeEditor"
       @save="saveEditor"
     />
+    <BookmarkUndoToast v-if="undo" :entry="undo" @undo="undo.undo()" @dismiss="undo.dismiss()" />
   </div>
 </template>
 
@@ -227,12 +229,18 @@ import '../styles/bookmark-layout.css';
 const STORAGE_KEY = 'midori_bookmarks';
 const CATEGORIES_KEY = 'midori_bookmark_categories';
 
+/** Timestamp of the newest write to the bookmarks by any New Tab, read from the shared mirror. */
+function mirrorAt() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY))?.updatedAt || 0; } catch { return 0; }
+}
+
 export default {
   name: 'BookmarkGrid',
   components: {
     DashboardIcon,
     BookmarkEditor: defineAsyncComponent(() => import('./BookmarkEditor.vue')),
     SponsoredTransparency: defineAsyncComponent(() => import('./SponsoredTransparency.vue')),
+    BookmarkUndoToast: defineAsyncComponent(() => import('./BookmarkUndoToast.vue')),
   },
   emits: [
     'ready',
@@ -276,8 +284,9 @@ export default {
       faviconsDisposed: false,
       faviconTaskKeys: new Set(),
       editorMode: '',
-      editingIndex: -1,
-      pendingBookmarkDelete: -1,
+      editingId: '',
+      pendingBookmarkDelete: '',
+      undo: null,
       pendingCategoryDelete: '',
       adRequested: false,
       adRequestComplete: false,
@@ -371,6 +380,10 @@ export default {
       }
     },
   },
+  created() {
+    this.syncedAt = 0;
+    this.bookmarksUnsaved = false;
+  },
   mounted() {
     this.perfMarkListener = event => {
       if (event.detail?.name === 'interaction-ready') {
@@ -408,7 +421,10 @@ export default {
     this.reportPerformance();
     this.teardownAdObserver();
     this.teardownPerformanceObserver();
-    void this.flushBookmarks();
+    void this.flushBookmarks().catch(() => undefined);
+    clearTimeout(this.remoteSyncTimer);
+    window.removeEventListener('storage', this.storageListener);
+    this.undoBuffer?.clear();
   },
   methods: {
     formatCopy(key, replacements = {}) {
@@ -503,19 +519,19 @@ export default {
       if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('invalid protocol');
       return parsed;
     },
-    openBookmarkEditor(index = -1) {
+    openBookmarkEditor(id = '') {
       if (!this.bookmarksReady) return;
-      this.editingIndex = index;
+      this.editingId = id;
       this.editorMode = 'bookmark';
     },
     openCategoryEditor() {
       if (!this.bookmarksReady) return;
-      this.editingIndex = -1;
+      this.editingId = '';
       this.editorMode = 'category';
     },
     closeEditor() {
       this.editorMode = '';
-      this.editingIndex = -1;
+      this.editingId = '';
     },
     saveEditor(value) {
       if (!this.bookmarksReady) return;
@@ -525,8 +541,10 @@ export default {
         this.activeTab = value;
       } else {
         if (!this.bookmarks[this.activeTab]) this.bookmarks[this.activeTab] = [];
-        if (this.editingIndex >= 0) this.bookmarks[this.activeTab][this.editingIndex] = value;
-        else this.bookmarks[this.activeTab].push(value);
+        const list = this.bookmarks[this.activeTab];
+        const index = this.editingId ? list.findIndex(bookmark => bookmark.id === this.editingId) : -1;
+        if (index >= 0) list.splice(index, 1, { ...list[index], ...value, rev: (list[index].rev || 0) + 1, updatedAt: Date.now() });
+        else list.push({ id: crypto.randomUUID(), rev: 1, updatedAt: Date.now(), ...value });
       }
       this.saveBookmarksDebounced();
       this.closeEditor();
@@ -536,62 +554,96 @@ export default {
       try {
         const parsed = this.normalizeBookmarkUrl(url);
         if (!this.bookmarks[this.activeTab]) this.bookmarks[this.activeTab] = [];
-        this.bookmarks[this.activeTab].push({ title, url: parsed.toString(), domain: parsed.hostname });
+        this.bookmarks[this.activeTab].push({ id: crypto.randomUUID(), rev: 1, updatedAt: Date.now(), title, url: parsed.toString(), domain: parsed.hostname });
         this.saveBookmarksDebounced();
         return true;
       } catch (_) {
         return false;
       }
     },
-    confirmDeleteBookmark(index) {
-      if (!this.bookmarksReady) return;
-      if (index < 0 || index >= this.currentBookmarks.length) return;
-      this.bookmarks[this.activeTab].splice(index, 1);
-      this.pendingBookmarkDelete = -1;
+    confirmDeleteBookmark(id) {
+      const category = this.activeTab;
+      const index = this.currentBookmarks.findIndex(bookmark => bookmark.id === id);
+      this.pendingBookmarkDelete = '';
+      if (!this.bookmarksReady || index < 0) return;
+      const [removed] = this.bookmarks[category].splice(index, 1);
+      void this.remember(removed.title, sync => () => sync.restoreBookmark(this, category, removed, index));
       this.saveBookmarksDebounced();
     },
     confirmDeleteCategory() {
       if (!this.bookmarksReady) return;
       const category = this.pendingCategoryDelete;
       if (!category || this.categories.length <= 1) return;
+      const index = this.categories.indexOf(category);
+      const items = this.bookmarks[category] || [];
       this.categories = this.categories.filter(item => item !== category);
       delete this.bookmarks[category];
       if (this.activeTab === category) this.activeTab = this.categories[0];
       this.pendingCategoryDelete = '';
+      void this.remember(category, sync => () => sync.restoreCategory(this, category, items, index));
       this.saveBookmarksDebounced();
+    },
+    /** Undo is loaded with the first deletion, not at startup. */
+    async remember(label, restoreFor) {
+      const sync = await import('../services/bookmarkSync.js');
+      await sync.remember(this, label, restoreFor(sync));
+    },
+    bookmarkState() {
+      return JSON.parse(JSON.stringify({ bookmarks: this.bookmarks, categories: this.categories }));
     },
     async loadBookmarks() {
       const [savedBookmarks, savedCategories] = await Promise.all([
         getJson(STORAGE_KEY, null, { strictRead: true }),
         getJson(CATEGORIES_KEY, null, { strictRead: true }),
       ]);
-      this.bookmarks = savedBookmarks && typeof savedBookmarks === 'object' && !Array.isArray(savedBookmarks)
-        ? savedBookmarks : cloneDefaults();
+      const stored = savedBookmarks && typeof savedBookmarks === 'object' && !Array.isArray(savedBookmarks);
+      const needsIds = stored && Object.values(savedBookmarks).some(list => Array.isArray(list) && list.some(item => !item?.id));
+      // Only shortcuts saved before ids existed need the upgrade code; the result is saved once.
+      this.bookmarks = needsIds ? (await import('../services/bookmarkData.js')).normalizeBookmarks(savedBookmarks)
+        : (stored ? savedBookmarks : cloneDefaults());
       this.categories = Array.isArray(savedCategories) && savedCategories.length
         ? savedCategories.filter(category => typeof category === 'string' && category.trim()) : [...DEFAULT_CATEGORIES];
       if (!this.categories.length) this.categories = [...DEFAULT_CATEGORIES];
       this.activeTab = this.categories.includes(this.activeTab) ? this.activeTab : this.categories[0];
+      this.syncedState = this.bookmarkState();
+      this.syncedAt = mirrorAt();
       this.bookmarksReady = true;
+      this.storageListener = event => {
+        if (event.key === STORAGE_KEY || event.key === CATEGORIES_KEY) this.requestRemoteSync();
+      };
+      window.addEventListener('storage', this.storageListener);
       writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
+      // Ids must reach storage or each tab would invent its own.
+      if (needsIds) this.saveBookmarksDebounced();
+    },
+    requestRemoteSync() {
+      void import('../services/bookmarkSync.js').then(sync => sync.requestSync(this, mirrorAt));
     },
     saveBookmarksDebounced() {
       if (!this.bookmarksReady) return;
-      const generation = ++this.bookmarkSaveGeneration;
       this.bookmarkSavePending = true;
-      void Promise.all([
-        setJsonDebounced(STORAGE_KEY, this.bookmarks, { delayMs: 700, maxBytes: 350_000 }),
-        setJsonDebounced(CATEGORIES_KEY, this.categories, { delayMs: 700, maxBytes: 32_000 }),
-      ]).then(() => {
+      this.bookmarksUnsaved = true;
+      // Another tab saved since this one last synchronised: merge it first, then save the result.
+      if (mirrorAt() > this.syncedAt && !this.remoteSyncing) { this.requestRemoteSync(); return; }
+      const generation = ++this.bookmarkSaveGeneration;
+      const writes = Promise.all([
+        setJsonDebounced(STORAGE_KEY, this.bookmarks, { delayMs: 700, maxBytes: 350_000, userData: true }),
+        setJsonDebounced(CATEGORIES_KEY, this.categories, { delayMs: 700, maxBytes: 32_000, userData: true }),
+      ]);
+      this.syncedAt = mirrorAt();
+      void writes.then(() => {
         if (generation !== this.bookmarkSaveGeneration) return;
         this.bookmarkSavePending = false;
+        this.bookmarksUnsaved = false;
+        this.syncedState = this.bookmarkState();
         writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
       }).catch(() => { if (generation === this.bookmarkSaveGeneration) this.bookmarkSavePending = false; });
     },
     async flushBookmarks() {
-      if (!this.bookmarksReady) return;
+      if (!this.bookmarksReady || !this.bookmarksUnsaved) return;
       await Promise.all([
-        flushDebounced(STORAGE_KEY, this.bookmarks, { maxBytes: 350_000 }),
-        flushDebounced(CATEGORIES_KEY, this.categories, { maxBytes: 32_000 }),
+        flushDebounced(STORAGE_KEY, this.bookmarks, { maxBytes: 350_000, userData: true }),
+        flushDebounced(CATEGORIES_KEY, this.categories, { maxBytes: 32_000, userData: true }),
       ]);
       writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
     },

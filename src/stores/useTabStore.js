@@ -123,49 +123,16 @@ const useTabStore = defineStore('tabStore', {
         window.__midoriEarlyWallpaper = null;
         window.__midoriWallpaperKey = null;
       }
-      switch(this.background.type) {
-        case 'Solid':
-          body.style.backgroundImage = '';
-          body.style.backgroundSize = '';
-          body.style.backgroundPosition = '';
-          body.style.backgroundRepeat = '';
-          if (!this.background.default) {
-            body.style.backgroundColor = this.background.color;
-          } else body.style.backgroundColor = '';
-          body.className = '';
-          break;
-        case 'Gradient':
-          body.style.backgroundImage = '';
-          body.style.backgroundSize = '';
-          body.style.backgroundPosition = '';
-          body.style.backgroundRepeat = '';
-          body.style.backgroundColor = '';
-          if(this.background.default) {
-            body.className = '';
-            body.classList.add(this.background.class);
-          } else {
-            console.log('soon');
-          }
-          break;
-        case 'Unsplash':
-        case 'MarketplaceWallpaper':
-        case 'LocalFolder':
-          {
-            body.style.backgroundColor = '';
-            body.style.backgroundImage = '';
-            body.style.backgroundSize = '';
-            body.style.backgroundPosition = '';
-            body.style.backgroundRepeat = '';
-          }
-          body.className = '';
-          break;
-        default:
-          body.style.backgroundImage = '';
-          body.style.backgroundSize = '';
-          body.style.backgroundPosition = '';
-          body.style.backgroundRepeat = '';
-          body.style.backgroundColor = '';
-          body.className = '';
+      const { type } = this.background;
+      for (const property of ['backgroundImage', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat']) body.style[property] = '';
+      body.style.backgroundColor = type === 'Solid' && !this.background.default ? this.background.color : '';
+      if (type === 'Gradient' && this.background.default) {
+        body.className = '';
+        body.classList.add(this.background.class);
+      } else if (type === 'Gradient') {
+        console.log('soon');
+      } else {
+        body.className = '';
       }
 
       if (typeof window !== 'undefined') {

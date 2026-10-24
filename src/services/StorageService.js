@@ -2,6 +2,11 @@ const DEFAULT_VERSION = 1;
 const DEFAULT_DEBOUNCE_MS = 600;
 const timers = new Map();
 const queues = new Map();
+const failed = new Map();
+let lifecycleBound = false;
+
+/** Identifies this document so other New Tabs can ignore their own writes. */
+export const WRITER_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 function hasRuntimeLastError() {
   return typeof chrome !== 'undefined' && chrome.runtime?.lastError;
@@ -16,92 +21,29 @@ function usesPromiseStorage(storage) {
   return typeof browser !== 'undefined' && storage === browser?.storage?.local;
 }
 
-function storageGet(storage, key) {
+/** Calls storage.local.<method>(arg) through whichever API style the browser provides. */
+function storageCall(storage, method, arg) {
   return new Promise((resolve, reject) => {
     try {
+      if (typeof storage[method] !== 'function') { resolve(undefined); return; }
       if (usesPromiseStorage(storage)) {
-        const maybePromise = storage.get(key);
-        if (maybePromise && typeof maybePromise.then === 'function') {
-          maybePromise.then(resolve, reject);
-        } else {
-          resolve(maybePromise);
-        }
+        Promise.resolve(storage[method](arg)).then(resolve, reject);
         return;
       }
-
-      if (typeof storage.get === 'function') {
-        storage.get(key, (result) => {
-          const lastError = hasRuntimeLastError();
-          if (lastError) reject(new Error(lastError.message));
-          else resolve(result);
-        });
-        return;
-      }
-
-      resolve(undefined);
+      storage[method](arg, result => {
+        const lastError = hasRuntimeLastError();
+        if (lastError) reject(new Error(lastError.message));
+        else resolve(result);
+      });
     } catch (error) {
       reject(error);
     }
   });
 }
 
-function storageSet(storage, payload) {
-  return new Promise((resolve, reject) => {
-    try {
-      if (usesPromiseStorage(storage)) {
-        const maybePromise = storage.set(payload);
-        if (maybePromise && typeof maybePromise.then === 'function') {
-          maybePromise.then(resolve, reject);
-        } else {
-          resolve(maybePromise);
-        }
-        return;
-      }
-
-      if (typeof storage.set === 'function') {
-        storage.set(payload, () => {
-          const lastError = hasRuntimeLastError();
-          if (lastError) reject(new Error(lastError.message));
-          else resolve();
-        });
-        return;
-      }
-
-      resolve();
-    } catch (error) {
-      reject(error);
-    }
-  });
-}
-
-function storageRemove(storage, key) {
-  return new Promise((resolve, reject) => {
-    try {
-      if (usesPromiseStorage(storage)) {
-        const maybePromise = storage.remove(key);
-        if (maybePromise && typeof maybePromise.then === 'function') {
-          maybePromise.then(resolve, reject);
-        } else {
-          resolve(maybePromise);
-        }
-        return;
-      }
-
-      if (typeof storage.remove === 'function') {
-        storage.remove(key, () => {
-          const lastError = hasRuntimeLastError();
-          if (lastError) reject(new Error(lastError.message));
-          else resolve();
-        });
-        return;
-      }
-
-      resolve();
-    } catch (error) {
-      reject(error);
-    }
-  });
-}
+const storageGet = (storage, key) => storageCall(storage, 'get', key);
+const storageSet = (storage, payload) => storageCall(storage, 'set', payload);
+const storageRemove = (storage, key) => storageCall(storage, 'remove', key);
 
 function snapshotJsonValue(value) {
   const serialized = JSON.stringify(value);
@@ -113,6 +55,7 @@ function wrapPayload(value, version = DEFAULT_VERSION) {
     __midoriStorageVersion: version,
     value,
     updatedAt: Date.now(),
+    origin: WRITER_ID,
   };
 }
 
@@ -166,7 +109,6 @@ export async function getJson(key, fallback = null, options = {}) {
       return pickNewestPayload(result?.[key], localPayload, fallback);
     } catch (error) {
       if (options.strictRead && localPayload === undefined) {
-        reportFailure(key, error);
         throw error;
       }
       return unwrapPayload(localPayload, fallback);
@@ -233,14 +175,28 @@ function enqueue(key, task) {
   return operation;
 }
 
-function reportFailure(key, error) {
+function guardUnload(event) {
+  if (![...failed.values()].some(Boolean)) return;
+  event.preventDefault();
+  event.returnValue = '';
+}
+
+function reportFailure(key, error, options) {
   console.error(`[StorageService] Could not save ${key}:`, error);
+  failed.set(key, Boolean(options?.userData));
   if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
     window.__midoriStorageError = true;
+    window.addEventListener?.('beforeunload', guardUnload);
     window.dispatchEvent(new CustomEvent('midori:storage-error', {
       detail: { key, message: error?.message || String(error) },
     }));
   }
+}
+
+function recovered(key) {
+  if (!failed.delete(key) || failed.size || typeof window === 'undefined') return;
+  window.__midoriStorageError = false;
+  window.dispatchEvent(new CustomEvent('midori:storage-recovered'));
 }
 
 function observed(promise) {
@@ -255,6 +211,31 @@ function settlePending(pending, result, error) {
   }
 }
 
+function writePending(key, pending) {
+  enqueue(key, () => writeExtension(key, pending.payload)).then(
+    value => { recovered(key); settlePending(pending, value); },
+    error => { reportFailure(key, error, pending.options); settlePending(pending, null, error); },
+  );
+}
+
+/** Starts every write still waiting for its debounce delay; used when the page is hidden or closed. */
+export function flushAllPending() {
+  for (const [key, pending] of [...timers]) {
+    clearTimeout(pending.timer);
+    timers.delete(key);
+    writePending(key, pending);
+  }
+}
+
+function bindLifecycle() {
+  if (lifecycleBound || typeof window === 'undefined' || !window.addEventListener || !document?.addEventListener) return;
+  lifecycleBound = true;
+  window.addEventListener('pagehide', flushAllPending);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushAllPending();
+  });
+}
+
 export function setJsonDebounced(key, value, options = {}) {
   const delay = Number(options.delayMs) >= 0 ? Number(options.delayMs) : DEFAULT_DEBOUNCE_MS;
   let payload;
@@ -262,14 +243,16 @@ export function setJsonDebounced(key, value, options = {}) {
     payload = preparePayload(key, value, options);
     writeMirror(key, payload);
   } catch (error) {
-    reportFailure(key, error);
+    reportFailure(key, error, options);
     return observed(Promise.reject(error));
   }
+  bindLifecycle();
   const previous = timers.get(key);
   if (previous) clearTimeout(previous.timer);
 
   const pending = {
     payload,
+    options,
     waiters: previous?.waiters || [],
     timer: null,
   };
@@ -277,10 +260,7 @@ export function setJsonDebounced(key, value, options = {}) {
   pending.timer = setTimeout(() => {
     if (timers.get(key) !== pending) return;
     timers.delete(key);
-    enqueue(key, () => writeExtension(key, pending.payload)).then(
-      value => settlePending(pending, value),
-      error => { reportFailure(key, error); settlePending(pending, null, error); },
-    );
+    writePending(key, pending);
   }, delay);
   timers.set(key, pending);
   return result;
@@ -292,7 +272,7 @@ export async function flushDebounced(key, value, options = {}) {
     payload = preparePayload(key, value, options);
     writeMirror(key, payload);
   } catch (error) {
-    reportFailure(key, error);
+    reportFailure(key, error, options);
     throw error;
   }
   const pending = timers.get(key);
@@ -302,10 +282,11 @@ export async function flushDebounced(key, value, options = {}) {
   }
   try {
     const result = await enqueue(key, () => writeExtension(key, payload));
+    recovered(key);
     if (pending) settlePending(pending, result);
     return result;
   } catch (error) {
-    reportFailure(key, error);
+    reportFailure(key, error, options);
     if (pending) settlePending(pending, null, error);
     throw error;
   }
@@ -319,11 +300,13 @@ export async function remove(key) {
     settlePending(pending, null, new DOMException('Storage write cancelled by remove', 'AbortError'));
   }
   try {
-    return await enqueue(key, async () => {
+    const result = await enqueue(key, async () => {
       const storage = getExtensionStorage();
       if (storage?.remove) await storageRemove(storage, key);
       localStorage.removeItem(key);
     });
+    recovered(key);
+    return result;
   } catch (error) {
     reportFailure(key, error);
     throw error;

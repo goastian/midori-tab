@@ -33,7 +33,7 @@
             <div class="cal-agenda-title">{{ selectedDateLabel }}</div>
             <div class="cal-agenda-subtitle">{{ agendaSubtitle }}</div>
           </div>
-          <button class="cal-primary-btn" type="button" @click="openComposer(selectedDate)">
+          <button class="cal-primary-btn" type="button" :disabled="!ready" @click="openComposer(selectedDate)">
             + {{ i18n.t.calendar.newEvent }}
           </button>
         </div>
@@ -42,15 +42,18 @@
           <article v-for="event in selectedDayEvents" :key="event.id" class="cal-event-card">
             <div class="cal-event-top">
               <div class="cal-event-info">
-                <div class="cal-event-title">{{ event.title }}</div>
+                <div class="cal-event-title">
+                  {{ event.title }}
+                  <span v-if="event.conflictOf" class="cal-conflict">{{ safety.conflictCopy }}</span>
+                </div>
                 <div class="cal-event-meta">
                   <span>{{ event.time || i18n.t.calendar.noTime }}</span>
                   <span v-if="event.location">· {{ event.location }}</span>
                 </div>
               </div>
               <div class="cal-event-actions">
-                <button class="cal-ghost-btn" type="button" @click="openComposer(event.date, event)">{{ i18n.t.calendar.edit }}</button>
-                <button class="cal-ghost-btn danger" type="button" @click="removeEvent(event.id)">{{ i18n.t.calendar.delete }}</button>
+                <button class="cal-ghost-btn" type="button" :disabled="!ready" @click="openComposer(event.date, event)">{{ i18n.t.calendar.edit }}</button>
+                <button class="cal-ghost-btn danger" type="button" :disabled="!ready" @click="removeEvent(event.id)">{{ i18n.t.calendar.delete }}</button>
               </div>
             </div>
             <p v-if="event.notes" class="cal-event-notes">{{ event.notes }}</p>
@@ -107,7 +110,7 @@
 
         <div class="cal-form-actions">
           <button class="cal-ghost-btn" type="button" @click="closeComposer">{{ i18n.t.calendar.cancel }}</button>
-          <button class="cal-primary-btn" type="button" @click="saveEvent">
+          <button class="cal-primary-btn" type="button" :disabled="!ready" @click="saveEvent">
             {{ editingEventId ? i18n.t.calendar.saveChanges : i18n.t.calendar.createEvent }}
           </button>
         </div>
@@ -116,7 +119,9 @@
 
     <div class="cal-today-bar">
       <span class="cal-today-label">{{ todayFormatted }}</span>
+      <SaveStatus :storage="storage" :copy="safety" @retry="retryStorage" />
     </div>
+    <UndoToast :entry="undoEntry" :copy="safety" @undo="undoLast" @dismiss="dismissUndo" />
   </div>
 
   <!-- Reminder notifications: bottom-right corner ONLY -->
@@ -137,11 +142,16 @@
 </template>
 
 <script>
+import { computed } from 'vue';
 import { useCalendar } from '../composables/useCalendar.js';
 import useI18nStore from '../stores/useI18nStore.js';
+import { getWidgetCopy } from '../i18n/widget-copy.js';
+import SaveStatus from './SaveStatus.vue';
+import UndoToast from './UndoToast.vue';
 
 export default {
   name: 'CalendarWidget',
+  components: { SaveStatus, UndoToast },
   props: {
     managed: { type: Boolean, default: false },
   },
@@ -149,6 +159,7 @@ export default {
     const i18n = useI18nStore();
     return {
       i18n,
+      safety: computed(() => getWidgetCopy(i18n.locale).dataSafety),
       ...useCalendar(i18n),
     };
   },
@@ -424,9 +435,23 @@ export default {
 }
 
 .cal-today-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding-top: 0.15rem;
   border-top: 1px solid var(--color-border, rgba(126,196,168,0.1));
-  text-align: center;
+}
+
+.cal-conflict {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px dashed var(--color-border-hover, rgba(126, 196, 168, 0.4));
+  border-radius: 10rem;
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--color-text-muted, #5A9A82);
 }
 
 /* ===== Inline Form Panel ===== */

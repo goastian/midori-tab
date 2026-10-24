@@ -1,5 +1,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
+import { newId, touchItem } from '../services/itemIds.js';
+import { contentEqual, mergeById } from '../services/listMerge.js';
+import { createSyncedRecord } from '../services/syncedRecord.js';
+import { createUndoBuffer } from '../services/undoBuffer.js';
+import { normalizeEvents } from '../services/widgetData.js';
 import { WIDGET_COST } from './useWidgetRuntime.js';
 
 const STORAGE_KEY = 'midori_calendar_events';
@@ -42,23 +46,16 @@ function createDraft(dateKey, source = null) {
 }
 
 function normalizeEvent(event) {
-  return {
-    id: event.id,
-    title: event.title || '',
-    date: event.date,
-    time: event.time || '09:00',
-    location: event.location || '',
-    notes: event.notes || '',
-    reminderMinutes: Number.isFinite(event.reminderMinutes) ? event.reminderMinutes : 15,
-    notifiedAt: event.notifiedAt || null,
-  };
+  return normalizeEvents([event])[0];
 }
 
-function createEventId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `evt_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+const sameEvent = (left, right) => contentEqual(left, right, ['notifiedAt']);
+
+/** A reminder shown in one tab must not come back in another; it is not an edit of the event. */
+function settleEvent(chosen, local, remote) {
+  if (chosen.notifiedAt) return chosen;
+  const source = [local, remote].find(item => item.notifiedAt && sameEvent(item, chosen));
+  return source ? { ...chosen, notifiedAt: source.notifiedAt } : chosen;
 }
 
 function sortEvents(events) {
@@ -67,14 +64,6 @@ function sortEvents(events) {
     const rightDate = parseEventDateTime(right.date, right.time)?.getTime() || 0;
     return leftDate - rightDate;
   });
-}
-
-async function loadSavedEvents() {
-  const raw = await getJson(STORAGE_KEY, []);
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-  return sortEvents(raw.map(normalizeEvent).filter(event => event.date && event.id));
 }
 
 export function useCalendar(i18n) {
@@ -92,6 +81,25 @@ export function useCalendar(i18n) {
   const activeReminders = ref([]);
   const reminderTimer = ref(null);
   const visibilityListener = ref(null);
+  const storage = ref({ load: 'idle', save: 'idle', error: null });
+  const undoEntry = ref(null);
+  const ready = computed(() => storage.value.load === 'ready');
+  const undoBuffer = createUndoBuffer(entry => { undoEntry.value = entry; });
+  const record = createSyncedRecord({
+    key: STORAGE_KEY,
+    maxBytes: CALENDAR_MAX_BYTES,
+    delayMs: 600,
+    empty: () => [],
+    normalize: normalizeEvents,
+    merge: (base, local, remote) => mergeById(base, local, remote, { same: sameEvent, settle: settleEvent }),
+    getValue: () => events.value,
+    setValue: value => {
+      events.value = sortEvents(value);
+      // Another tab may have added or moved events after the first load.
+      if (ready.value) { checkReminders(); scheduleReminderCheck(); }
+    },
+    onState: state => { storage.value = state; },
+  });
 
   const currentLocale = computed(() => i18n.locale || undefined);
   const year = computed(() => viewYear.value);
@@ -173,10 +181,7 @@ export function useCalendar(i18n) {
   });
 
   function persistEvents() {
-    setJsonDebounced(STORAGE_KEY, events.value, {
-      delayMs: 600,
-      maxBytes: CALENDAR_MAX_BYTES,
-    }).catch(() => {});
+    void record.touch();
   }
 
   function clearReminderTimer() {
@@ -304,6 +309,7 @@ export function useCalendar(i18n) {
   }
 
   function saveEvent() {
+    if (!ready.value) return;
     const title = draft.value.title.trim();
     if (!title) {
       formError.value = i18n.t.calendar.errorTitleRequired;
@@ -319,7 +325,8 @@ export function useCalendar(i18n) {
     const reminderMinutes = Number(draft.value.reminderMinutes) || 0;
 
     const nextEvent = normalizeEvent({
-      id: existingEvent?.id || createEventId(),
+      id: existingEvent?.id || newId(),
+      rev: existingEvent?.rev,
       title,
       date: draft.value.date,
       time: draft.value.time || '09:00',
@@ -328,6 +335,7 @@ export function useCalendar(i18n) {
       reminderMinutes,
       notifiedAt: existingEvent?.notifiedAt || null,
     });
+    Object.assign(nextEvent, existingEvent ? touchItem(nextEvent) : { updatedAt: Date.now() });
 
     if (
       !existingEvent ||
@@ -353,10 +361,28 @@ export function useCalendar(i18n) {
   }
 
   function removeEvent(eventId) {
+    const index = events.value.findIndex(event => event.id === eventId);
+    if (!ready.value || index < 0) return;
+    const removed = events.value[index];
     events.value = events.value.filter(event => event.id !== eventId);
     activeReminders.value = activeReminders.value.filter(reminder => reminder.id !== eventId);
+    undoBuffer.push({ label: removed.title, restore: () => restoreEvent(removed) });
     persistEvents();
     scheduleReminderCheck();
+  }
+
+  function restoreEvent(event) {
+    if (!ready.value || events.value.some(item => item.id === event.id)) return;
+    events.value = sortEvents([...events.value, event]);
+    selectedDate.value = event.date;
+    persistEvents();
+    scheduleReminderCheck();
+  }
+
+  function retryStorage() {
+    void record.retry().then(loaded => {
+      if (loaded && ready.value) { checkReminders(); scheduleReminderCheck(); }
+    });
   }
 
   function reminderCopy(minutes) {
@@ -394,13 +420,10 @@ export function useCalendar(i18n) {
   }
 
   onMounted(async () => {
-    events.value = await loadSavedEvents();
-    checkReminders();
-    scheduleReminderCheck();
     visibilityListener.value = () => {
       if (document.visibilityState === 'hidden') {
         clearReminderTimer();
-        flushDebounced(STORAGE_KEY, events.value, { maxBytes: CALENDAR_MAX_BYTES }).catch(() => {});
+        void record.flush();
         return;
       }
       checkReminders();
@@ -408,11 +431,17 @@ export function useCalendar(i18n) {
     };
     document.addEventListener('visibilitychange', visibilityListener.value);
     document.addEventListener('keydown', handleEscape);
+    if (await record.load()) {
+      checkReminders();
+      scheduleReminderCheck();
+    }
   });
 
   onBeforeUnmount(() => {
     clearReminderTimer();
-    flushDebounced(STORAGE_KEY, events.value, { maxBytes: CALENDAR_MAX_BYTES }).catch(() => {});
+    void record.flush();
+    record.dispose();
+    undoBuffer.clear();
     if (visibilityListener.value) {
       document.removeEventListener('visibilitychange', visibilityListener.value);
     }
@@ -421,6 +450,12 @@ export function useCalendar(i18n) {
 
   return {
     widgetPolicy: CALENDAR_WIDGET_POLICY,
+    storage,
+    ready,
+    retryStorage,
+    undoEntry,
+    undoLast: () => undoBuffer.undo(),
+    dismissUndo: () => undoBuffer.clear(),
     year,
     monthName,
     dayLabels,
