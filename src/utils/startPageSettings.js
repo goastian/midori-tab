@@ -78,27 +78,26 @@ export function getSpeedDialMetrics(size) {
   return SPEED_DIAL_METRICS[size] || SPEED_DIAL_METRICS[START_PAGE_DEFAULTS.speedDialSize];
 }
 
-export function resolveResponsiveSpeedDialColumns({
-  configuredColumns,
-  viewportWidth,
-  availableWidth,
-  size,
-  horizontalPadding = 40,
-  gap = 12,
-} = {}) {
-  const columns = clampInteger(
-    configuredColumns,
-    2,
-    12,
-    START_PAGE_DEFAULTS.speedDialColumns,
-  );
+const SPEED_DIAL_GAP = 12;
+
+/**
+ * Inline custom properties for the speed dial layout. The column count is
+ * resolved by CSS from the width the grid actually receives (see
+ * bookmark-layout.css), so it never lags behind a resize.
+ */
+export function speedDialLayoutStyles({ size, columns } = {}) {
   const metrics = getSpeedDialMetrics(size);
-  const resolvedWidth = availableWidth == null
-    ? Math.max(0, Number(viewportWidth || 0) - horizontalPadding)
-    : Math.max(0, Number(availableWidth) || 0);
-  if (!resolvedWidth) return columns;
-  const fittingColumns = Math.max(1, Math.floor((resolvedWidth + gap) / (metrics.minWidth + gap)));
-  return Math.min(columns, fittingColumns);
+  const count = clampInteger(columns, 2, 12, START_PAGE_DEFAULTS.speedDialColumns);
+  const width = size === 'fit' ? 1080 : (count * (metrics.width + SPEED_DIAL_GAP)) - SPEED_DIAL_GAP;
+  return {
+    container: { maxWidth: `${Math.min(1080, width)}px` },
+    grid: {
+      '--dial-height': `${metrics.height}px`,
+      '--dial-icon-size': `${metrics.icon}px`,
+      '--dial-min': `${metrics.minWidth}px`,
+      '--dial-columns': count,
+    },
+  };
 }
 
 export function requiresPaidDisclosure(ad) {

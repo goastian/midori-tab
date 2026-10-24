@@ -47,7 +47,7 @@ body {
   min-height: 100%;
   min-height: 100dvh;
   overflow-x: clip;
-  background-color: var(--color-bg, #080D14);
+  background-color: var(--midori-start-color, var(--color-bg, #080D14));
   font-family: var(--font-sans);
   color: var(--color-text);
 }
@@ -74,19 +74,19 @@ body {
 }
 
 .bg-orange {
-  background: var(--gradient-orange);
+  background-image: var(--gradient-orange);
 }
 
 .bg-green {
-  background: var(--gradient-green);
+  background-image: var(--gradient-green);
 }
 
 .bg-deal {
-  background: var(--gradient-deal);
+  background-image: var(--gradient-deal);
 }
 
 .bg-purple {
-  background: var(--gradient-purple);
+  background-image: var(--gradient-purple);
 }
 
 .bg {

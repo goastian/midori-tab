@@ -116,6 +116,13 @@ const useTabStore = defineStore('tabStore', {
       }
 
       const body = document.getElementsByTagName('body')[0];
+      const root = document.documentElement;
+      if (background) {
+        root.style.removeProperty('--midori-start-background');
+        root.style.removeProperty('--midori-start-color');
+        window.__midoriEarlyWallpaper = null;
+        window.__midoriWallpaperKey = null;
+      }
       switch(this.background.type) {
         case 'Solid':
           body.style.backgroundImage = '';
@@ -124,7 +131,7 @@ const useTabStore = defineStore('tabStore', {
           body.style.backgroundRepeat = '';
           if (!this.background.default) {
             body.style.backgroundColor = this.background.color;
-          }
+          } else body.style.backgroundColor = '';
           body.className = '';
           break;
         case 'Gradient':
@@ -144,12 +151,11 @@ const useTabStore = defineStore('tabStore', {
         case 'MarketplaceWallpaper':
         case 'LocalFolder':
           {
-            const previewUrl = this.background.previewUrl || this.background.imageUrl || '';
-            body.style.backgroundColor = '#0f1520';
-            body.style.backgroundImage = previewUrl ? `url(${previewUrl})` : '';
-            body.style.backgroundSize = previewUrl ? 'cover' : '';
-            body.style.backgroundPosition = previewUrl ? 'center center' : '';
-            body.style.backgroundRepeat = previewUrl ? 'no-repeat' : '';
+            body.style.backgroundColor = '';
+            body.style.backgroundImage = '';
+            body.style.backgroundSize = '';
+            body.style.backgroundPosition = '';
+            body.style.backgroundRepeat = '';
           }
           body.className = '';
           break;

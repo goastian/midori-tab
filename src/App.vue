@@ -5,7 +5,7 @@
       <span>{{ i18n.locale === 'es' ? 'No se pudieron guardar los cambios. Libera espacio y vuelve a intentarlo.' : 'Changes could not be saved. Free storage space and try again.' }}</span>
       <button type="button" :aria-label="i18n.locale === 'es' ? 'Cerrar aviso' : 'Dismiss notice'" @click="storageError = false">×</button>
     </aside>
-    <WallpaperLayer v-if="featuresReady && showImageBackground" />
+    <WallpaperLayer v-if="showImageBackground" />
     <SettingsModal v-if="tabStore.state" />
     <SmartSuggestions v-if="renderSmartSuggestions" ref="smartSuggestions" />
     <OmniLauncher

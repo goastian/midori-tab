@@ -32,17 +32,15 @@
           @ready="bookmarksReady = true; markInteractionReady()"
         />
         <template #fallback>
-          <div class="async-placeholder async-placeholder--sponsored"></div>
+          <BookmarkGridPlaceholder :settings="tab" />
         </template>
       </Suspense>
     </section>
 
     <section
       v-if="tab.widgetsEnabled && activeBoardWidgets.length"
-      :class="[
-        'widget-board',
-        `widget-board--${widgetBoardMode}`,
-      ]"
+      class="widget-board"
+      :data-columns="maxWidgetColumns"
       :aria-label="i18n.$t('dashboard.widgetBoard.title')"
       ref="widgetBoard"
     >
@@ -51,7 +49,6 @@
       </p>
       <div
         class="dash-widgets"
-        :style="widgetGridStyle"
         role="list"
         :aria-describedby="activeBoardWidgets.length > 1 ? 'widget-board-hint' : undefined"
       >
@@ -70,7 +67,6 @@
             },
           ]"
           :data-widget="key"
-          :style="widgetCardStyle(key)"
           role="listitem"
           @dragover.prevent="handleDragOver(key, $event)"
           @dragleave="handleDragLeave(key, $event)"
@@ -105,9 +101,14 @@
                 <DashboardIcon name="close" :size="15" :stroke-width="1.8" aria-hidden="true" />
               </button>
             </header>
-            <div class="widget-card__body">
-              <div v-if="!renderGridWidgets" class="async-placeholder widget-card__placeholder" :style="widgetPlaceholderStyle(key)" role="presentation"></div>
-              <component :is="widgetComponentMap[key]" :managed="true" v-else />
+            <div class="widget-card__body" :style="widgetPlaceholderStyle(key)">
+              <Suspense v-if="renderGridWidgets">
+                <component :is="widgetComponentMap[key]" :managed="true" />
+                <template #fallback>
+                  <div class="widget-card__placeholder" aria-hidden="true"></div>
+                </template>
+              </Suspense>
+              <div v-else class="widget-card__placeholder" aria-hidden="true"></div>
             </div>
           </div>
         </article>
@@ -185,12 +186,11 @@ import useWidgetsStore from '../stores/useWidgetsStore';
 import useI18nStore from '../stores/useI18nStore.js';
 import DashboardActions from '../components/dashboard/DashboardActions.vue';
 import DashboardShell from '../components/dashboard/DashboardShell.vue';
+import BookmarkGridPlaceholder from '../components/BookmarkGridPlaceholder.vue';
 import { useWidgetManagement } from '../composables/useWidgetManagement.js';
-import { subscribeViewportSize } from '../composables/layoutResizeBus.js';
 import perfMarks from '../bootstrap/perfMarks.js';
 import {
   moveWidget,
-  resolveResponsiveWidgetColumns,
   resolveWidgetBoardMode,
 } from '../utils/widgetLayout.js';
 
@@ -200,6 +200,7 @@ export default {
   components: {
     AstianAppsMenu: defineAsyncComponent(() => import('../components/dashboard/AstianAppsMenu.vue')),
     BookmarkGrid: defineAsyncComponent(() => import('../components/BookmarkGrid.vue')),
+    BookmarkGridPlaceholder,
     BrowserBookmarksWidget: defineAsyncComponent(() => import('../components/BrowserBookmarksWidget.vue')),
     CalendarWidget: defineAsyncComponent(() => import('../components/CalendarWidget.vue')),
     CurrencyWidget: defineAsyncComponent(() => import('../components/CurrencyWidget.vue')),
@@ -237,7 +238,6 @@ export default {
       dropPlacement: 'before',
       dropAxis: 'horizontal',
       reorderAnnouncement: '',
-      viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
       renderGridWidgets: false,
       shellReady: false,
       searchReady: false,
@@ -249,10 +249,6 @@ export default {
 
   mounted() {
     window.addEventListener('midori:open-marketplace', this.handleOpenMarketplace);
-    this.unsubViewportSize = subscribeViewportSize(({ width }) => {
-      this.viewportWidth = width;
-    });
-
     this.deferGridWidgets();
     this.markInteractionReady();
 
@@ -274,7 +270,6 @@ export default {
     this.stableDisposed = true;
     if (this.stableFallback) clearTimeout(this.stableFallback);
     window.removeEventListener('midori:open-marketplace', this.handleOpenMarketplace);
-    this.unsubViewportSize?.();
     this.widgetBoardObserver?.disconnect();
     this.widgetBoardObserver = null;
   },
@@ -295,23 +290,12 @@ export default {
     widgetMetaMap() {
       return this.widgetManagement.getWidgetMetaMap();
     },
-    widgetBoardMode() {
-      return resolveWidgetBoardMode(this.effectiveWidgetColumns);
-    },
-    effectiveWidgetColumns() {
-      return Math.max(1, Math.min(
-        resolveResponsiveWidgetColumns({
-          configuredColumns: this.tab.widgetColumns,
-          viewportWidth: this.viewportWidth,
-        }),
-        this.activeBoardWidgets.length || 1,
-      ));
-    },
-    widgetGridStyle() {
-      return { '--widget-columns': this.effectiveWidgetColumns };
+    maxWidgetColumns() {
+      const configured = Math.min(4, Math.max(1, Number(this.tab.widgetColumns) || 1));
+      return Math.max(1, Math.min(configured, this.activeBoardWidgets.length || 1));
     },
     widgetBoardHint() {
-      const key = this.widgetBoardMode === 'pair'
+      const key = resolveWidgetBoardMode(this.maxWidgetColumns) === 'pair'
         ? 'dashboard.widgetBoard.pairHint'
         : 'dashboard.widgetBoard.gridHint';
       return this.i18n.$t(key);
@@ -363,7 +347,7 @@ export default {
     widgetPlaceholderStyle(key) {
       // PERF-202: reserva la altura real del widget en su estado contenido
       // para que el montaje asíncrono no provoque layout shift.
-      return { minHeight: this.widgetManagement.getWidgetPlaceholderHeight(key) };
+      return { '--widget-reserved-height': this.widgetManagement.getWidgetPlaceholderHeight(key) };
     },
 
     toggleQuickSettings() {
@@ -378,15 +362,6 @@ export default {
     openStartPageSettingsAndCloseQuick() {
       this.showQuickSettings = false;
       this.tab.openSettings('start-page');
-    },
-
-    widgetCardStyle(key) {
-      const layout = this.widgetMetaMap[key]?.layout || 'compact';
-      const isWide = layout === 'wide' || layout === 'wide-tall';
-      const span = this.widgetBoardMode === 'grid' && isWide
-        ? this.effectiveWidgetColumns
-        : 1;
-      return { '--widget-span': span };
     },
 
     toggleSection(key) {
@@ -441,11 +416,18 @@ export default {
       }
     },
 
+    liveWidgetBoardMode() {
+      const grid = this.$refs.widgetBoard?.querySelector('.dash-widgets');
+      const columns = grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 1;
+      return resolveWidgetBoardMode(columns);
+    },
+
     handleDragOver(key, event) {
       if (!this.draggedWidgetKey || this.draggedWidgetKey === key) return;
       event.dataTransfer.dropEffect = 'move';
 
       const rect = event.currentTarget.getBoundingClientRect();
+      const boardMode = this.liveWidgetBoardMode();
       const stacked = window.matchMedia('(max-width: 700px)').matches;
       const sourceIndex = this.activeBoardWidgets.indexOf(this.draggedWidgetKey);
       const targetIndex = this.activeBoardWidgets.indexOf(key);
@@ -458,10 +440,10 @@ export default {
       const sameVisualRow = sourceRect
         ? verticalOverlap >= Math.min(sourceRect.height, rect.height) * 0.4
         : false;
-      this.dropAxis = stacked || (this.widgetBoardMode === 'grid' && !sameVisualRow)
+      this.dropAxis = stacked || (boardMode === 'grid' && !sameVisualRow)
         ? 'vertical'
         : 'horizontal';
-      const after = this.widgetBoardMode === 'pair'
+      const after = boardMode === 'pair'
         ? sourceIndex < targetIndex
         : this.dropAxis === 'vertical'
           ? event.clientY >= rect.top + (rect.height / 2)
@@ -570,37 +552,56 @@ export default {
 
 .widget-board {
   width: 100%;
+  max-width: var(--dashboard-content-width, 45rem);
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
   transition: max-width 220ms ease;
 }
 
-.widget-board--single {
-  max-width: var(--dashboard-content-width, 45rem);
-}
-
-.widget-board--pair {
-  max-width: 940px;
-}
-
-.widget-board--grid {
-  max-width: 1060px;
-}
-
 .dash-widgets {
   width: 100%;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
+  align-items: start;
   column-gap: 0.85rem;
   row-gap: 0.75rem;
 }
 
-.widget-board--single .dash-widgets,
-.widget-board--pair .dash-widgets,
-.widget-board--grid .dash-widgets {
-  grid-template-columns: repeat(var(--widget-columns, 1), minmax(0, 1fr));
-  grid-auto-flow: row;
-  align-items: start;
+/* Columns follow the viewport through media queries so a resize or a restore
+   from minimized never paints a layout computed for the previous size. The
+   breakpoints are the former JS thresholds (available width 680/920/1120 plus
+   32px of padding). */
+@media (min-width: 712px) {
+  .widget-board:not([data-columns='1']) {
+    max-width: 940px;
+  }
+
+  .widget-board:not([data-columns='1']) .dash-widgets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 952px) {
+  .widget-board:is([data-columns='3'], [data-columns='4']) {
+    max-width: 1060px;
+  }
+
+  .widget-board:is([data-columns='3'], [data-columns='4']) .dash-widgets {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .widget-board:is([data-columns='3'], [data-columns='4']) .widget-card--wide,
+  .widget-board:is([data-columns='3'], [data-columns='4']) .widget-card--wide-tall {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1152px) {
+  .widget-board[data-columns='4'] .dash-widgets {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .widget-card {
@@ -619,16 +620,6 @@ export default {
   border-radius: var(--nova-panel-radius, 14px);
   box-shadow: 0 8px 28px rgba(8, 35, 26, 0.1), inset 0 1px rgba(255, 255, 255, 0.16);
   transition: border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease, transform 160ms ease;
-}
-
-.widget-board--grid .widget-card--compact,
-.widget-board--grid .widget-card--compact-tall {
-  grid-column: span var(--widget-span, 1);
-}
-
-.widget-board--grid .widget-card--wide,
-.widget-board--grid .widget-card--wide-tall {
-  grid-column: span var(--widget-span, 1);
 }
 
 .widget-card:hover .widget-card__surface,
@@ -758,7 +749,8 @@ export default {
 
 .widget-card__body {
   min-width: 0;
-  min-height: 0;
+  min-height: min(var(--widget-reserved-height, 0px), var(--widget-body-max-height, 10000px));
+  max-height: var(--widget-body-max-height, none);
   flex: 0 1 auto;
   overflow: auto;
   overscroll-behavior: contain;
@@ -767,20 +759,48 @@ export default {
 }
 
 .widget-card[data-widget='browserBookmarks'] .widget-card__body {
-  max-height: 330px;
+  --widget-body-max-height: 330px;
+}
+
+.widget-card[data-widget='privacy'] {
+  container-type: inline-size;
+}
+
+.widget-card[data-widget='privacy'] .widget-card__body {
+  --widget-body-max-height: var(--widget-reserved-height);
+}
+
+@container (max-width: 320px) {
+  .widget-card[data-widget='privacy'] .widget-card__body {
+    --privacy-content-height: calc(8rem + 2px);
+  }
+}
+
+@media (max-width: 520px) {
+  .widget-card[data-widget='privacy'] .widget-card__body {
+    /* Privacy's two-column grid needs a second 3.075rem row and a .5rem gap. */
+    --privacy-content-height: calc(11rem + 2px);
+  }
+
+  @container (max-width: 320px) {
+    .widget-card[data-widget='privacy'] .widget-card__body {
+      /* Each row also reserves .775rem for labels that wrap onto two lines. */
+      --privacy-content-height: calc(12.5rem + 2px);
+    }
+  }
 }
 
 .widget-card[data-widget='calendar'] .widget-card__body {
-  max-height: 420px;
+  --widget-body-max-height: 420px;
 }
 
 .widget-card[data-widget='rss'] .widget-card__body {
-  max-height: min(620px, 72vh);
+  --widget-body-max-height: min(620px, 72vh);
 }
 
 .widget-card[data-widget='notes'] .widget-card__body,
 .widget-card[data-widget='todo'] .widget-card__body {
-  max-height: 260px;
+  --widget-body-max-height: 260px;
 }
 
 .widget-card__body :deep(.weather-widget),
@@ -820,55 +840,15 @@ export default {
   position: relative;
 }
 
-.async-placeholder::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(126,196,168,0.08), transparent);
-  animation: placeholder-sheen 1.1s ease-in-out infinite;
-}
-
 .async-placeholder--search {
-  min-height: 54px;
+  min-height: calc(var(--nova-search-height, 48px) + var(--nova-segment-padding, 4px) + var(--nova-segment-padding, 4px) + 2px);
 }
 
 .widget-card__placeholder {
-  border: 0;
-  border-radius: 0;
-  min-height: 132px;
-}
-
-.widget-card__placeholder::after {
-  border-radius: 14px;
-}
-
-.async-placeholder--sponsored {
-  width: 104px;
-  min-height: 104px;
-}
-
-@keyframes placeholder-sheen {
-  100% {
-    transform: translateX(100%);
-  }
+  min-height: min(var(--widget-reserved-height, 132px), var(--widget-body-max-height, 10000px));
 }
 
 @media (max-width: 700px) {
-  .widget-board--pair .dash-widgets,
-  .widget-board--grid .dash-widgets {
-    grid-template-columns: 1fr;
-    grid-auto-flow: row;
-  }
-
-  .widget-board--grid .widget-card--compact,
-  .widget-board--grid .widget-card--compact-tall,
-  .widget-board--grid .widget-card--wide,
-  .widget-board--grid .widget-card--wide-tall {
-    grid-column: 1;
-    grid-row: auto;
-  }
-
   .widget-card.is-drop-target::after {
     left: 0.65rem;
     right: 0.65rem;

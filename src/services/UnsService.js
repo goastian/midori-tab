@@ -79,14 +79,6 @@ class UnsplashService {
     return this.#srcSet;
   }
 
-  /**
-   * Obtener URL de thumbnail pequeño para cálculo de luminosidad
-   * Devuelve la URL actual ya optimizada por tamaño y calidad.
-   */
-  getThumbnailUrl() {
-    return this.#url;
-  }
-
   #setImage(meta) {
     this.#url = meta.url;
     this.#srcSet = meta.srcSet || '';
@@ -95,20 +87,33 @@ class UnsplashService {
     this.#imageLink = meta.imagePage;
   }
 
-  async setImagen({ signal } = {}) {
+  async setImagen({ signal, preferredUrl = '', preferredImage = null } = {}) {
     try {
       const now = Date.now();
       const expiry = Number(localStorage.getItem(CACHE_EXPIRY)) || 0;
       const index = Number(localStorage.getItem(CACHE_INDEX)) || 0;
-      const cachedList = await getJson(CACHE_KEY_LIST, []);
+      const storedList = await getJson(CACHE_KEY_LIST, []);
+      const cachedList = Array.isArray(storedList) ? storedList.filter(image => typeof image?.url === 'string') : [];
+      const preferredIndex = cachedList.findIndex(image => image.url === preferredUrl);
+
+      // Metadata may refresh in another tab after this document painted its preview.
+      if (preferredUrl && preferredImage?.url === preferredUrl && preferredIndex < 0) {
+        this.#setImage(preferredImage);
+        this.#refreshMetadataIfNeeded(false);
+        return;
+      }
 
       /**
        * Check if cache is still valid
        */
-      if (now < expiry && cachedList.length > 0) {
-        const current = cachedList[index % cachedList.length];
+      if ((now < expiry || preferredIndex >= 0) && cachedList.length > 0) {
+        const selectedIndex = preferredIndex >= 0 ? preferredIndex : index % cachedList.length;
+        const current = cachedList[selectedIndex];
         this.#setImage(current);
-        localStorage.setItem(CACHE_INDEX, String((index + 1) % cachedList.length));
+        // Keep the boot preview's selection, without rewinding another tab's rotation.
+        if (preferredIndex < 0 || index % cachedList.length === selectedIndex) {
+          localStorage.setItem(CACHE_INDEX, String((selectedIndex + 1) % cachedList.length));
+        }
 
         // Evita expiraciones abruptas manteniendo metadata fresca en segundo plano.
         this.#refreshMetadataIfNeeded(false);
@@ -128,6 +133,15 @@ class UnsplashService {
     } catch (error) {
       if (error?.name !== 'AbortError' && !signal?.aborted) console.error('Error al establecer la imagen:', error);
     }
+  }
+
+  /** The image the next new tab will select, or null when there is nothing else to rotate to. */
+  async peekNext() {
+    const stored = await getJson(CACHE_KEY_LIST, []);
+    const list = Array.isArray(stored) ? stored.filter(image => typeof image?.url === 'string') : [];
+    if (list.length < 2) return null;
+    const next = list[(Number(localStorage.getItem(CACHE_INDEX)) || 0) % list.length];
+    return next.url === this.#url ? null : next;
   }
 
   async #refreshMetadataIfNeeded(force) {

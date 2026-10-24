@@ -18,7 +18,7 @@ const WIDGET_PLACEHOLDER_HEIGHTS = {
   weather: '235px',
   currency: '215px',
   browserBookmarks: '300px',
-  privacy: '205px',
+  privacy: 'var(--privacy-content-height, calc(7rem + 2px))',
   calendar: '410px',
   notes: '265px',
   todo: '280px',

@@ -1,22 +1,16 @@
 <template>
-    <div class="background-skeleton" v-if="showImageBackground && !backgroundImage"></div>
-    <Transition name="bg-fade">
       <img
         ref="wallpaperElement"
-        :key="backgroundCrossOrigin || 'default'"
         :crossorigin="backgroundCrossOrigin"
-        :src="backgroundImage"
-        :srcset="backgroundSrcSet || undefined"
         sizes="100vw"
+        :srcset="backgroundSrcSet || undefined"
+        :src="backgroundImage"
         class="background"
         v-if="showImageBackground && backgroundImage"
-        v-show="imageReady"
         decoding="async"
         fetchpriority="high"
-        @load="imageReady = true"
-        @error="retryBackgroundWithoutCors"
+        @error="handleImageError"
       />
-    </Transition>
     <div class="credits" v-if="showCredits">
       <span class="credits__label">Photo</span> by
       <a :href="imageAuthorLink" target="_blank" rel="noopener noreferrer">{{ imageAuthor }}</a>
@@ -29,13 +23,18 @@ import { inject } from 'vue';
 import useTabStore from '../stores/useTabStore.js';
 import { cancelRemoteTask, scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
 import { WALLPAPER_ELEMENT } from '../composables/useLogoContrast.js';
+import { cacheWallpaperPreview, prewarmWallpaperPreview, removeWallpaperPreview } from '../services/wallpaperPreviewCache.js';
 
 export default {
   setup() { return { wallpaperElement: inject(WALLPAPER_ELEMENT) }; },
   data() {
+    const tabStore = useTabStore();
+    const early = window.__midoriEarlyWallpaper;
+    const initialWallpaper = early?.type === tabStore.background?.type ? early : null;
     return {
-      tabStore: useTabStore(),
-      backgroundImage: '', backgroundSrcSet: '', backgroundCorsFallback: false, imageReady: false,
+      tabStore, initialWallpaper,
+      backgroundImage: '', backgroundSrcSet: '', backgroundCorsFallback: false,
+      fullImageReady: false, resumeWhenVisible: false, resumeTimer: null, disposed: false,
       imageAuthor: '', imageAuthorLink: '', imageLink: '', marketplaceBlobUrl: '', localBlobUrl: '',
       backgroundRequestId: 0, backgroundController: null,
       refreshWallpaperListener: null, backgroundChangedListener: null, wallpaperVisibilityListener: null,
@@ -43,7 +42,7 @@ export default {
   },
   computed: {
     backgroundCrossOrigin() {
-        return !this.backgroundCorsFallback && this.isUnsplashImage(this.backgroundImage) ? 'anonymous' : undefined;
+        return !this.backgroundCorsFallback && /^https?:/.test(this.backgroundImage) ? 'anonymous' : undefined;
       },
     showImageBackground() {
         return ['Unsplash', 'MarketplaceWallpaper', 'LocalFolder'].includes(this.tabStore.background?.type);
@@ -56,11 +55,15 @@ export default {
       }
   },
   mounted() {
+    void this.restoreInitialPreview();
     this.scheduleInitialBackground();
     this.setupWallpaperRefresh();
   },
   beforeUnmount() {
+    this.disposed = true;
+    clearTimeout(this.resumeTimer);
     cancelRemoteTask('wallpaper');
+    cancelRemoteTask('wallpaper-prewarm');
     cancelRemoteTask('unsplash-metadata');
     this.backgroundRequestId += 1;
     this.backgroundController?.abort();
@@ -71,19 +74,33 @@ export default {
     this.releaseLocalBlobUrl();
   },
   methods: {
+    async restoreInitialPreview() {
+        const initial = this.initialWallpaper;
+        if (!initial?.dataUrl) return;
+        const decoded = await this.preloadImage(initial.dataUrl);
+        if (this.disposed || this.initialWallpaper !== initial || this.backgroundImage
+          || this.tabStore.background?.type !== initial.type) return;
+        if (decoded) this.applyBackgroundImage(initial.dataUrl, '', { decoded, complete: false });
+        else this.handleImageError();
+      },
     scheduleInitialBackground() {
         const kind = this.tabStore.background?.type;
         if (kind === 'Unsplash' || kind === 'MarketplaceWallpaper') {
           void scheduleRemoteTask('wallpaper', signal => this.load({ signal }), { priority: 0 });
           this.wallpaperVisibilityListener = () => {
-            if (document.visibilityState === 'visible' && !this.backgroundImage) {
-              void scheduleRemoteTask('wallpaper', signal => this.load({ signal }), { priority: 0 });
+            if (document.visibilityState === 'visible' && !this.fullImageReady) {
+              if (this.backgroundController?.signal.aborted) this.resumeWhenVisible = true;
+              else void scheduleRemoteTask('wallpaper', signal => this.load({ signal }), { priority: 0 });
             }
           };
           document.addEventListener('visibilitychange', this.wallpaperVisibilityListener);
         } else void this.load();
       },
     async load({ signal } = {}) {
+        this.fullImageReady = false;
+        this.resumeWhenVisible = false;
+        clearTimeout(this.resumeTimer);
+        this.resumeTimer = null;
         this.backgroundController?.abort();
         const controller = new AbortController();
         this.backgroundController = controller;
@@ -95,6 +112,15 @@ export default {
         } finally {
           signal?.removeEventListener('abort', abort);
           if (this.backgroundController === controller) this.backgroundController = null;
+          if (this.resumeWhenVisible && !this.disposed) {
+            this.resumeWhenVisible = false;
+            this.resumeTimer = setTimeout(() => {
+              this.resumeTimer = null;
+              if (!this.disposed && document.visibilityState === 'visible' && !this.fullImageReady) {
+                void scheduleRemoteTask('wallpaper', signal => this.load({ signal }), { priority: 0 });
+              }
+            }, 0);
+          }
         }
       },
     async loadBackground({ signal } = {}) {
@@ -102,7 +128,9 @@ export default {
         if (this.tabStore.background?.type === 'MarketplaceWallpaper') {
           const background = this.tabStore.background;
           this.releaseLocalBlobUrl();
-          await this.loadMarketplaceWallpaper(background, signal, requestId);
+          const { loadMarketplaceWallpaper } = await import('../services/MarketplaceWallpaperService.js');
+          if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
+          await loadMarketplaceWallpaper(this, background, signal, requestId);
           if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
           this.imageAuthor = background.authorName || '';
           this.imageAuthorLink = background.authorUrl || '';
@@ -131,32 +159,54 @@ export default {
           const { default: UnsService } = await import('../services/UnsService.js');
           if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
           const uns = new UnsService();
-          await uns.setImagen({ signal });
+          const initial = this.initialWallpaper?.type === 'Unsplash' ? this.initialWallpaper : null;
+          await uns.setImagen({ signal, preferredUrl: initial?.key || '', preferredImage: initial?.meta });
           if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
-          await this.preloadImage(uns.getUrl(), signal);
+          const decoded = await this.preloadImage(uns.getUrl(), signal, uns.getSrcSet?.() || '');
           if (signal?.aborted || requestId !== this.backgroundRequestId) return false;
-          this.applyBackgroundImage(uns.getUrl(), uns.getSrcSet?.() || '');
+          if (!decoded) return false;
+          this.applyBackgroundImage(uns.getUrl(), uns.getSrcSet?.() || '', { decoded, cacheKey: uns.getUrl() });
+          this.initialWallpaper = null;
           this.imageAuthor = uns.getAuthor();
           this.imageAuthorLink = uns.getAuthorLink();
           this.imageLink = uns.getImageLink();
+          this.scheduleNextPreview(uns);
         } catch (e) {
           if (e?.name !== 'AbortError') console.error("Error al cargar la imagen de fondo:", e);
         }
       },
+    scheduleNextPreview(uns) {
+        void scheduleRemoteTask('wallpaper-prewarm', async signal => {
+          const next = await uns.peekNext();
+          if (!next || this.disposed || signal.aborted) return false;
+          return prewarmWallpaperPreview(next.url, signal);
+        }, { priority: -1, notBeforeMs: performance.now() + 2500 });
+      },
     applyBackgroundImage(url, srcSet = '', options = {}) {
         const nextUrl = url || '';
         const nextSrcSet = srcSet || '';
-        const immediate = Boolean(options.immediate);
+        this.fullImageReady = Boolean(nextUrl && options.decoded && options.complete !== false);
         if (this.backgroundImage === nextUrl && this.backgroundSrcSet === nextSrcSet) {
-          if (immediate && !this.imageReady) {
-            this.imageReady = true;
-          }
           return;
         }
-        this.imageReady = immediate;
-        this.backgroundCorsFallback = false;
+        this.backgroundCorsFallback = options.decoded?.crossOrigin !== 'anonymous';
         this.backgroundImage = nextUrl;
         this.backgroundSrcSet = nextSrcSet;
+        if (options.decoded && options.cacheKey) {
+          window.__midoriWallpaperKey = options.cacheKey;
+          void cacheWallpaperPreview(options.cacheKey, options.decoded);
+        }
+      },
+    handleImageError() {
+        if ((this.backgroundImage && !this.backgroundImage.startsWith('data:image/')) || !this.initialWallpaper?.dataUrl) return;
+        const { key, dataUrl } = this.initialWallpaper;
+        removeWallpaperPreview(key);
+        this.backgroundImage = '';
+        this.initialWallpaper.dataUrl = '';
+        const root = document.documentElement;
+        if (root.style.getPropertyValue('--midori-start-background').includes(dataUrl)) {
+          root.style.removeProperty('--midori-start-background');
+        }
       },
     releaseMarketplaceBlobUrl() {
         if (this.marketplaceBlobUrl && this.marketplaceBlobUrl.startsWith('blob:')) {
@@ -186,179 +236,73 @@ export default {
             return;
           }
           if (url) {
-            this.localBlobUrl = url;
-            await this.preloadImage(url, signal);
+            const decoded = await this.preloadImage(url, signal);
             if (signal?.aborted || requestId !== this.backgroundRequestId) {
               URL.revokeObjectURL(url);
-              if (this.localBlobUrl === url) this.localBlobUrl = previousBlobUrl;
               return;
             }
-            this.applyBackgroundImage(url, '');
+            if (!decoded) { URL.revokeObjectURL(url); return; }
+            this.localBlobUrl = url;
+            this.applyBackgroundImage(url, '', { decoded });
           } else {
             this.localBlobUrl = '';
             this.applyBackgroundImage('', '');
           }
         } catch (error) {
           console.warn('Local wallpaper load failed', error);
-          if (!signal?.aborted && requestId === this.backgroundRequestId) {
-            this.localBlobUrl = '';
-            this.applyBackgroundImage('', '');
-          }
         } finally {
           if (previousBlobUrl && previousBlobUrl !== this.localBlobUrl && previousBlobUrl.startsWith('blob:')) {
             URL.revokeObjectURL(previousBlobUrl);
           }
         }
       },
-    isMarketplaceDownloadUrl(url) {
-        return typeof url === 'string' && /\/api\/v1\/assets\/[^/]+\/download(?:$|\?)/.test(url);
-      },
-    isUnsplashImage(url) {
-        try { return new URL(url).hostname === 'images.unsplash.com'; } catch { return false; }
-      },
-    retryBackgroundWithoutCors() {
-        if (this.backgroundCrossOrigin) this.backgroundCorsFallback = true;
-      },
-    async preloadImage(url, signal) {
-        if (!url) return;
-
-        await new Promise((resolve) => {
+    async preloadImage(url, signal, srcSet = '', allowCorsFallback = true) {
+        if (!url || signal?.aborted) return null;
+        const anonymous = /^https?:/.test(url) && allowCorsFallback;
+        let timedOut = false;
+        const image = await new Promise((resolve) => {
           const img = new Image();
-          if (this.isUnsplashImage(url)) img.crossOrigin = 'anonymous';
+          if (anonymous) img.crossOrigin = 'anonymous';
           img.decoding = 'async';
+          img.fetchPriority = 'high';
           let settled = false;
-          const finish = () => {
+          const finish = value => {
             if (settled) return;
             settled = true;
             clearTimeout(timeout);
             signal?.removeEventListener('abort', onAbort);
             img.onload = null;
             img.onerror = null;
-            resolve();
+            resolve(value);
           };
-          const onAbort = () => { img.src = ''; finish(); };
-          if (signal?.aborted) { resolve(); return; }
-          const timeout = setTimeout(onAbort, 8000);
+          const onAbort = () => { img.removeAttribute('srcset'); img.src = ''; finish(null); };
+          const timeout = setTimeout(() => { timedOut = true; onAbort(); }, 8000);
           signal?.addEventListener('abort', onAbort, { once: true });
-          img.onload = finish;
-          img.onerror = finish;
+          img.onload = async () => {
+            try {
+              await img.decode();
+              finish(signal?.aborted ? null : img);
+            } catch { finish(null); }
+          };
+          img.onerror = () => finish(null);
+          img.sizes = '100vw';
+          if (srcSet) img.srcset = srcSet;
           img.src = url;
         });
-      },
-    async resolveMarketplaceDownloadImage(downloadUrl, assetSlug, signal) {
-        try {
-          const { fetchBlobWithTimeout } = await import('../services/fetchJsonWithTimeout.js');
-          if (typeof caches !== 'undefined') {
-            const cache = await caches.open('midori-marketplace-wallpapers-v1');
-            const request = new Request(downloadUrl, { method: 'GET', mode: 'cors', credentials: 'omit' });
-            let response = await cache.match(request);
-            const cached = Boolean(response);
-            let blob;
-
-            if (!response) {
-              ({ response, payload: blob } = await fetchBlobWithTimeout(request, { signal, timeoutMs: 8000 }));
-            }
-
-            if (!response?.ok) {
-              return '';
-            }
-
-            const responseContentType = response.headers?.get('content-type') || '';
-            if (!responseContentType.includes('image/')) {
-              return '';
-            }
-
-            blob ||= await response.blob();
-            if (!blob || !blob.type?.startsWith('image/') || blob.size > 8 * 1024 * 1024 || signal?.aborted) {
-              await cache.delete(request);
-              return '';
-            }
-            try {
-              if (cached) await cache.delete(request);
-              await cache.put(request, new Response(blob, { headers: { 'content-type': blob.type } }));
-              const keys = await cache.keys();
-              for (const old of keys.slice(0, Math.max(0, keys.length - 8))) await cache.delete(old);
-            } catch (error) {
-              console.warn('Marketplace wallpaper cache unavailable', error);
-            }
-            return URL.createObjectURL(blob);
-          }
-
-          const { response, payload: blob } = await fetchBlobWithTimeout(downloadUrl, {
-            mode: 'cors', credentials: 'omit', signal, timeoutMs: 8000,
-          });
-          if (!response.ok) {
-            return '';
-          }
-
-          if (!blob || !blob.type?.startsWith('image/') || blob.size > 8 * 1024 * 1024 || signal?.aborted) {
-            return '';
-          }
-
-          return URL.createObjectURL(blob);
-        } catch (error) {
-          if (error?.name !== 'AbortError' && !signal?.aborted) console.warn('Marketplace wallpaper fallback failed', { assetSlug, error });
-          return '';
-        }
-      },
-    async loadMarketplaceWallpaper(background, signal, requestId) {
-        const previewUrl = background?.previewUrl || '';
-        const sourceUrl = background?.imageUrl || background?.downloadUrl || '';
-        const srcSet = background?.imageSrcSet || '';
-
-        if (previewUrl && !signal?.aborted && requestId === this.backgroundRequestId) {
-          this.applyBackgroundImage(previewUrl, '', { immediate: true });
-          this.releaseMarketplaceBlobUrl();
-        }
-
-        if (!sourceUrl) {
-          if (!previewUrl) {
-            this.applyBackgroundImage('', '');
-            this.releaseMarketplaceBlobUrl();
-          }
-          return;
-        }
-
-        let resolvedUrl = sourceUrl;
-        if (this.isMarketplaceDownloadUrl(sourceUrl)) {
-          resolvedUrl = await this.resolveMarketplaceDownloadImage(sourceUrl, background?.assetSlug || '', signal);
-        }
-
-        if (signal?.aborted || requestId !== this.backgroundRequestId) {
-          if (resolvedUrl?.startsWith('blob:')) URL.revokeObjectURL(resolvedUrl);
-          return;
-        }
-
-        if (!resolvedUrl) {
-          if (!previewUrl) {
-            this.applyBackgroundImage('', '');
-            this.releaseMarketplaceBlobUrl();
-          }
-          return;
-        }
-
-        await this.preloadImage(resolvedUrl, signal);
-        if (signal?.aborted || requestId !== this.backgroundRequestId) {
-          if (resolvedUrl.startsWith('blob:')) URL.revokeObjectURL(resolvedUrl);
-          return;
-        }
-        this.applyBackgroundImage(resolvedUrl, resolvedUrl.startsWith('blob:') ? '' : srcSet);
-        if (resolvedUrl.startsWith('blob:')) {
-          const previous = this.marketplaceBlobUrl;
-          this.marketplaceBlobUrl = resolvedUrl;
-          if (previous && previous !== resolvedUrl) URL.revokeObjectURL(previous);
-        }
+        if (!image && anonymous && !timedOut && !signal?.aborted) return this.preloadImage(url, signal, srcSet, false);
+        return image;
       },
     setupWallpaperRefresh() {
         const listener = () => {
           if (['Unsplash', 'LocalFolder'].includes(this.tabStore.background?.type)) {
+            this.initialWallpaper = null;
             this.load();
           }
         };
         this.refreshWallpaperListener = listener;
         window.addEventListener('midori:refresh-wallpaper', listener);
 
-        this.backgroundChangedListener = () => this.load();
+        this.backgroundChangedListener = () => { this.initialWallpaper = null; this.load(); };
         window.addEventListener('midori:background-changed', this.backgroundChangedListener);
       }
   },
@@ -366,17 +310,6 @@ export default {
 </script>
 
 <style scoped>
-.background-skeleton {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -3;
-  pointer-events: none;
-  background: var(--color-bg);
-}
-
 .background {
   position: fixed;
   top: 0;
@@ -386,13 +319,6 @@ export default {
   z-index: -3;
   object-fit: cover;
   pointer-events: none;
-}
-
-.bg-fade-enter-active {
-  transition: opacity 0.4s ease;
-}
-.bg-fade-enter-from {
-  opacity: 0;
 }
 
 .credits {

@@ -34,8 +34,8 @@ function paintPageBackground(context, rect) {
 
 export function useLogoContrast(logo) {
   const wallpaper = inject(WALLPAPER_ELEMENT, ref(null));
-  const tone = ref(document.documentElement.dataset.theme === 'dark' ? 'light' : 'green');
-  const needsOutline = ref(false);
+  const tone = ref(document.documentElement.dataset.logoTone || (document.documentElement.dataset.theme === 'dark' ? 'light' : 'green'));
+  const needsOutline = ref(document.documentElement.dataset.logoOutline === 'true');
   let frame = null;
   let source = '';
   let previousTone = null;
@@ -45,6 +45,23 @@ export function useLogoContrast(logo) {
   let unreadable = false;
   let cancelThumbnail = () => {};
   const cleanup = [];
+
+  function remember(result) {
+    const key = window.__midoriWallpaperKey || window.__midoriEarlyWallpaper?.key;
+    if (!key) return;
+    try {
+      const raw = localStorage.getItem('midori_wallpaper_logo_v1');
+      const records = raw && raw.length <= 8192 ? JSON.parse(raw) : [];
+      const current = { key, width: innerWidth, height: innerHeight,
+        theme: document.documentElement.dataset.theme, density: document.documentElement.dataset.density,
+        tone: result.tone, outline: result.needsOutline };
+      const entries = (Array.isArray(records) ? records : []).filter(item => item && item.key !== key).slice(-7);
+      entries.push(current);
+      let serialized = JSON.stringify(entries);
+      while (serialized.length > 8192 && entries.length) { entries.shift(); serialized = JSON.stringify(entries); }
+      if (serialized !== raw) localStorage.setItem('midori_wallpaper_logo_v1', serialized);
+    } catch { /* Optional visual cache. */ }
+  }
 
   function schedule() {
     if (frame !== null) return;
@@ -152,6 +169,7 @@ export function useLogoContrast(logo) {
     const rect = logo.value.getBoundingClientRect();
     if (!rect.width || !rect.height || rect.bottom <= 0 || rect.top >= innerHeight) return;
     const image = wallpaper.value;
+    if (!image && window.__midoriEarlyWallpaper?.dataUrl) return;
     const nextSource = image?.currentSrc || image?.src || '';
     if (nextSource !== source) {
       cancelThumbnail();
@@ -169,6 +187,7 @@ export function useLogoContrast(logo) {
         tone.value = result.tone;
         needsOutline.value = result.needsOutline;
         previousTone = result.tone;
+        if (image) remember(result);
       }
     } catch {
       // Remote wallpapers still display normally when their pixels cannot be read.
@@ -189,7 +208,13 @@ export function useLogoContrast(logo) {
       if (image) imageObserver.observe(image, { attributes: true, attributeFilter: ['src', 'srcset', 'style'] });
       schedule();
     }, { immediate: true, flush: 'post' }));
-    cleanup.push(subscribeViewportSize(schedule), observeElementSize(logo.value, schedule));
+    let resizeTimer = null;
+    let initialSize = true;
+    cleanup.push(subscribeViewportSize(() => {
+      if (initialSize) { initialSize = false; schedule(); return; }
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(schedule, 150);
+    }), () => clearTimeout(resizeTimer), observeElementSize(logo.value, schedule));
     const toolbar = logo.value.closest('.dashboard')?.querySelector('.dashboard-toolbar');
     if (toolbar) cleanup.push(observeElementSize(toolbar, schedule));
     const observer = new MutationObserver(schedule);

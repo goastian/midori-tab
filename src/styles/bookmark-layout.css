@@ -1,0 +1,82 @@
+.bookmark-grid {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.72rem;
+}
+
+.bookmark-grid .tabs-bar {
+  align-self: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 4px;
+  border: 1px solid;
+}
+
+.bookmark-grid .tab-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.bookmark-grid .tab-btn,
+.bookmark-grid .tab-add {
+  min-height: 30px;
+  padding: 0.36rem 0.78rem;
+  border: 1px solid;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 550;
+}
+
+.bookmark-grid .tab-add {
+  min-width: 30px;
+  padding-inline: 0.55rem;
+  font-size: 1rem;
+}
+
+.bookmark-grid .speed-dial-grid {
+  width: 100%;
+  position: relative;
+  --dial-gap: 0.75rem;
+  display: grid;
+  gap: var(--dial-gap);
+  align-items: stretch;
+  /* At most --dial-columns tracks, fewer when each would drop below --dial-min.
+     The half pixel keeps layout rounding from dropping one column. */
+  grid-template-columns: repeat(auto-fill, minmax(max(var(--dial-min, 92px), calc((100% - (var(--dial-columns, 7) - 1) * var(--dial-gap)) / var(--dial-columns, 7) - 0.5px)), 1fr));
+}
+
+.bookmark-grid .speed-dial-card {
+  min-width: 0;
+  position: relative;
+}
+
+.bookmark-grid .speed-dial-link {
+  width: 100%;
+  min-height: var(--dial-height);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.36rem, 1vw, 0.56rem);
+  padding: 0.72rem 0.46rem 0.62rem;
+  border: 1px solid;
+}
+
+@media (max-width: 600px) {
+  .bookmark-grid { gap: 0.6rem; }
+  .bookmark-grid .tabs-bar {
+    max-width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+  .bookmark-grid .tabs-bar::-webkit-scrollbar { display: none; }
+  .bookmark-grid .speed-dial-grid { --dial-gap: 0.58rem; }
+}

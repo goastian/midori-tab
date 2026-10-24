@@ -193,6 +193,13 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
+    modulePreload: {
+      polyfill: false,
+      resolveDependencies(_filename, dependencies, { hostType }) {
+        // Local feature scripts use native ESM; Vite still loads their CSS before mounting.
+        return hostType === 'html' ? dependencies : [];
+      },
+    },
     minify: 'terser',
     terserOptions: {
       compress: {

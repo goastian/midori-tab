@@ -53,6 +53,7 @@ function installDom() {
   const attributes = new Map([['data-theme', 'dark']]);
   globalThis.document = {
     documentElement: {
+      style: { getPropertyValue: () => '', removeProperty() {}, setProperty() {} },
       getAttribute(key) { return attributes.get(key) ?? null; },
       setAttribute(key, value) { attributes.set(key, value); },
       removeAttribute(key) { attributes.delete(key); },

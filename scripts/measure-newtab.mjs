@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { arch, cpus, platform, tmpdir, totalmem } from 'node:os';
@@ -143,27 +143,86 @@ function chromiumNetwork(context) {
   };
 }
 
+async function launchNativeFocusChromium(profile, { extensionPath, viewport, env, chromiumArgs = [] }) {
+  const child = spawn(process.env.MIDORI_CHROMIUM_EXECUTABLE || chromium.executablePath(), [
+    `--user-data-dir=${profile}`, '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0',
+    '--no-first-run', '--no-default-browser-check', '--no-sandbox', '--disable-dev-shm-usage',
+    '--disable-background-networking', '--disable-features=Translate,OptimizationHints',
+    `--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`,
+    `--window-size=${viewport.width},${viewport.height + 160}`, ...chromiumArgs, 'about:blank',
+  ], { env, stdio: ['ignore', 'ignore', 'pipe'] });
+  let browser;
+  let log = '';
+  const closed = new Promise(resolve => child.once('close', resolve));
+  const close = async () => {
+    try { await browser?.close(); }
+    finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      const force = setTimeout(() => child.kill('SIGKILL'), 2000);
+      try { await closed; } finally { clearTimeout(force); }
+    }
+  };
+  try {
+    const endpoint = await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error(`Chromium native-focus transport did not become ready: ${log}`)), 30_000);
+      const fail = error => { clearTimeout(timeout); reject(error); };
+      child.once('error', fail);
+      child.once('exit', (code, signal) => fail(new Error(`Chromium exited (${code ?? signal}): ${log}`)));
+      child.stderr.on('data', chunk => {
+        log = (log + chunk).slice(-16_000);
+        const match = log.match(/DevTools listening on (ws:\/\/127\.0\.0\.1:\d+\/devtools\/browser\/\S+)/);
+        if (match) { clearTimeout(timeout); resolve(match[1]); }
+      });
+    });
+    // A second CDP session cannot remove the focus override owned by Playwright's
+    // original session. Connect without installing it in the first place.
+    browser = await chromium.connectOverCDP(endpoint, { noDefaults: true, timeout: 30_000 });
+    const context = browser.contexts()[0];
+    if (!context) throw new Error('The native-focus Chromium process did not expose its persistent context');
+    const newPage = context.newPage.bind(context);
+    context.newPage = async () => {
+      const page = await newPage();
+      await page.setViewportSize(viewport);
+      return page;
+    };
+    return { context, close };
+  } catch (error) { await close(); throw error; }
+}
+
 export async function openContextWithRetry(options) {
   const extensionPath = options.extensionPath || resolve(ROOT, 'dist');
+  const viewport = options.viewport || VIEWPORT;
+  const headless = options.headless ?? true;
   if (options.engine === 'firefox') return openGeckoSession({ extensionPath,
-    executablePath: process.env.MIDORI_FIREFOX_EXECUTABLE || undefined, viewport: VIEWPORT, headless: true });
+    executablePath: process.env.MIDORI_FIREFOX_EXECUTABLE || undefined, viewport, headless, env: options.env });
   const profile = mkdtempSync(join(tmpdir(), 'midori-chromium-profile-'));
   let context;
+  let nativeClose;
+  const closeBrowser = () => nativeClose ? nativeClose() : context?.close();
   try {
-    context = await chromium.launchPersistentContext(profile, { headless: true, channel: 'chromium', timeout: 30_000,
-      executablePath: process.env.MIDORI_CHROMIUM_EXECUTABLE || undefined,
-      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, '--disable-features=Translate,OptimizationHints'],
-      viewport: VIEWPORT });
+    if (options.nativeFocus) {
+      if (headless) throw new Error('Native-focus Chromium visual integration requires a headed session');
+      const launch = await launchNativeFocusChromium(profile, { ...options, extensionPath, viewport });
+      context = launch.context;
+      nativeClose = launch.close;
+    } else {
+      context = await chromium.launchPersistentContext(profile, { headless, channel: 'chromium', timeout: 30_000,
+        executablePath: process.env.MIDORI_CHROMIUM_EXECUTABLE || undefined,
+        args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`,
+          '--disable-features=Translate,OptimizationHints', ...(options.chromiumArgs || [])],
+        viewport, env: options.env });
+    }
     const network = chromiumNetwork(context);
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', { timeout: 10_000 });
     const id = new URL(worker.url()).host;
-    const metadata = { transport: 'playwright', browserName: 'chromium', browserVersion: context.browser()?.version() || null,
-      viewport: VIEWPORT, extensionId: id, fullExtensionInstalled: true };
-    const close = async () => { try { await context.close(); } finally { rmSync(profile, { recursive: true, force: true }); } };
+    const metadata = { transport: options.nativeFocus ? 'playwright-cdp-native-focus' : 'playwright',
+      browserName: 'chromium', browserVersion: context.browser()?.version() || null,
+      viewport, headless, extensionId: id, fullExtensionInstalled: true };
+    const close = async () => { try { await closeBrowser(); } finally { rmSync(profile, { recursive: true, force: true }); } };
     return { context, profile, url: `chrome-extension://${id}/index.html`, network, metadata, close };
   } catch (error) {
-    await context?.close();
-    rmSync(profile, { recursive: true, force: true });
+    try { await closeBrowser(); }
+    finally { rmSync(profile, { recursive: true, force: true }); }
     throw error;
   }
 }

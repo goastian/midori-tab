@@ -16,12 +16,12 @@ const WIDGET_FEATURES = {
   NotesWidget: 'notes', TodoWidget: 'todo', BrowserBookmarksWidget: 'browserBookmarks', PrivacyWidget: 'privacy',
 };
 const OPTIONAL_MODULES = [
-  /\/src\/components\/(?:MarketplaceBrowser|SettingsModal|WidgetPicker)\.vue(?:\?|$)/,
+  /\/src\/components\/(?:BookmarkEditor|SponsoredTransparency|MarketplaceBrowser|SettingsModal|WidgetPicker)\.vue(?:\?|$)/,
   /\/src\/components\/(?:settings|rewards)\//,
   /\/src\/components\/dashboard\/(?:MarketplaceSheet|QuickSettingsPanel)\.vue(?:\?|$)/,
   /\/src\/services\/(?:MarketplaceApiClient|RewardsInterestService)\.js$/,
 ];
-const OPTIONAL_FILES = /^\/assets\/(?:Marketplace|Settings|WidgetPicker|Rewards|QuickSettings)/;
+const OPTIONAL_FILES = /^\/assets\/(?:BookmarkEditor|SponsoredTransparency|Marketplace|Settings|WidgetPicker|Rewards|QuickSettings)/;
 const LAB_RESOURCE = /^\/assets\/labVisualStability-[^/]+\.js$/;
 const CODE_RESOURCE = /\.(?:[cm]?js|css)$/;
 

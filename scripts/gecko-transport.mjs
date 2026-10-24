@@ -233,7 +233,7 @@ function installObservers({ addonId, origin, resourceObserverSource }) {
 }
 
 export async function openGeckoSession({ extensionPath, executablePath = process.env.MIDORI_FIREFOX_EXECUTABLE || '/usr/bin/midori',
-  viewport = { width: 1280, height: 800 }, headless = true } = {}) {
+  viewport = { width: 1280, height: 800 }, headless = true, env = process.env, preferences: extraPreferences = {} } = {}) {
   if (!extensionPath) throw new Error('Gecko transport requires extensionPath');
   const manifest = JSON.parse(readFileSync(join(extensionPath, 'manifest.json')));
   const addonId = manifest.browser_specific_settings?.gecko?.id;
@@ -251,12 +251,13 @@ export async function openGeckoSession({ extensionPath, executablePath = process
     'extensions.experiments.enabled': true,
     'xpinstall.signatures.required': false,
     'browser.sessionstore.resume_from_crash': false,
+    ...extraPreferences,
   };
   writeFileSync(join(profile, 'user.js'), Object.entries(preferences)
     .map(([key, value]) => `user_pref(${JSON.stringify(key)}, ${JSON.stringify(value)});`).join('\n'));
   const args = ['--no-remote', '--profile', profile, '--marionette', '--remote-allow-system-access', 'about:blank'];
   if (headless) args.unshift('--headless');
-  const child = spawn(executablePath, args, { env: { ...process.env, MOZ_REMOTE_ALLOW_SYSTEM_ACCESS: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(executablePath, args, { env: { ...env, MOZ_REMOTE_ALLOW_SYSTEM_ACCESS: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = '';
   let spawnError;
   const appendLog = chunk => { log = (log + chunk).slice(-24_000); };
@@ -427,6 +428,14 @@ export async function openGeckoSession({ extensionPath, executablePath = process
           const bytes = Buffer.from(result.value, 'base64');
           if (path) writeFileSync(path, bytes);
           return bytes;
+        });
+        page.setWindowRect = rect => serial(async () => {
+          await commandContext('content', handle);
+          return client.send('WebDriver:SetWindowRect', rect);
+        });
+        page.windowCommand = name => serial(async () => {
+          await commandContext('content', handle);
+          return client.send(name);
         });
         page.close = async () => {
           if (!pages.delete(page) || closed) return;

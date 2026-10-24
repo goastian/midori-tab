@@ -7,7 +7,7 @@
         class="tab-item"
         :class="{ active: category === activeTab }"
       >
-        <button class="tab-btn" type="button" @click="activeTab = category">{{ category }}</button>
+        <button class="tab-btn" type="button" :disabled="!bookmarksReady" @click="activeTab = category">{{ category }}</button>
         <button
           v-if="categories.length > 1 && showDeleteButton"
           :disabled="!bookmarksReady"
@@ -166,34 +166,14 @@
             <span class="speed-dial-title" :title="ad.title">{{ ad.title }}</span>
           </a>
 
-          <div
+          <SponsoredTransparency
             v-if="requiresDisclosure && showTransparency"
-            class="transparency-panel"
-            role="dialog"
-            :aria-label="i18n.$t('ads.whyTitle')"
-            @click.stop
-          >
-            <strong>{{ i18n.$t('ads.whyTitle') }}</strong>
-            <p>{{ i18n.$t('ads.whyCopy') }}</p>
-            <p v-if="frequencyCap > 0" class="frequency-copy">{{ frequencyCopy }}</p>
-
-            <div v-if="ad.transparency?.feedback_enabled" class="feedback-actions">
-              <span>{{ i18n.$t('ads.feedbackPrompt') }}</span>
-              <div>
-                <button type="button" :disabled="feedbackPending" @click="submitFeedback(true)">
-                  {{ i18n.$t('ads.relevant') }}
-                </button>
-                <button type="button" :disabled="feedbackPending" @click="submitFeedback(false)">
-                  {{ i18n.$t('ads.notRelevant') }}
-                </button>
-              </div>
-              <small v-if="feedbackMessage" role="status">{{ feedbackMessage }}</small>
-            </div>
-
-            <button type="button" class="dismiss-action" @click="dismissSponsored">
-              {{ i18n.$t('ads.dismiss') }}
-            </button>
-          </div>
+            :transparency="ad.transparency"
+            :feedback-pending="feedbackPending"
+            :feedback-state="feedbackState"
+            @feedback="submitFeedback"
+            @dismiss="dismissSponsored"
+          />
         </template>
 
         <div v-else class="sponsored-skeleton" aria-hidden="true">
@@ -201,6 +181,8 @@
           <span></span>
         </div>
       </article>
+
+      <div v-else-if="showAds && reserveAdSlot" class="sponsored-empty-slot" aria-hidden="true"></div>
 
       <article
         v-if="showSpeedDials && showAddButton && currentBookmarks.length < speedDialLimit"
@@ -213,54 +195,21 @@
       </article>
     </div>
 
-    <Teleport to="body">
-      <Transition name="editor-fade">
-        <div v-if="editorMode" class="editor-overlay" @click="closeEditor">
-          <form class="dial-editor" @click.stop @submit.prevent="saveEditor">
-            <header>
-              <div>
-                <span class="editor-eyebrow">Speed Dial</span>
-                <h3>{{ editorTitle }}</h3>
-              </div>
-              <button type="button" class="editor-close" :aria-label="i18n.$t('bookmarks.cancel')" @click="closeEditor">
-                <DashboardIcon name="close" :size="16" :stroke-width="1.8" aria-hidden="true" />
-              </button>
-            </header>
-
-            <label v-if="editorMode === 'category'">
-              <span>{{ i18n.$t('bookmarks.categoryName') }}</span>
-              <input v-model.trim="draft.category" type="text" maxlength="40" required autofocus />
-            </label>
-            <template v-else>
-              <label>
-                <span>{{ i18n.$t('dashboard.shortcutsDialog.name') }}</span>
-                <input v-model.trim="draft.title" type="text" maxlength="80" required autofocus />
-              </label>
-              <label>
-                <span>{{ i18n.$t('dashboard.shortcutsDialog.address') }}</span>
-                <input v-model.trim="draft.url" type="text" inputmode="url" maxlength="2048" placeholder="https://" required />
-              </label>
-            </template>
-
-            <p v-if="editorError" class="editor-error" role="alert">{{ editorError }}</p>
-            <footer>
-              <button type="button" class="editor-button editor-button--secondary" @click="closeEditor">
-                {{ i18n.$t('bookmarks.cancel') }}
-              </button>
-              <button type="submit" class="editor-button editor-button--primary">
-                {{ i18n.$t('bookmarks.save') }}
-              </button>
-            </footer>
-          </form>
-        </div>
-      </Transition>
-    </Teleport>
+    <BookmarkEditor
+      v-if="editorMode"
+      :mode="editorMode"
+      :bookmark="editingIndex >= 0 ? currentBookmarks[editingIndex] : null"
+      :categories="categories"
+      :normalize-url="normalizeBookmarkUrl"
+      @close="closeEditor"
+      @save="saveEditor"
+    />
   </div>
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue';
 import useI18nStore from '../stores/useI18nStore.js';
-import { observeElementSize } from '../composables/layoutResizeBus.js';
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
 import { cancelRemoteTask, scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
 import faviconService from '../services/FaviconService.js';
@@ -269,40 +218,22 @@ import { readBookmarkSnapshot, writeBookmarkSnapshot } from '../bootstrap/bookma
 import {
   getSpeedDialMetrics,
   requiresPaidDisclosure,
-  resolveResponsiveSpeedDialColumns,
+  speedDialLayoutStyles,
 } from '../utils/startPageSettings.js';
 import DashboardIcon from './icons/DashboardIcon.vue';
+import { DEFAULT_CATEGORIES, cloneDefaults } from '../services/bookmarkDefaults.js';
+import '../styles/bookmark-layout.css';
 
 const STORAGE_KEY = 'midori_bookmarks';
 const CATEGORIES_KEY = 'midori_bookmark_categories';
-const DEFAULT_CATEGORIES = ['Personal', 'Travel', 'Web3'];
-const DEFAULT_BOOKMARKS = {
-  Personal: [
-    { title: 'Support Midori', url: 'https://astian.org/community', domain: 'astian.org' },
-    { title: 'Amazon', url: 'https://amzn.to/47IiNIO', domain: 'amazon.com' },
-    { title: 'AliExpress', url: 'https://s.click.aliexpress.com/e/_Dlf1B1R/', domain: 'aliexpress.com' },
-    { title: 'eBay', url: 'https://ebay.us/gW9r3z/', domain: 'ebay.com' },
-    { title: 'Temu', url: 'https://temu.to/k/gxr990d7ytg', domain: 'temu.com' },
-  ],
-  Travel: [
-    { title: 'Kayak', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fflights/', domain: 'kayak.com' },
-    { title: 'Kayak Hotels', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fhotels', domain: 'kayak.com' },
-    { title: 'Kayak Cars', url: 'https://www.kayak.com/in?a=kan_318921_594075&lc=en&url=%2Fcars', domain: 'kayak.com' },
-    { title: 'Trip', url: 'https://www.trip.com/?Allianceid=4479273&SID=57814702&trip_sub1=astian&trip_sub3=D20537295', domain: 'trip.com' },
-  ],
-  Web3: [
-    { title: 'Midori Wallet', url: 'https://wallet.astian.org', domain: 'wallet.astian.org' },
-    { title: 'P2P.me', url: 'https://app.p2p.me/recommend?address=0xB3082b37cC95a9d4e6B1aEC19719a00c37D47597&nonce=215422&signature=0x161f733dab2a16e55bc8b2000a2a22be178c884d932916cf62a72c96154c059c163b749bd522672fbb7dccefa56f9127c14c7d747335ddbb10d65cc2ed33344f1b', domain: 'p2p.me' },
-  ],
-};
-
-function cloneDefaults() {
-  return JSON.parse(JSON.stringify(DEFAULT_BOOKMARKS));
-}
 
 export default {
   name: 'BookmarkGrid',
-  components: { DashboardIcon },
+  components: {
+    DashboardIcon,
+    BookmarkEditor: defineAsyncComponent(() => import('./BookmarkEditor.vue')),
+    SponsoredTransparency: defineAsyncComponent(() => import('./SponsoredTransparency.vue')),
+  },
   emits: [
     'ready',
     'sponsored-impression',
@@ -344,16 +275,13 @@ export default {
       faviconCacheLoading: false,
       faviconsDisposed: false,
       faviconTaskKeys: new Set(),
-      layoutWidth: typeof window === 'undefined' ? 1080 : Math.max(0, window.innerWidth - 40),
-      unobserveLayout: null,
       editorMode: '',
       editingIndex: -1,
-      editorError: '',
-      draft: { title: '', url: '', category: '' },
       pendingBookmarkDelete: -1,
       pendingCategoryDelete: '',
       adRequested: false,
       adRequestComplete: false,
+      reserveAdSlot: true,
       adObserver: null,
       adViewability: null,
       clickGuard: null,
@@ -374,29 +302,14 @@ export default {
     visibleBookmarks() {
       return this.showSpeedDials ? this.currentBookmarks.slice(0, this.speedDialLimit) : [];
     },
-    effectiveColumns() {
-      return resolveResponsiveSpeedDialColumns({
-        configuredColumns: this.speedDialColumns,
-        availableWidth: this.layoutWidth,
-        size: this.speedDialSize,
-      });
-    },
-    dialMetrics() {
-      return getSpeedDialMetrics(this.speedDialSize);
+    layoutStyles() {
+      return speedDialLayoutStyles({ size: this.speedDialSize, columns: this.speedDialColumns });
     },
     containerStyle() {
-      const gap = 12;
-      const configuredWidth = this.speedDialSize === 'fit'
-        ? 1080
-        : (this.effectiveColumns * (this.dialMetrics.width + gap)) - gap;
-      return { maxWidth: `${Math.min(1080, configuredWidth)}px` };
+      return this.layoutStyles.container;
     },
     gridStyle() {
-      return {
-        '--dial-height': `${this.dialMetrics.height}px`,
-        '--dial-icon-size': `${this.dialMetrics.icon}px`,
-        gridTemplateColumns: `repeat(${this.effectiveColumns}, minmax(0, 1fr))`,
-      };
+      return this.layoutStyles.grid;
     },
     hasAd() { return Boolean(this.adsStore?.hasAd); },
     ad() { return this.adsStore?.currentAd || {}; },
@@ -423,23 +336,6 @@ export default {
         ? 'noopener noreferrer nofollow sponsored'
         : 'noopener noreferrer';
     },
-    frequencyCap() {
-      return Number(this.ad.transparency?.frequency_cap_per_day || 0);
-    },
-    frequencyCopy() {
-      return this.formatCopy('ads.frequencyCap', { count: this.frequencyCap });
-    },
-    feedbackMessage() {
-      if (this.feedbackState === 'sent') return this.i18n.$t('ads.feedbackThanks');
-      if (this.feedbackState === 'error') return this.i18n.$t('ads.feedbackError');
-      return '';
-    },
-    editorTitle() {
-      if (this.editorMode === 'category') return this.i18n.$t('bookmarks.addCategory');
-      return this.editingIndex >= 0
-        ? this.i18n.$t('bookmarks.edit')
-        : this.i18n.$t('dashboard.shortcutsDialog.title');
-    },
   },
   watch: {
     visibleBookmarks() { void this.primeFavicons(); },
@@ -453,6 +349,7 @@ export default {
         this.teardownPerformanceObserver();
         return;
       }
+      this.reserveAdSlot = true;
       if (!this.hasAd) {
         this.adRequested = false;
         this.adRequestComplete = false;
@@ -494,7 +391,6 @@ export default {
       document.addEventListener('visibilitychange', this.handleAdPageVisibility);
     }
     this.$nextTick(() => {
-      this.setupLayoutObserver();
       void this.ensureAdRuntime();
     });
   },
@@ -509,7 +405,6 @@ export default {
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.handleAdPageVisibility);
     }
-    this.unobserveLayout?.();
     this.reportPerformance();
     this.teardownAdObserver();
     this.teardownPerformanceObserver();
@@ -521,21 +416,6 @@ export default {
         (copy, [name, value]) => String(copy).replace(`{${name}}`, String(value)),
         this.i18n.$t(key),
       );
-    },
-    measureLayoutWidth() {
-      const parentWidth = this.$el?.parentElement?.clientWidth;
-      this.layoutWidth = Math.max(
-        0,
-        Number(parentWidth) || (typeof window === 'undefined' ? 1080 : window.innerWidth - 40),
-      );
-    },
-    setupLayoutObserver() {
-      this.measureLayoutWidth();
-      const target = this.$el?.parentElement || this.$el;
-      if (!target) return;
-      this.unobserveLayout = observeElementSize(target, ({ width }) => {
-        if (width > 0) this.layoutWidth = width;
-      });
     },
     bookmarkInitial(bookmark) {
       return String(bookmark?.title || '?').trim().charAt(0).toUpperCase() || '?';
@@ -625,63 +505,31 @@ export default {
     },
     openBookmarkEditor(index = -1) {
       if (!this.bookmarksReady) return;
-      const bookmark = index >= 0 ? this.currentBookmarks[index] : null;
       this.editingIndex = index;
       this.editorMode = 'bookmark';
-      this.editorError = '';
-      this.draft = {
-        title: bookmark?.title || '',
-        url: bookmark?.url || 'https://',
-        category: '',
-      };
     },
     openCategoryEditor() {
       if (!this.bookmarksReady) return;
       this.editingIndex = -1;
       this.editorMode = 'category';
-      this.editorError = '';
-      this.draft = { title: '', url: '', category: '' };
     },
     closeEditor() {
       this.editorMode = '';
       this.editingIndex = -1;
-      this.editorError = '';
     },
-    saveEditor() {
+    saveEditor(value) {
       if (!this.bookmarksReady) return;
       if (this.editorMode === 'category') {
-        const category = this.draft.category.trim();
-        if (!category || this.categories.includes(category)) {
-          this.editorError = this.i18n.$t('bookmarks.categoryExists');
-          return;
-        }
-        this.categories.push(category);
-        this.bookmarks[category] = [];
-        this.activeTab = category;
-        this.saveBookmarksDebounced();
-        this.closeEditor();
-        return;
-      }
-
-      try {
-        const parsed = this.normalizeBookmarkUrl(this.draft.url.trim());
-        const bookmark = {
-          title: this.draft.title.trim(),
-          url: parsed.toString(),
-          domain: parsed.hostname,
-        };
-        if (!bookmark.title) throw new Error('missing title');
+        this.categories.push(value);
+        this.bookmarks[value] = [];
+        this.activeTab = value;
+      } else {
         if (!this.bookmarks[this.activeTab]) this.bookmarks[this.activeTab] = [];
-        if (this.editingIndex >= 0) {
-          this.bookmarks[this.activeTab][this.editingIndex] = bookmark;
-        } else {
-          this.bookmarks[this.activeTab].push(bookmark);
-        }
-        this.saveBookmarksDebounced();
-        this.closeEditor();
-      } catch (_) {
-        this.editorError = this.i18n.$t('bookmarks.invalidUrl');
+        if (this.editingIndex >= 0) this.bookmarks[this.activeTab][this.editingIndex] = value;
+        else this.bookmarks[this.activeTab].push(value);
       }
+      this.saveBookmarksDebounced();
+      this.closeEditor();
     },
     addBookmarkExternal(title, url) {
       if (!this.bookmarksReady) return false;
@@ -840,6 +688,7 @@ export default {
       }
     },
     dismissSponsored() {
+      this.reserveAdSlot = false;
       void this.adsStore?.dismiss();
       this.showTransparency = false;
     },
@@ -916,46 +765,19 @@ export default {
 </script>
 
 <style scoped>
-.bookmark-grid {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.72rem;
-  transition: max-width 220ms ease;
-}
-
 .tabs-bar {
-  align-self: flex-start;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 4px;
   background: var(--surface-island, rgba(255, 255, 255, 0.84));
-  border: 1px solid var(--color-border, rgba(34, 75, 61, 0.12));
+  border-color: var(--color-border, rgba(34, 75, 61, 0.12));
   border-radius: var(--nova-island-radius, 12px);
   box-shadow: var(--shadow-flat, 0 1px 3px rgba(0, 0, 0, 0.12));
 }
 
-.tab-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
 .tab-btn,
 .tab-add {
-  min-height: 30px;
-  padding: 0.36rem 0.78rem;
   color: var(--color-text-muted, #5a7b6d);
   background: transparent;
-  border: 1px solid transparent;
+  border-color: transparent;
   border-radius: var(--nova-control-radius, 8px);
-  font: inherit;
-  font-size: 0.76rem;
-  font-weight: 550;
   cursor: pointer;
   transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
@@ -966,17 +788,29 @@ export default {
   border-color: var(--color-border, rgba(34, 75, 61, 0.12));
 }
 
+.tab-add {
+  color: white;
+  background: var(--color-primary, #04a469);
+}
+
+.speed-dial-card {
+  border-radius: var(--nova-panel-radius, 14px);
+}
+
+.speed-dial-link {
+  color: var(--color-text, #1a2b26);
+  background: var(--surface-island, rgba(255, 255, 255, 0.86));
+  border-color: var(--color-border, rgba(34, 75, 61, 0.12));
+  border-radius: var(--nova-panel-radius, 14px);
+  box-shadow: 0 5px 18px rgba(8, 35, 26, 0.07), inset 0 1px rgba(255, 255, 255, 0.18);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 170ms ease, border-color 170ms ease, box-shadow 170ms ease, transform 170ms ease;
+}
+
 .tab-btn:hover,
 .tab-btn:focus-visible {
   color: var(--color-text, #1a2b26);
-}
-
-.tab-add {
-  min-width: 30px;
-  padding-inline: 0.55rem;
-  color: white;
-  background: var(--color-primary, #04a469);
-  font-size: 1rem;
 }
 
 .tab-delete {
@@ -1043,39 +877,6 @@ export default {
   color: white;
   background: var(--accent-danger, #d75d49);
   border-color: transparent;
-}
-
-.speed-dial-grid {
-  width: 100%;
-  position: relative;
-  display: grid;
-  gap: 0.75rem;
-  align-items: stretch;
-}
-
-.speed-dial-card {
-  min-width: 0;
-  position: relative;
-  border-radius: var(--nova-panel-radius, 14px);
-}
-
-.speed-dial-link {
-  width: 100%;
-  min-height: var(--dial-height);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(0.36rem, 1vw, 0.56rem);
-  padding: 0.72rem 0.46rem 0.62rem;
-  color: var(--color-text, #1a2b26);
-  background: var(--surface-island, rgba(255, 255, 255, 0.86));
-  border: 1px solid var(--color-border, rgba(34, 75, 61, 0.12));
-  border-radius: var(--nova-panel-radius, 14px);
-  box-shadow: 0 5px 18px rgba(8, 35, 26, 0.07), inset 0 1px rgba(255, 255, 255, 0.18);
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 170ms ease, border-color 170ms ease, box-shadow 170ms ease, transform 170ms ease;
 }
 
 .speed-dial-link:hover,
@@ -1271,6 +1072,11 @@ export default {
   border: 1px solid var(--color-border, rgba(34, 75, 61, 0.1));
 }
 
+.sponsored-empty-slot {
+  min-height: var(--dial-height);
+  pointer-events: none;
+}
+
 .sponsored-skeleton {
   min-height: calc(var(--dial-height) - 2px);
   display: flex;
@@ -1293,62 +1099,6 @@ export default {
   border-radius: 5px;
 }
 
-.transparency-panel {
-  width: min(330px, calc(100vw - 2rem));
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 30;
-  padding: 0.88rem;
-  color: var(--color-text, #1a2b26);
-  background: var(--surface-base, #f5f8f7);
-  border: 1px solid var(--color-border-hover, rgba(34, 75, 61, 0.22));
-  border-radius: var(--nova-panel-radius, 14px);
-  box-shadow: 0 18px 46px rgba(8, 35, 26, 0.22);
-  font-size: 0.74rem;
-}
-
-.transparency-panel p {
-  margin: 0.45rem 0 0;
-  color: var(--color-text-muted, #5a7b6d);
-  line-height: 1.45;
-}
-
-.frequency-copy { font-weight: 600; }
-
-.feedback-actions {
-  display: grid;
-  gap: 0.44rem;
-  margin-top: 0.72rem;
-  padding-top: 0.62rem;
-  border-top: 1px solid var(--color-border, rgba(34, 75, 61, 0.12));
-}
-
-.feedback-actions div { display: flex; gap: 0.38rem; }
-
-.feedback-actions button,
-.dismiss-action {
-  min-height: 29px;
-  padding: 0.32rem 0.5rem;
-  color: var(--color-text, #1a2b26);
-  background: var(--surface-control, rgba(255, 255, 255, 0.78));
-  border: 1px solid var(--color-border, rgba(34, 75, 61, 0.14));
-  border-radius: 7px;
-  font: inherit;
-  font-size: 0.69rem;
-  cursor: pointer;
-}
-
-.feedback-actions button:disabled { cursor: wait; opacity: 0.6; }
-.feedback-actions small { color: var(--color-primary, #047a50); }
-
-.dismiss-action {
-  width: 100%;
-  margin-top: 0.62rem;
-  color: var(--color-text-muted, #5a7b6d);
-  background: transparent;
-}
-
 .add-link {
   border-style: dashed;
   box-shadow: none;
@@ -1361,155 +1111,13 @@ export default {
   font-weight: 350;
 }
 
-.editor-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9200;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  background: rgba(4, 12, 10, 0.42);
-  backdrop-filter: blur(4px);
-}
-
-.dial-editor {
-  width: min(420px, 100%);
-  display: grid;
-  gap: 0.82rem;
-  padding: 1rem;
-  color: var(--color-text, #1a2b26);
-  background: var(--surface-base, #f5f8f7);
-  border: 1px solid var(--color-border-hover, rgba(34, 75, 61, 0.2));
-  border-radius: 15px;
-  box-shadow: 0 24px 64px rgba(8, 35, 26, 0.26);
-}
-
-.dial-editor header,
-.dial-editor footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.7rem;
-}
-
-.editor-eyebrow {
-  display: block;
-  margin-bottom: 0.1rem;
-  color: var(--color-primary, #047a50);
-  font-size: 0.62rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.dial-editor h3 {
-  margin: 0;
-  font-size: 1rem;
-  letter-spacing: -0.012em;
-}
-
-.editor-close {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  color: var(--color-text-muted, #5a7b6d);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.dial-editor label {
-  display: grid;
-  gap: 0.36rem;
-  color: var(--color-text-muted, #4d6c60);
-  font-size: 0.72rem;
-  font-weight: 650;
-}
-
-.dial-editor input {
-  width: 100%;
-  min-height: 40px;
-  padding: 0.55rem 0.68rem;
-  color: var(--color-text, #1a2b26);
-  background: var(--surface-island, rgba(255, 255, 255, 0.88));
-  border: 1px solid var(--color-border, rgba(34, 75, 61, 0.16));
-  border-radius: 9px;
-  font: inherit;
-  font-size: 0.8rem;
-}
-
-.editor-error {
-  margin: 0;
-  color: var(--accent-danger, #b74534);
-  font-size: 0.72rem;
-}
-
-.dial-editor footer { justify-content: flex-end; }
-
-.editor-button {
-  min-height: 36px;
-  padding: 0.48rem 0.72rem;
-  border-radius: 8px;
-  font: inherit;
-  font-size: 0.76rem;
-  font-weight: 620;
-  cursor: pointer;
-}
-
-.editor-button--secondary {
-  color: var(--color-text-muted, #5a7b6d);
-  background: transparent;
-  border: 1px solid var(--color-border, rgba(34, 75, 61, 0.14));
-}
-
-.editor-button--primary {
-  color: white;
-  background: var(--color-primary, #047a50);
-  border: 1px solid transparent;
-}
-
 button:focus-visible,
-a:focus-visible,
-input:focus-visible {
+a:focus-visible {
   outline: 2px solid var(--color-primary, #04a469);
   outline-offset: 2px;
 }
 
-.editor-fade-enter-active,
-.editor-fade-leave-active { transition: opacity 170ms ease; }
-.editor-fade-enter-from,
-.editor-fade-leave-to { opacity: 0; }
-
 @media (max-width: 600px) {
-  .bookmark-grid {
-    gap: 0.6rem;
-  }
-
-  .tabs-bar {
-    max-width: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: none;
-  }
-
-  .tabs-bar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .speed-dial-grid { gap: 0.58rem; }
   .delete-confirmation { align-items: flex-start; flex-direction: column; }
-  .transparency-panel {
-    position: fixed;
-    top: auto;
-    right: 1rem;
-    bottom: 1rem;
-    left: 1rem;
-    width: auto;
-  }
 }
 </style>

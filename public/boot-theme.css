@@ -9,8 +9,20 @@
 }
 
 html { font-size: 16px; }
-body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+:root[data-resizing] *, :root[data-resizing] *::before, :root[data-resizing] *::after { transition: none !important; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--midori-start-color, var(--color-bg, #eff8f3));
+  background-image: var(--midori-start-background, none);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
 :root[data-theme="light"] {
+  --color-bg: #eff8f3;
   --color-primary: #0eae5b;
   --color-primary-hover: #0a914c;
   --color-text: #142a24;
@@ -21,6 +33,7 @@ body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Se
   --surface-control: rgba(255, 255, 255, 0.86);
 }
 :root[data-theme="dark"] {
+  --color-bg: #07150d;
   --color-primary: #29c58b;
   --color-primary-hover: #48d4a1;
   --color-text: #eaf3f2;
@@ -57,6 +70,10 @@ body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Se
 .early-logo-container { width: 100%; padding: 0.1rem 0.2rem; display: flex; align-items: center; justify-content: center; }
 .early-logo { width: 14rem; max-width: 100%; height: auto; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.18)); }
 [data-theme="dark"] .early-logo { filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
+[data-logo-tone="light"] .early-logo { filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
+[data-logo-tone="green"] .early-logo { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.18)); }
+[data-logo-tone="light"][data-logo-outline="true"] .early-logo { filter: brightness(0) invert(1) drop-shadow(0 0 0.6px rgba(0,0,0,0.95)) drop-shadow(0 1px 1.5px rgba(0,0,0,0.65)); }
+[data-logo-tone="green"][data-logo-outline="true"] .early-logo { filter: drop-shadow(0 0 0.7px rgba(255,255,255,0.95)) drop-shadow(0 1px 2px rgba(255,255,255,0.65)); }
 [data-early-search="pending"] #app .dash-header,
 [data-early-search="pending"] #app .dash-search { visibility: hidden; }
 [data-density="compact"] .early-dashboard {

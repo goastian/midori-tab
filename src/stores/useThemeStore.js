@@ -180,7 +180,9 @@ const useThemeStore = defineStore('themeStore', {
         '--border-color': vars['--color-border'] || '',
       };
 
-      const allVars = { ...vars, ...legacyAliases };
+      const backgroundVars = Object.fromEntries(['--midori-start-background', '--midori-start-color']
+        .map(key => [key, root.style.getPropertyValue(key)]).filter(([, value]) => value));
+      const allVars = { ...vars, ...legacyAliases, ...backgroundVars };
       const cssText = Object.entries(allVars)
         .map(([key, value]) => `${key}: ${value}`)
         .join('; ');

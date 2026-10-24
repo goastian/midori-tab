@@ -1,13 +1,14 @@
 <template>
-  <div class="privacy-widget">
+  <div class="privacy-widget" :aria-busy="!hasLoaded || inFlight">
     <div class="pw-header" :class="{ 'pw-header--managed': managed }">
       <span v-if="!managed" class="pw-icon">🛡️</span>
       <span v-if="!managed" class="pw-title">{{ i18n.$t('privacy.title') }}</span>
-      <span v-if="!available" class="pw-badge pw-badge--off">{{ i18n.$t('common.off') }}</span>
+      <span v-if="!hasLoaded" class="pw-badge pw-badge--loading">{{ i18n.$t('privacy.loading') }}</span>
+      <span v-else-if="!available" class="pw-badge pw-badge--off">{{ i18n.$t('common.off') }}</span>
       <span v-else class="pw-badge pw-badge--on">{{ statusLabel }}</span>
     </div>
 
-    <div v-if="!available" class="pw-empty">
+    <div v-if="hasLoaded && !available" class="pw-empty">
       <p class="pw-empty-text">{{ i18n.$t('privacy.notAvailable') }}</p>
     </div>
 
@@ -89,6 +90,7 @@ export default {
     return {
       i18n: useI18nStore(),
       available: false,
+      hasLoaded: false,
       totalBlocked: 0,
       totalRequests: 0,
       pageBlocked: 0,
@@ -114,21 +116,21 @@ export default {
   computed: {
     /** Formats blocked count with K/M suffixes. */
     formattedBlocked() {
-      return this.formatCompact(this.totalBlocked);
+      return this.hasLoaded ? this.formatCompact(this.totalBlocked) : '—';
     },
 
     formattedRequests() {
-      return this.totalRequests === null ? '—' : this.formatCompact(this.totalRequests);
+      return !this.hasLoaded || this.totalRequests === null ? '—' : this.formatCompact(this.totalRequests);
     },
 
     formattedBlockRate() {
-      if (this.blockRate === null) return '—';
+      if (!this.hasLoaded || this.blockRate === null) return '—';
       if (this.blockRate >= 10) return Math.round(this.blockRate) + '%';
       return this.blockRate.toFixed(1) + '%';
     },
 
     formattedPageBlocked() {
-      return this.formatCompact(this.pageBlocked);
+      return this.hasLoaded ? this.formatCompact(this.pageBlocked) : '—';
     },
 
     statusLabel() {
@@ -274,7 +276,12 @@ export default {
           this.failureCount = 0;
           this.clearRefreshTimer();
         }
+      } catch {
+        this.failureCount += 1;
+        this.available = false;
+        this.scheduleStartupRetry();
       } finally {
+        this.hasLoaded = true;
         this.inFlight = false;
       }
     },
@@ -322,6 +329,7 @@ export default {
 <style scoped>
 .privacy-widget {
   width: 100%;
+  min-height: var(--privacy-content-height, calc(7rem + 2px));
   background: var(--surface-raised, #0F1520);
   border: 1px solid var(--color-border, rgba(126,196,168,0.1));
   border-radius: var(--radius-md, 10px);
@@ -371,6 +379,11 @@ export default {
   background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.pw-badge--loading {
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
 }
 
 /* ── Empty state ── */
@@ -423,6 +436,12 @@ export default {
   line-height: 1.25;
   overflow-wrap: anywhere;
   text-align: center;
+}
+
+@container (max-width: 320px) {
+  .pw-stat-label {
+    min-height: 1.55rem;
+  }
 }
 
 /* ── Categories breakdown ── */

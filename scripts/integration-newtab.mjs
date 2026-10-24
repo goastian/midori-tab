@@ -10,10 +10,15 @@ import { runTransportIntegration } from './integration-transport.mjs';
 import { runUpdateIntegration } from './integration-updates.mjs';
 import { readBundleGraph } from './critical-requests.mjs';
 import { runEarlySearchIntegration } from '../tests/integration/early-search.mjs';
+import { runStartupVisualIntegration } from '../tests/integration/startup-visual.mjs';
+import { runBookmarkEditorIntegration } from '../tests/integration/bookmark-editor.mjs';
+import { runUpdateToastIntegration } from '../tests/integration/update-toast.mjs';
 import { instrumentFaviconFixture, runFaviconIntegration } from '../tests/integration/favicon-cache.mjs';
 import { runSpacesIntegration } from '../tests/integration/spaces.mjs';
 import { runSponsoredIntegration } from '../tests/integration/sponsored-runtime.mjs';
 import { runSmartSuggestionsIntegration } from '../tests/integration/smart-suggestions.mjs';
+import { runResizeLayoutIntegration } from '../tests/integration/resize-layout.mjs';
+import { runWallpaperPrewarmIntegration } from '../tests/integration/wallpaper-prewarm.mjs';
 
 const HELP = 'Usage: npm run test:integration -- [--engine firefox|chromium] [--build] [--dist PATH] [--output-dir PATH]';
 
@@ -117,6 +122,13 @@ export async function runIntegration(options) {
           const result = await runTransportIntegration(session, { outputDir: directory });
           return { report: join(directory, 'transport-integration.json'), passed: result.passed };
         });
+        await check('update-toast-deferred-load-native-version-and-dismissal', async () => {
+          const outputDir = join(options.outputDir, 'update-toast');
+          const result = await runUpdateToastIntegration(session, { engine: options.engine,
+            extensionPath: options.extensionPath, outputDir });
+          return { report: join(outputDir, 'update-toast.json'), passed: result.passed,
+            identity: result.identity, cases: result.cases.map(item => item.id) };
+        });
       } finally {
         await check('temporary-profile-cleanup', async () => {
           await closeContext(session);
@@ -146,6 +158,17 @@ export async function runIntegration(options) {
         outputDir: join(options.outputDir, 'early-search') });
     });
 
+    await check('startup-visual-background-and-layout-continuity', async () => {
+      const outputDir = join(options.outputDir, 'startup-visual');
+      const result = await runStartupVisualIntegration({ engine: options.engine,
+        extensionPath: options.extensionPath, outputDir, throwOnFailure: false });
+      const report = join(outputDir, 'startup-visual.json');
+      const failed = result.cases.filter(item => item.status !== 'passed').map(item => item.id);
+      assert.equal(result.passed, true, `Startup visual regressions: ${failed.join(', ')}; see ${report}`);
+      return { report, passed: result.passed,
+        cases: result.cases.map(({ id, status, measurements }) => ({ id, status, measurements })) };
+    });
+
     await check('disabled-search-still-reaches-dashboard-readiness', async () => {
       const directory = copyExtension('disabled-search');
       const html = readFileSync(join(directory, 'index.html'), 'utf8');
@@ -172,10 +195,38 @@ export async function runIntegration(options) {
       finally { await closeContext(faviconSession); }
     });
 
+    await check('bookmark-editor-deferred-load-and-persistent-editing', async () => {
+      const editorSession = await openContextWithRetry(baseOptions);
+      const outputDir = join(options.outputDir, 'bookmark-editor');
+      try {
+        const result = await runBookmarkEditorIntegration(editorSession, { extensionPath: options.extensionPath, outputDir });
+        return { report: join(outputDir, 'bookmark-editor.json'), passed: result.passed,
+          cases: result.cases, editorResources: result.editorResources };
+      } finally { await closeContext(editorSession); }
+    });
+
     await check('spaces-optional-load-toggle-persistence-and-reset', async () => {
       const spacesSession = await openContextWithRetry(baseOptions);
       try { return await runSpacesIntegration(spacesSession, { outputDir: join(options.outputDir, 'spaces') }); }
       finally { await closeContext(spacesSession); }
+    });
+
+    await check('resize-and-restore-layout-follows-viewport-without-intermediate-states', async () => {
+      const resizeSession = await openContextWithRetry(baseOptions);
+      const outputDir = join(options.outputDir, 'resize-layout');
+      try {
+        const result = await runResizeLayoutIntegration(resizeSession, { outputDir });
+        return { report: join(outputDir, 'resize-layout.json'), passed: result.passed, frames: result.frames, columns: result.columns };
+      } finally { await closeContext(resizeSession); }
+    });
+
+    await check('next-wallpaper-preview-is-prewarmed-for-the-following-tab', async () => {
+      const prewarmSession = await openContextWithRetry(baseOptions);
+      const outputDir = join(options.outputDir, 'wallpaper-prewarm');
+      try {
+        const result = await runWallpaperPrewarmIntegration(prewarmSession, { outputDir });
+        return { report: join(outputDir, 'wallpaper-prewarm.json'), passed: result.passed, requests: result.requests };
+      } finally { await closeContext(prewarmSession); }
     });
 
     await check('smart-suggestions-optional-load-cross-tab-and-dismiss', async () => {
