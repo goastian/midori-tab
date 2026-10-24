@@ -765,6 +765,7 @@
   min-height: 100dvh;
   display: block;
   position: relative;
+  isolation: isolate;
   overflow-x: clip;
   background: transparent;
 }
