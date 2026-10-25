@@ -191,10 +191,6 @@ const useThemeStore = defineStore('themeStore', {
       writeThemeBootVars(variant, vars, this.activeThemeId);
     },
 
-    clearThemeVars() {
-      document.documentElement.removeAttribute('style');
-    },
-
     updateCustomTheme(variant, vars) {
       if (variant === 'light') {
         this.customTheme.light = { ...this.customTheme.light, ...vars };
@@ -205,18 +201,6 @@ const useThemeStore = defineStore('themeStore', {
         this.applyTheme();
       }
       this.persistAsyncState();
-    },
-
-    getThemeAutoAdapt() {
-      return this.activeTheme.autoAdapt;
-    },
-
-    setAutoAdapt(themeId, value) {
-      if (themeId === 'custom') {
-        this.customTheme.autoAdapt = value;
-        this.persistAsyncState();
-      }
-      // Predefined themes always have autoAdapt; controlled per-theme via this flag
     },
 
     async hydrateAsyncState() {

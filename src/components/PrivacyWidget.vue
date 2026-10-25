@@ -18,11 +18,11 @@
         <span class="pw-stat-label">{{ i18n.$t('privacy.stats.blocked') }}</span>
       </div>
       <div class="pw-stat">
-        <span class="pw-stat-value">{{ formattedRequests }}</span>
+        <span class="pw-stat-value" :title="requestsUnavailable ? unavailableLabel : null">{{ formattedRequests }}<span v-if="requestsUnavailable" class="pw-sr-only"> {{ unavailableLabel }}</span></span>
         <span class="pw-stat-label">{{ i18n.$t('privacy.stats.requests') }}</span>
       </div>
       <div class="pw-stat">
-        <span class="pw-stat-value">{{ formattedBlockRate }}</span>
+        <span class="pw-stat-value" :title="blockRateUnavailable ? unavailableLabel : null">{{ formattedBlockRate }}<span v-if="blockRateUnavailable" class="pw-sr-only"> {{ unavailableLabel }}</span></span>
         <span class="pw-stat-label">{{ i18n.$t('privacy.stats.blockRate') }}</span>
       </div>
       <div class="pw-stat">
@@ -114,6 +114,18 @@ export default {
   },
 
   computed: {
+    unavailableLabel() {
+      return this.i18n.$t('privacy.stats.unavailable');
+    },
+
+    requestsUnavailable() {
+      return this.hasLoaded && this.available && this.totalRequests === null;
+    },
+
+    blockRateUnavailable() {
+      return this.hasLoaded && this.available && this.blockRate === null;
+    },
+
     /** Formats blocked count with K/M suffixes. */
     formattedBlocked() {
       return this.hasLoaded ? this.formatCompact(this.totalBlocked) : '—';
@@ -492,5 +504,14 @@ export default {
   .pw-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.pw-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 </style>

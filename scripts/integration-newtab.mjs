@@ -20,6 +20,11 @@ import { runSmartSuggestionsIntegration } from '../tests/integration/smart-sugge
 import { runResizeLayoutIntegration } from '../tests/integration/resize-layout.mjs';
 import { runWallpaperPrewarmIntegration } from '../tests/integration/wallpaper-prewarm.mjs';
 import { instrumentStorageFaultFixture, runWidgetDataSafetyIntegration } from '../tests/integration/widget-data-safety.mjs';
+import { runRemoteWidgetsIntegration } from '../tests/integration/remote-widgets.mjs';
+import { runPrivacyIntegration, runRewardsIntegration } from '../tests/integration/privacy-rewards.mjs';
+import { runWallpaperLifecycleIntegration } from '../tests/integration/wallpaper-lifecycle.mjs';
+import { runRealPackageIntegration } from '../tests/integration/real-package.mjs';
+import { runRestoreStabilityIntegration } from '../tests/integration/restore-stability.mjs';
 
 const HELP = 'Usage: npm run test:integration -- [--engine firefox|chromium] [--build] [--dist PATH] [--output-dir PATH]';
 
@@ -251,6 +256,48 @@ export async function runIntegration(options) {
       return runSponsoredIntegration({ engine: options.engine, extensionPath: options.extensionPath,
         outputDir: join(options.outputDir, 'sponsored-runtime') });
     });
+
+    const remoteOptions = name => ({ engine: options.engine, extensionPath: options.extensionPath, outputDir: join(options.outputDir, name) });
+    const summarize = (name, result) => ({ report: join(options.outputDir, name), passed: result.passed, cases: result.cases.map(item => item.id) });
+
+    await check('remote-queue-barrier-budget-hide-disable-offline-snapshots-and-late-responses', async () => {
+      const result = await runRemoteWidgetsIntegration(remoteOptions('remote-widgets'));
+      return summarize('remote-widgets/remote-widgets.json', result);
+    });
+
+    // Headless Chromium never reports a hidden tab, so hiding and restoring is only observable in Midori Gecko.
+    if (options.engine === 'firefox') {
+      await check('hide-cover-and-restore-keeps-layout-wallpaper-and-requests-stable', async () => {
+        const result = await runRestoreStabilityIntegration(remoteOptions('restore-stability'));
+        return { report: join(options.outputDir, 'restore-stability/restore-stability.json'), passed: result.passed, cycles: result.cycles,
+          background: result.background };
+      });
+    }
+
+    await check('wallpapers-and-favicons-cancellation-blob-release-cache-reuse-and-import-rollback', async () => {
+      const result = await runWallpaperLifecycleIntegration(remoteOptions('wallpaper-lifecycle'));
+      return summarize('wallpaper-lifecycle/wallpaper-lifecycle.json', result);
+    });
+
+    // The Midori bridge and the host companions only exist in Midori; Chromium has no equivalent to verify.
+    if (options.engine === 'firefox') {
+      await check('privacy-bridge-fallback-and-unavailable-rate', async () => {
+        const result = await runPrivacyIntegration(remoteOptions('privacy'));
+        return summarize('privacy/privacy.json', result);
+      });
+    }
+
+    await check('rewards-register-once-close-cancel-timeout-and-network-failure', async () => {
+      const result = await runRewardsIntegration(remoteOptions('rewards'));
+      return summarize('rewards/rewards.json', result);
+    });
+
+    if (options.engine === 'firefox') {
+      await check('real-package-privacy-host-bridge-and-open-er-api-permissions', async () => {
+        const result = await runRealPackageIntegration(remoteOptions('real-package'));
+        return summarize('real-package/real-package.json', result);
+      });
+    }
 
     await check('negative-dynamic-optional-feature-and-deduplicated-css', async () => {
       const directory = copyExtension('optional-feature');

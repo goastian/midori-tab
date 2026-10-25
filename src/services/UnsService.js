@@ -1,4 +1,4 @@
-import { getJson, quotaSafeSet, remove } from './StorageService.js';
+import { getJson, quotaSafeSet } from './StorageService.js';
 import { scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
 import { fetchJsonWithTimeout } from './fetchJsonWithTimeout.js';
 
@@ -207,16 +207,6 @@ class UnsplashService {
       if (error?.name !== 'AbortError' && !signal?.aborted) console.error('Error en la precarga de imágenes:', error);
       return null;
     }
-  }
-
-  /**
-   * Clear cache manually.
-   */
-  async clearCache() {
-    await remove(CACHE_KEY_LIST);
-    localStorage.removeItem(CACHE_INDEX);
-    localStorage.removeItem(CACHE_EXPIRY);
-    localStorage.removeItem(CACHE_FETCH_LOCK);
   }
 }
 

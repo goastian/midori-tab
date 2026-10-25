@@ -549,18 +549,6 @@ export default {
       this.saveBookmarksDebounced();
       this.closeEditor();
     },
-    addBookmarkExternal(title, url) {
-      if (!this.bookmarksReady) return false;
-      try {
-        const parsed = this.normalizeBookmarkUrl(url);
-        if (!this.bookmarks[this.activeTab]) this.bookmarks[this.activeTab] = [];
-        this.bookmarks[this.activeTab].push({ id: crypto.randomUUID(), rev: 1, updatedAt: Date.now(), title, url: parsed.toString(), domain: parsed.hostname });
-        this.saveBookmarksDebounced();
-        return true;
-      } catch (_) {
-        return false;
-      }
-    },
     confirmDeleteBookmark(id) {
       const category = this.activeTab;
       const index = this.currentBookmarks.findIndex(bookmark => bookmark.id === id);
@@ -733,6 +721,9 @@ export default {
       const completed = await scheduleRemoteTask('ads-decision', signal => this.adsStore.loadAd(false, { signal }), { priority: 1 });
       if (!completed) this.adRequested = false;
       if (!this.$el?.isConnected) return;
+      // A decision interrupted by hiding the tab stays pending and is asked again on return;
+      // closing the slot here would drop the sponsored shortcut for the rest of the page.
+      if (!completed) return;
       this.adRequestComplete = true;
       if (!this.adsStore.hasAd) {
         this.teardownAdObserver();

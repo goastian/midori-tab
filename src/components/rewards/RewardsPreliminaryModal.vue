@@ -91,6 +91,7 @@
 import { markRaw } from 'vue';
 import DashboardIcon from '../icons/DashboardIcon.vue';
 import RewardsInterestService, { REWARDS_COUNTRY_CODES } from '../../services/RewardsInterestService.js';
+import { getWidgetCopy } from '../../i18n/widget-copy.js';
 
 // A hot-reloaded extension can temporarily combine this lazy view with an
 // older already-loaded locale chunk. Never expose translation keys in that
@@ -148,6 +149,9 @@ export default {
     this.requestController?.abort();
   },
   methods: {
+    errorMessage(error) {
+      return getWidgetCopy(this.i18n.locale).rewardsErrors[error?.code] || this.t('rewards.error');
+    },
     t(key) {
       const translated = this.i18n.$t(key);
       return translated === key ? (MISSING_COPY_FALLBACK[key] || translated) : translated;
@@ -175,7 +179,7 @@ export default {
         if (this.closed) return;
         this.step = registration.status === 'active' ? 'payout' : 'pending';
       } catch (error) {
-        if (!this.closed && error?.name !== 'AbortError') this.error = error?.message || this.t('rewards.error');
+        if (!this.closed && error?.name !== 'AbortError') this.error = this.errorMessage(error);
       } finally {
         if (this.requestController === controller) this.requestController = null;
         if (!this.closed) this.saving = false;
@@ -192,7 +196,7 @@ export default {
         if (this.closed) return;
         this.step = 'registered';
       } catch (error) {
-        if (!this.closed && error?.name !== 'AbortError') this.error = error?.message || this.t('rewards.error');
+        if (!this.closed && error?.name !== 'AbortError') this.error = this.errorMessage(error);
       } finally {
         if (this.requestController === controller) this.requestController = null;
         if (!this.closed) this.saving = false;

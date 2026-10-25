@@ -31,10 +31,12 @@ async function resolveMarketplaceDownloadImage(downloadUrl, assetSlug, signal) {
         return '';
       }
       try {
-        if (cached) await cache.delete(request);
-        await cache.put(request, new Response(blob, { headers: { 'content-type': blob.type } }));
-        const keys = await cache.keys();
-        for (const old of keys.slice(0, Math.max(0, keys.length - 8))) await cache.delete(old);
+        // A hit is served as it is: rewriting up to 8 MiB on every new tab only costs time and memory.
+        if (!cached) {
+          await cache.put(request, new Response(blob, { headers: { 'content-type': blob.type } }));
+          const keys = await cache.keys();
+          for (const old of keys.slice(0, Math.max(0, keys.length - 8))) await cache.delete(old);
+        }
       } catch (error) {
         console.warn('Marketplace wallpaper cache unavailable', error);
       }

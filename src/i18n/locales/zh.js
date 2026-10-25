@@ -193,6 +193,7 @@ export default {
       blocked: '已拦截',
       requests: '请求',
       blockRate: '拦截率',
+      unavailable: '不可用',
       page: '当前标签页',
     },
     categories: {

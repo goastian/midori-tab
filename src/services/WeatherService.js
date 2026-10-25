@@ -1,5 +1,6 @@
 import { getJson, setJsonDebounced } from './StorageService.js';
 import { fetchJsonWithTimeout } from './fetchJsonWithTimeout.js';
+import { RemoteHttpError, classifyRemoteError } from '../utils/remoteStatus.js';
 
 const CACHE_KEY = 'midori_weather_cache_v1';
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -40,6 +41,10 @@ function getConditionKey(code) {
   return 'unknown';
 }
 
+function staleCopy(entry, error) {
+  return { ...entry.data, fromCache: true, stale: true, failureKind: classifyRemoteError(error) };
+}
+
 class WeatherService {
   async getCachedForecast({ latitude, longitude, unit = 'metric' }) {
     const cache = await readCache();
@@ -77,21 +82,24 @@ class WeatherService {
       }));
     } catch (error) {
       if (signal?.aborted || error?.name === 'AbortError') throw error;
-      if (cache[cacheId]) {
-        return { ...cache[cacheId].data, fromCache: true, stale: true };
-      }
+      if (cache[cacheId]) return staleCopy(cache[cacheId], error);
       throw error;
     }
 
     if (!response.ok) {
-      if (cache[cacheId]) {
-        return { ...cache[cacheId].data, fromCache: true, stale: true };
-      }
-      throw new Error(`Weather request failed: ${response.status}`);
+      const failure = new RemoteHttpError('Weather', response.status);
+      if (cache[cacheId]) return staleCopy(cache[cacheId], failure);
+      throw failure;
     }
 
-    const current = payload.current || {};
-    const daily = payload.daily || {};
+    const current = payload?.current || {};
+    const daily = payload?.daily || {};
+    // A 200 without readings must not replace a usable snapshot.
+    if (!Number.isFinite(current.temperature_2m)) {
+      const failure = new RemoteHttpError('Weather', 502);
+      if (cache[cacheId]) return staleCopy(cache[cacheId], failure);
+      throw failure;
+    }
 
     const data = {
       temperature: current.temperature_2m,

@@ -68,20 +68,9 @@ const useWidgetsStore = defineStore('widgetsStore', {
       }
     },
 
-    /** Moves a widget from one index to another (drag & drop). */
-    reorder(fromIndex, toIndex) {
-      const item = this.order.splice(fromIndex, 1)[0];
-      this.order.splice(toIndex, 0, item);
-    },
-
     /** Applies a new order to one widget subset while preserving hidden/system positions. */
     setWidgetSubsetOrder(widgetKeys) {
       this.order = mergeWidgetSubset(this.order, widgetKeys);
-    },
-
-    /** Resets order to default. */
-    resetOrder() {
-      this.order = [...DEFAULT_ORDER];
     },
 
     /** Restores the built-in Start Page widget selection and order. */

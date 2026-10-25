@@ -4,6 +4,9 @@ let ready = false;
 let started = false;
 let wakeTimer = null;
 
+const RUN_LIMIT_MS = 60_000;
+const ABORT_GRACE_MS = 5_000;
+
 function budget() {
   return navigator.connection?.saveData ? 1 : 2;
 }
@@ -13,7 +16,40 @@ function foreground() {
 }
 
 function settle(entry, value) {
-  for (const resolve of entry.waiters) resolve(value);
+  for (const resolve of entry.waiters.splice(0)) resolve(value);
+}
+
+function release(entry, value) {
+  if (entry.released) return;
+  entry.released = true;
+  clearTimeout(entry.runTimer);
+  clearTimeout(entry.graceTimer);
+  if (running.get(entry.key) === entry) running.delete(entry.key);
+  settle(entry, value);
+  drain();
+}
+
+// A task that ignores its signal must not hold a slot forever: once it has
+// been told to stop, it is given a short grace period to settle by itself.
+function abortRunning(entry) {
+  if (entry.released || entry.aborting) return;
+  entry.aborting = true;
+  entry.controller.abort();
+  entry.graceTimer = setTimeout(() => release(entry, false), entry.graceMs);
+}
+
+function start(entry) {
+  const controller = new AbortController();
+  entry.controller = controller;
+  running.set(entry.key, entry);
+  entry.runTimer = setTimeout(() => abortRunning(entry), entry.timeoutMs);
+  Promise.resolve().then(() => entry.run(controller.signal)).then(
+    value => value === undefined ? true : value,
+    error => {
+      if (error?.name !== 'AbortError') console.warn(`[Midori] Remote task ${entry.key} failed`, error);
+      return false;
+    },
+  ).then(value => release(entry, value));
 }
 
 function drain() {
@@ -30,19 +66,7 @@ function drain() {
       return;
     }
     pending.delete(next.key);
-    const controller = new AbortController();
-    running.set(next.key, controller);
-    Promise.resolve().then(() => next.run(controller.signal)).then(
-      value => value === undefined ? true : value,
-      error => {
-        if (error?.name !== 'AbortError') console.warn(`[Midori] Remote task ${next.key} failed`, error);
-        return false;
-      },
-    ).then(value => {
-      running.delete(next.key);
-      settle(next, value);
-      drain();
-    });
+    start(next);
   }
 }
 
@@ -50,12 +74,12 @@ function handleVisibility() {
   if (!foreground()) {
     for (const entry of pending.values()) settle(entry, false);
     pending.clear();
-    for (const controller of running.values()) controller.abort();
+    for (const entry of [...running.values()]) abortRunning(entry);
     if (wakeTimer) { clearTimeout(wakeTimer); wakeTimer = null; }
   } else drain();
 }
 
-function start() {
+function bind() {
   if (started || typeof window === 'undefined') return;
   started = true;
   ready = Boolean(window.__midoriPerf?.marks?.['interaction-ready']);
@@ -65,8 +89,14 @@ function start() {
   document.addEventListener('visibilitychange', handleVisibility);
 }
 
-export function scheduleRemoteTask(key, run, { priority = 0, notBeforeMs = 0 } = {}) {
-  start();
+/**
+ * Queues `run` under `key`. Asking again for a key that is already running is ignored (resolves false)
+ * unless `supersede` is set: the newest request wins, the running one is aborted and its slot is freed.
+ */
+export function scheduleRemoteTask(key, run, {
+  priority = 0, notBeforeMs = 0, timeoutMs = RUN_LIMIT_MS, graceMs = ABORT_GRACE_MS, supersede = false,
+} = {}) {
+  bind();
   if (!foreground()) return Promise.resolve(false);
   const existing = pending.get(key);
   if (existing) {
@@ -75,8 +105,14 @@ export function scheduleRemoteTask(key, run, { priority = 0, notBeforeMs = 0 } =
     existing.notBeforeMs = Math.max(existing.notBeforeMs, notBeforeMs);
     return new Promise(resolve => existing.waiters.push(resolve));
   }
-  if (running.has(key)) return Promise.resolve(false);
-  const entry = { key, run, priority, notBeforeMs, createdAt: performance.now(), waiters: [] };
+  const active = running.get(key);
+  if (active) {
+    if (!supersede) return Promise.resolve(false);
+    active.aborting = true;
+    active.controller.abort();
+    release(active, false);
+  }
+  const entry = { key, run, priority, notBeforeMs, timeoutMs, graceMs, createdAt: performance.now(), waiters: [] };
   pending.set(key, entry);
   const promise = new Promise(resolve => entry.waiters.push(resolve));
   drain();
@@ -86,7 +122,8 @@ export function scheduleRemoteTask(key, run, { priority = 0, notBeforeMs = 0 } =
 export function cancelRemoteTask(key) {
   const entry = pending.get(key);
   if (entry) { pending.delete(key); settle(entry, false); }
-  running.get(key)?.abort();
+  const active = running.get(key);
+  if (active) abortRunning(active);
 }
 
 export function remoteTaskState() {

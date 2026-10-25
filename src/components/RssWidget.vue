@@ -78,10 +78,6 @@
       </div>
     </div>
 
-    <p v-if="isStale" class="news-notice" role="status">
-      <Icon icon="solar:clock-circle-linear" aria-hidden="true" /> {{ copy.stale }}
-    </p>
-
     <div v-if="loading && !articles.length" class="news-skeleton" aria-hidden="true">
       <div class="news-skeleton__lead"></div>
       <div class="news-skeleton__stack"><i></i><i></i><i></i><i></i></div>
@@ -103,7 +99,7 @@
     <template v-else>
       <div class="news-section-heading">
         <h4>{{ copy.latest }}</h4>
-        <span v-if="lastUpdated">{{ copy.updated }} {{ formatDate(lastUpdated) }}</span>
+        <span v-if="lastUpdated" :class="{ 'is-stale': isStale }" role="status">{{ updatedLabel }}</span>
       </div>
 
       <div class="news-layout">
@@ -213,6 +209,11 @@ import useI18nStore from '../stores/useI18nStore.js';
 import { getWidgetCopy } from '../i18n/widget-copy.js';
 import { WIDGET_COST, createWidgetRuntime } from '../composables/useWidgetRuntime.js';
 import { observeNewsImage } from '../composables/newsImageObserver.js';
+import { classifyRemoteError, describeRemoteState, formatAge } from '../utils/remoteStatus.js';
+
+function filterKey({ country = '', language = '', topic = '' } = {}) {
+  return JSON.stringify([country, language, topic]);
+}
 
 const NEWS_REFRESH_MS = 5 * 60 * 1000;
 const FILTER_DELAY_MS = 180;
@@ -274,6 +275,7 @@ export default {
       loadedCursors: new Set(),
       paginationFilters: { country: '', language: '', topic: '', query: '' },
       filterTimer: null,
+      shownFilterKey: '',
       imageGeneration: 0,
       pendingArticleDetailKeys: new Set(),
       widgetPolicy: WIDGET_POLICY,
@@ -284,6 +286,15 @@ export default {
   computed: {
     copy() {
       return getWidgetCopy(this.i18n.locale).rssWidget;
+    },
+    remoteCopy() {
+      return getWidgetCopy(this.i18n.locale).remoteStatus;
+    },
+    updatedLabel() {
+      const label = `${this.copy.updated} ${this.formatDate(this.lastUpdated)}`;
+      if (!this.isStale) return label;
+      const age = formatAge(this.lastUpdated, this.i18n.locale);
+      return `${this.copy.stale}${age ? ` (${age})` : ''} · ${label}`;
     },
     leadStory() {
       return this.articles[0] || {};
@@ -316,6 +327,7 @@ export default {
       this.isStale = Boolean(snapshot.isStale);
       this.lastUpdated = new Date(snapshot.fetchedAt).toISOString();
       this.lastRequestSucceeded = true;
+      this.shownFilterKey = filterKey(this.filters);
     }).catch(() => undefined);
     this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
       onVisible: () => this.loadNewsWhenVisible(),
@@ -374,7 +386,7 @@ export default {
           force,
           signal: this.requestController?.signal,
         });
-        if (requestId !== this.requestSequence) return;
+        if (requestId !== this.requestSequence) return false;
 
         const nextArticles = append
           ? appendNewsArticles(this.articles, result.articles)
@@ -389,14 +401,25 @@ export default {
         }
         this.lastUpdated = result.fetchedAt ? new Date(result.fetchedAt).toISOString() : new Date().toISOString();
         this.lastRequestSucceeded = true;
+        if (!append) this.shownFilterKey = filterKey(requestFilters);
         if (!append) this.loadArticleImage(nextArticles[0]);
         this.$nextTick(() => this.setupLoadMoreObserver());
         return !result.isStale;
       } catch (error) {
         if (append) this.loadedCursors.delete(cursor);
-        if (error?.name === 'AbortError') return;
-        if (requestId !== this.requestSequence) return;
-        this.error = error instanceof Error ? error.message : String(error || 'No se pudieron cargar las noticias.');
+        if (error?.name === 'AbortError') return false;
+        if (requestId !== this.requestSequence) return false;
+        if (!append && filterKey(requestFilters) !== this.shownFilterKey) {
+          // Stories of another country, language or category must not stay on screen as if they matched.
+          this.articles = [];
+          this.trendTopics = [];
+          this.meta = { hasMore: false, nextCursor: '' };
+          this.isStale = false;
+          this.lastUpdated = '';
+        }
+        this.error = describeRemoteState(this.remoteCopy, classifyRemoteError(error), {
+          fetchedAt: this.articles.length ? this.lastUpdated : null, locale: this.i18n.locale,
+        });
         this.lastRequestSucceeded = false;
         return false;
       } finally {
@@ -468,13 +491,13 @@ export default {
       try {
         const detail = await freeNewsService.fetchArticleDetails(article.id);
         if (!detail?.url) {
-          this.error = 'La fuente no proporcionó un enlace para esta noticia.';
+          this.error = this.copy.noArticleLink;
           return;
         }
         article.url = detail.url;
         await this.openResolvedArticle(detail.url);
       } catch (error) {
-        if (error?.name !== 'AbortError') this.error = 'No se pudo abrir esta noticia. Inténtalo de nuevo.';
+        if (error?.name !== 'AbortError') this.error = this.copy.openFailed;
       } finally {
         article.opening = false;
       }
@@ -670,6 +693,7 @@ export default {
 .news-section-heading { justify-content: space-between; gap: var(--news-space-2); margin-block: var(--news-space-4) var(--news-space-2); }
 .news-section-heading h4 { font-size: var(--font-size-sm); letter-spacing: -0.01em; }
 .news-section-heading span { color: var(--news-ink-muted); font-family: var(--font-news-meta); font-size: var(--font-size-xs); text-align: end; }
+.news-section-heading span.is-stale { color: var(--news-warning, var(--news-ink)); }
 
 .news-layout { display: grid; align-items: start; gap: var(--news-space-2); }
 .news-supporting-stories { display: grid; gap: var(--news-space-2); }

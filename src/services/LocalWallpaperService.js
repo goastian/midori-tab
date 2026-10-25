@@ -109,29 +109,38 @@ export async function saveLocalWallpapers(fileList) {
 
   if (!files.length) return 0;
 
+  // Nothing is written until every image is ready, so a failure keeps the previous library.
   const records = [];
   let totalBytes = 0;
-  for (const [index, file] of files.entries()) {
-    const variants = await prepareWallpaper(file);
+  let saved = 0;
+  for (const file of files) {
+    let variants;
+    try { variants = await prepareWallpaper(file); } catch { continue; }
     totalBytes += variants.full.blob.size + (variants.small?.blob.size || 0);
     if (totalBytes > MAX_LIBRARY_BYTES) throw new Error('Wallpaper library exceeds 80 MiB');
-    records.push({ id: `full-${index}`, ...variants.full });
-    if (variants.small) records.push({ id: `small-${index}`, ...variants.small });
+    records.push({ id: `full-${saved}`, ...variants.full });
+    if (variants.small) records.push({ id: `small-${saved}`, ...variants.small });
+    saved += 1;
   }
+  if (!saved) return 0;
   const db = await openDb();
   try {
     await new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      store.clear();
-      for (const record of records) {
-        store.add(record);
-      }
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error || new Error('Failed to save wallpapers'));
       transaction.onabort = () => reject(transaction.error || new Error('Save aborted'));
+      try {
+        const store = transaction.objectStore(STORE_NAME);
+        store.clear();
+        for (const record of records) store.add(record);
+      } catch (error) {
+        // An exception here would otherwise commit the clear without the new images.
+        try { transaction.abort(); } catch { /* already finished */ }
+        reject(error);
+      }
     });
-    return files.length;
+    return saved;
   } finally {
     db.close();
   }

@@ -193,6 +193,7 @@ export default {
       blocked: 'Bloqués',
       requests: 'Requêtes',
       blockRate: 'Taux de blocage',
+      unavailable: 'Non disponible',
       page: 'Cet onglet',
     },
     categories: {

@@ -193,6 +193,7 @@ export default {
         blocked: 'Blockiert',
         requests: 'Anfragen',
         blockRate: 'Blockierrate',
+        unavailable: 'Nicht verfügbar',
         page: 'Dieser Tab',
       },
       categories: {

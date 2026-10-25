@@ -97,6 +97,8 @@ export default {
         } else void this.load();
       },
     async load({ signal } = {}) {
+        // A preview prepared for the previous background must not keep downloading after it was replaced.
+        cancelRemoteTask('wallpaper-prewarm');
         this.fullImageReady = false;
         this.resumeWhenVisible = false;
         clearTimeout(this.resumeTimer);

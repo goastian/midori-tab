@@ -193,6 +193,7 @@ export default {
       blocked: 'Bloccati',
       requests: 'Richieste',
       blockRate: 'Tasso di blocco',
+      unavailable: 'Non disponibile',
       page: 'Questa scheda',
     },
     categories: {

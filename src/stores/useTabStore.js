@@ -89,16 +89,6 @@ const useTabStore = defineStore('tabStore', {
       themeStore.applyTheme(this.theme);
     },
 
-    setDensity(density) {
-      this.density = density;
-      document.documentElement.setAttribute('data-density', this.density);
-    },
-
-    setTitle(title) {
-        this.tabName = title;
-        document.title = this.tabName;
-    },
-
     applyStartPageSettings(settings = {}) {
       Object.assign(this, normalizeStartPageSettings({
         ...this.$state,

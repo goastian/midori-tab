@@ -137,6 +137,7 @@ export default {
       blocked: 'Bloqueados',
       requests: 'Solicitações',
       blockRate: 'Taxa de bloqueio',
+      unavailable: 'Indisponível',
       page: 'Esta aba',
     },
     categories: {

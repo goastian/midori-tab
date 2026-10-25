@@ -46,10 +46,6 @@ const useI18nStore = defineStore('i18nStore', {
     languages() {
       return availableLanguages;
     },
-
-    currentLanguage(state) {
-      return availableLanguages.find(l => l.code === state.locale) || availableLanguages.find(l => l.code === 'en') || availableLanguages[0];
-    },
   },
 
   actions: {

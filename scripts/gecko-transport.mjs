@@ -396,7 +396,9 @@ export async function openGeckoSession({ extensionPath, executablePath = process
         page.waitForFunction = async (fn, arg, { timeout = 30_000 } = {}) => {
           const deadline = Date.now() + timeout;
           while (Date.now() < deadline) {
-            if (await page.evaluate(fn, arg)) return;
+            // Marionette reports a stale element when Vue replaces a node while the poll runs; polling again is correct.
+            try { if (await page.evaluate(fn, arg)) return; }
+            catch (error) { if (!/stale element reference/.test(error.message)) throw error; }
             await pause(50);
           }
           throw new Error(`Gecko waitForFunction timed out after ${timeout} ms: ${fn.toString()}`);

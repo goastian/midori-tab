@@ -1,5 +1,6 @@
 import { getJson, setJsonDebounced } from './StorageService.js';
 import { fetchJsonWithTimeout } from './fetchJsonWithTimeout.js';
+import { RemoteHttpError, classifyRemoteError } from '../utils/remoteStatus.js';
 
 const CACHE_KEY = 'midori_currency_cache_v1';
 const CACHE_TTL_MS = 45 * 60 * 1000;
@@ -24,6 +25,10 @@ function writeCache(cache) {
   } catch {
     // Ignore storage failures.
   }
+}
+
+function staleCopy(entry, error) {
+  return { ...entry.data, fromCache: true, stale: true, failureKind: classifyRemoteError(error) };
 }
 
 class CurrencyService {
@@ -53,24 +58,21 @@ class CurrencyService {
       }));
     } catch (error) {
       if (options.signal?.aborted || error?.name === 'AbortError') throw error;
-      if (cache[normalizedBase]) {
-        return { ...cache[normalizedBase].data, fromCache: true, stale: true };
-      }
+      if (cache[normalizedBase]) return staleCopy(cache[normalizedBase], error);
       throw error;
     }
 
     if (!response.ok) {
-      if (cache[normalizedBase]) {
-        return { ...cache[normalizedBase].data, fromCache: true, stale: true };
-      }
-      throw new Error(`Currency request failed: ${response.status}`);
+      const failure = new RemoteHttpError('Currency', response.status);
+      if (cache[normalizedBase]) return staleCopy(cache[normalizedBase], failure);
+      throw failure;
     }
 
-    if (payload.result !== 'success' || !payload.rates) {
-      if (cache[normalizedBase]) {
-        return { ...cache[normalizedBase].data, fromCache: true, stale: true };
-      }
-      throw new Error('Currency service unavailable');
+    if (payload?.result !== 'success' || !payload.rates || typeof payload.rates !== 'object'
+      || !Object.values(payload.rates).some(Number.isFinite)) {
+      const failure = new RemoteHttpError('Currency', 502);
+      if (cache[normalizedBase]) return staleCopy(cache[normalizedBase], failure);
+      throw failure;
     }
 
     const data = {

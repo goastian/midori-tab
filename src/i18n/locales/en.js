@@ -413,6 +413,7 @@ export default {
       blocked: 'Blocked',
       requests: 'Requests',
       blockRate: 'Block rate',
+      unavailable: 'Not available',
       page: 'This tab',
     },
     categories: {

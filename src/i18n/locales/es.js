@@ -419,6 +419,7 @@ export default {
       blocked: 'Bloqueados',
       requests: 'Solicitudes',
       blockRate: 'Tasa de bloqueo',
+      unavailable: 'No disponible',
       page: 'Esta pestaña',
     },
     categories: {

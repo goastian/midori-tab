@@ -1,6 +1,8 @@
+// Gecko reports isIntersecting=false while the visible share is under the lowest threshold, so a tall
+// widget (the news canvas) would count as hidden and ignore refreshes. Threshold 0 keeps it visible.
 export const WIDGET_VISIBILITY_OPTIONS = Object.freeze({
   rootMargin: '120px',
-  threshold: 0.1,
+  threshold: Object.freeze([0, 0.1]),
 });
 
 const targets = new Map();

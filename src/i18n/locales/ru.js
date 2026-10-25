@@ -193,6 +193,7 @@ export default {
       blocked: 'Заблокировано',
       requests: 'Запросы',
       blockRate: 'Доля блокировок',
+      unavailable: 'Недоступно',
       page: 'Эта вкладка',
     },
     categories: {

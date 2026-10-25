@@ -17,6 +17,8 @@ function isForegroundDocument() {
 
 function noop() {}
 
+const DEFAULT_RETRY_AFTER_MS = 30_000;
+
 export function createWidgetRuntime(component, policy = {}, hooks = {}) {
   let unobserve = null;
   let unsubscribeVisibility = null;
@@ -25,6 +27,8 @@ export function createWidgetRuntime(component, policy = {}, hooks = {}) {
   let visible = Boolean(policy.eager);
   let foreground = isForegroundDocument();
   let lastRunAt = 0;
+  let lastFailureAt = 0;
+  let epoch = 0;
   let active = visible && foreground;
 
   const getRoot = () => {
@@ -42,8 +46,12 @@ export function createWidgetRuntime(component, policy = {}, hooks = {}) {
 
   const shouldRun = (force = false) => {
     if (force) return true;
+    const now = Date.now();
+    // Returning to the tab must not repeat a refresh that has just failed
+    // (offline, provider error): it would only flash a loading state again.
+    if (lastFailureAt && now - lastFailureAt < (policy.retryAfterMs ?? DEFAULT_RETRY_AFTER_MS)) return false;
     if (!policy.ttlMs || !lastRunAt) return true;
-    return Date.now() - lastRunAt >= policy.ttlMs;
+    return now - lastRunAt >= policy.ttlMs;
   };
 
   const runWhenVisible = async (task, options = {}) => {
@@ -52,18 +60,24 @@ export function createWidgetRuntime(component, policy = {}, hooks = {}) {
     if (!shouldRun(force)) return false;
     const execute = async () => {
       if (!canRun()) return false;
+      const mine = ++epoch;
       try {
         const result = await task();
-        if (result === false || !canRun()) return false;
+        // A newer refresh took over: this result must not be recorded as a success or a failure.
+        if (mine !== epoch || !canRun()) return false;
+        if (result === false) { lastFailureAt = Date.now(); return false; }
         lastRunAt = Date.now();
+        lastFailureAt = 0;
         return true;
       } catch (error) {
-        if (error?.name !== 'AbortError') console.warn(`[Midori] Widget ${policy.key} refresh failed`, error);
+        if (error?.name === 'AbortError') return false;
+        console.warn(`[Midori] Widget ${policy.key} refresh failed`, error);
+        if (mine === epoch && canRun()) lastFailureAt = Date.now();
         return false;
       }
     };
     return policy.usesNetwork
-      ? scheduleRemoteTask(`widget:${policy.key}`, execute, { priority: policy.cost === WIDGET_COST.HIGH ? 2 : 1 })
+      ? scheduleRemoteTask(`widget:${policy.key}`, execute, { priority: policy.cost === WIDGET_COST.HIGH ? 2 : 1, supersede: force })
       : execute();
   };
 
@@ -149,6 +163,9 @@ export function createWidgetRuntime(component, policy = {}, hooks = {}) {
     shouldRun,
     get lastRunAt() {
       return lastRunAt;
+    },
+    get lastFailureAt() {
+      return lastFailureAt;
     },
   };
 }

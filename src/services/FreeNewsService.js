@@ -325,7 +325,9 @@ export class FreeNewsService {
 
   async fetchNews(filters = {}, { force = false, signal } = {}) {
     if (!this.isConfigured()) {
-      throw new Error('FreeNewsAPI no está configurada. Añade VITE_FREENEWS_API_KEY al archivo .env de Midori Tab.');
+      const error = new Error('FreeNewsAPI no está configurada. Añade VITE_FREENEWS_API_KEY al archivo .env de Midori Tab.');
+      error.code = 'not-configured';
+      throw error;
     }
 
     const requestedFilters = normalizeNewsFilters(filters);

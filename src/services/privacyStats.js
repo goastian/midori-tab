@@ -1,7 +1,17 @@
 const FIREFOX_PRIVACY_ID = 'midori-protection@astian.org';
 const CHROMIUM_PRIVACY_ID = 'pimgloaejdgobcgjahbgippfilfdpcfa';
 
+const BRIDGE_TIMEOUT_MS = 3000;
+const COMPANION_TIMEOUT_MS = 1500;
+
 let cachedExtensionId = '';
+
+// A host that never answers must not leave the widget waiting forever.
+function withTimeout(promise, timeoutMs = BRIDGE_TIMEOUT_MS) {
+  let timer;
+  const timeout = new Promise(resolve => { timer = setTimeout(resolve, timeoutMs, null); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 function runtimeProtocol() {
   try {
@@ -68,21 +78,21 @@ function isBridgeResponse(response) {
   return !!response && typeof response === 'object' && !response.error && 'totalBlocked' in response;
 }
 
-export async function requestPrivacyStats() {
+export async function requestPrivacyStats({ timeoutMs = BRIDGE_TIMEOUT_MS } = {}) {
   const message = { action: 'get-stats-summary', schemaVersion: 2 };
 
-  const selfResponse = await sendToSelf(message);
+  const selfResponse = await withTimeout(sendToSelf(message), timeoutMs);
   if (isBridgeResponse(selfResponse)) return selfResponse;
 
   if (cachedExtensionId) {
-    const response = await sendToExtension(cachedExtensionId, message);
-    if (response && !response.error) return response;
+    const response = await withTimeout(sendToExtension(cachedExtensionId, message), Math.min(timeoutMs, COMPANION_TIMEOUT_MS));
+    if (isBridgeResponse(response)) return response;
     cachedExtensionId = '';
   }
 
   for (const extensionId of getPrivacyExtensionCandidates()) {
-    const response = await sendToExtension(extensionId, message);
-    if (!response || response.error) continue;
+    const response = await withTimeout(sendToExtension(extensionId, message), Math.min(timeoutMs, COMPANION_TIMEOUT_MS));
+    if (!isBridgeResponse(response)) continue;
     cachedExtensionId = extensionId;
     return response;
   }
@@ -107,6 +117,9 @@ const CATEGORY_KEYS = Object.freeze([
 
 export function normalizePrivacyStats(data) {
   if (!data || typeof data !== 'object') return null;
+  const reported = data.totalBlocked;
+  // A response without a usable blocked total is not a report: show nothing rather than zeros.
+  if (reported === null || reported === undefined || reported === '' || !Number.isFinite(Number(reported)) || Number(reported) < 0) return null;
 
   const totalBlocked = toCount(data.totalBlocked);
   const reportedRequests = toCount(data.totalRequests);

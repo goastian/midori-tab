@@ -193,6 +193,7 @@ export default {
       blocked: 'ブロック済み',
       requests: 'リクエスト',
       blockRate: 'ブロック率',
+      unavailable: '利用不可',
       page: 'このタブ',
     },
     categories: {

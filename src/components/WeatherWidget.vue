@@ -7,23 +7,23 @@
       </div>
       <div class="weather-actions">
         <button type="button" class="weather-btn" @click="toggleUnit">{{ unitLabel }}</button>
-        <button type="button" class="weather-btn" @click="refresh(true)" :disabled="loading">↻</button>
+        <button type="button" class="weather-btn" @click="refresh(true)" :disabled="loading" :aria-label="remoteCopy.retry" :title="remoteCopy.retry">↻</button>
       </div>
     </header>
 
-    <div v-if="loading && !forecast" class="weather-state">{{ i18n.$t('weather.loading') }}</div>
-    <div v-else-if="error && !forecast" class="weather-state weather-state--error">{{ error }}</div>
-    <div v-else-if="forecast" class="weather-body">
-      <div class="weather-temp">{{ rounded(forecast.temperature) }}{{ degreeSuffix }}</div>
+    <div v-if="loading && !shownForecast" class="weather-state">{{ i18n.$t('weather.loading') }}</div>
+    <div v-else-if="error && !shownForecast" class="weather-state weather-state--error" role="alert">{{ error }}</div>
+    <div v-else-if="shownForecast" class="weather-body" :aria-busy="loading">
+      <div class="weather-temp">{{ rounded(shownForecast.temperature) }}{{ degreeSuffix }}</div>
       <div class="weather-meta">
         <span>{{ conditionLabel }}</span>
-        <span>{{ i18n.$t('weather.high') }} {{ rounded(forecast.high) }}{{ degreeSuffix }}</span>
-        <span>{{ i18n.$t('weather.low') }} {{ rounded(forecast.low) }}{{ degreeSuffix }}</span>
-        <span>{{ i18n.$t('weather.wind') }} {{ rounded(forecast.wind) }}</span>
+        <span>{{ i18n.$t('weather.high') }} {{ rounded(shownForecast.high) }}{{ degreeSuffix }}</span>
+        <span>{{ i18n.$t('weather.low') }} {{ rounded(shownForecast.low) }}{{ degreeSuffix }}</span>
+        <span>{{ i18n.$t('weather.wind') }} {{ rounded(shownForecast.wind) }}</span>
       </div>
-      <p v-if="forecast.stale" class="weather-stale">{{ i18n.$t('weather.stale') }}</p>
-      <p v-if="loading" class="weather-stale">{{ i18n.$t('weather.loading') }}</p>
+      <p class="weather-stale" :class="{ 'weather-stale--error': Boolean(error) }" role="status">{{ statusText }}</p>
     </div>
+    <div v-else class="weather-state"></div>
 
     <footer class="weather-footer">
       <button type="button" class="weather-link" @click="useCurrentLocation">{{ i18n.$t('weather.useCurrentLocation') }}</button>
@@ -39,11 +39,15 @@
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
 import weatherService from '../services/WeatherService.js';
+import { fetchJsonWithTimeout } from '../services/fetchJsonWithTimeout.js';
 import { getJson, setJsonDebounced } from '../services/StorageService.js';
 import { WIDGET_COST, createWidgetRuntime } from '../composables/useWidgetRuntime.js';
+import { getWidgetCopy } from '../i18n/widget-copy.js';
+import { classifyRemoteError, describeRemoteState, formatAge } from '../utils/remoteStatus.js';
 
 const SETTINGS_KEY = 'midori_weather_settings_v1';
 const WEATHER_TTL_MS = 10 * 60 * 1000;
+const LOOKUP_TIMEOUT_MS = 7000;
 const WIDGET_POLICY = Object.freeze({
   key: 'weather',
   cost: WIDGET_COST.MEDIUM,
@@ -74,6 +78,14 @@ function formatCoordinates(latitude, longitude) {
   return `${lat}, ${lon}`;
 }
 
+function roundCoordinate(value) {
+  return Math.round(Number(value) * 100) / 100;
+}
+
+function lookupJson(url, signal) {
+  return fetchJsonWithTimeout(url, { cache: 'default', signal, timeoutMs: LOOKUP_TIMEOUT_MS });
+}
+
 export default {
   name: 'WeatherWidget',
 
@@ -98,26 +110,40 @@ export default {
   },
 
   computed: {
+    remoteCopy() {
+      return getWidgetCopy(this.i18n.locale).remoteStatus;
+    },
     degreeSuffix() {
       return this.settings.unit === 'imperial' ? '°F' : '°C';
     },
     unitLabel() {
       return this.settings.unit === 'imperial' ? '°F' : '°C';
     },
+    /** A forecast is only shown for the unit and place that are selected now. */
+    shownForecast() {
+      const forecast = this.forecast;
+      if (!forecast || forecast.unit !== this.settings.unit || !hasValidCoordinates(this.settings)) return null;
+      return roundCoordinate(forecast.latitude) === roundCoordinate(this.settings.latitude)
+        && roundCoordinate(forecast.longitude) === roundCoordinate(this.settings.longitude) ? forecast : null;
+    },
     conditionLabel() {
-      const key = this.forecast?.conditionKey || 'unknown';
+      const key = this.shownForecast?.conditionKey || 'unknown';
       return this.i18n.$t(`weather.conditions.${key}`);
+    },
+    statusText() {
+      if (this.error) return this.error;
+      if (this.loading) return this.i18n.$t('weather.loading');
+      if (!this.shownForecast?.stale) return '';
+      const age = formatAge(this.shownForecast.fetchedAt, this.i18n.locale);
+      return age ? this.remoteCopy.savedFrom.replace('{age}', age) : this.i18n.$t('weather.stale');
     },
   },
 
   async mounted() {
     await this.restoreSettings();
     if (this.disposed) return;
-    if (hasValidCoordinates(this.settings)) {
-      const cached = await weatherService.getCachedForecast(this.settings);
-      if (this.disposed) return;
-      this.forecast = cached;
-    }
+    await this.showCachedForecast();
+    if (this.disposed) return;
     this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
       onVisible: () => this.loadWhenVisible(),
       onFocus: () => this.loadWhenVisible(),
@@ -153,12 +179,35 @@ export default {
       }
     },
 
+    async showCachedForecast() {
+      this.forecast = null;
+      if (!hasValidCoordinates(this.settings)) return;
+      const requested = { latitude: this.settings.latitude, longitude: this.settings.longitude, unit: this.settings.unit };
+      const cached = await weatherService.getCachedForecast(requested);
+      if (this.disposed || requested.unit !== this.settings.unit
+        || requested.latitude !== this.settings.latitude || requested.longitude !== this.settings.longitude) return;
+      this.forecast = cached;
+    },
+
     shouldReplaceLegacyDefault() {
       const label = String(this.settings.locationLabel || '').trim().toLowerCase();
       return (!this.settings.locationSource || this.settings.locationSource === 'auto') && label === 'madrid';
     },
 
-    async resolveLocationLabel(latitude, longitude) {
+    failureMessage(error, kind = classifyRemoteError(error)) {
+      return describeRemoteState(this.remoteCopy, kind, {
+        fetchedAt: this.shownForecast?.fetchedAt, locale: this.i18n.locale,
+      });
+    },
+
+    /** Connectivity problems are reported as such; anything else keeps the specific message. */
+    lookupFailureMessage(error, fallbackKey) {
+      const kind = classifyRemoteError(error);
+      return ['offline', 'network', 'timeout', 'rateLimited'].includes(kind)
+        ? this.failureMessage(error, kind) : this.i18n.$t(fallbackKey);
+    },
+
+    async resolveLocationLabel(latitude, longitude, signal) {
       try {
         const endpoint = new URL('https://nominatim.openstreetmap.org/reverse');
         endpoint.searchParams.set('format', 'jsonv2');
@@ -168,10 +217,9 @@ export default {
         endpoint.searchParams.set('addressdetails', '1');
         endpoint.searchParams.set('accept-language', this.i18n.locale || 'en');
 
-        const response = await fetch(endpoint.toString(), { cache: 'default' });
+        const { response, payload } = await lookupJson(endpoint.toString(), signal);
         if (!response.ok) throw new Error('Reverse geocode failed');
 
-        const payload = await response.json();
         const address = payload?.address || {};
         const place = address.city || address.town || address.village || address.municipality || address.county || address.state;
         const country = address.country;
@@ -184,35 +232,56 @@ export default {
       return `${this.i18n.$t('weather.currentLocationLabel')} (${formatCoordinates(latitude, longitude)})`;
     },
 
-    async useApproximateLocation() {
+    /** Starts a cancellable lookup. Returns the signal, or null when a newer one replaced it. */
+    beginLookup() {
+      this.abortRequest();
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      this.requestController = controller;
       this.loading = true;
       this.error = '';
+      return { controller, signal: controller?.signal, id: this.requestSequence };
+    },
 
+    endLookup(lookup) {
+      if (lookup.id !== this.requestSequence) return;
+      this.requestController = null;
+      this.loading = false;
+    },
+
+    async useApproximateLocation() {
+      const lookup = this.beginLookup();
       try {
-        const response = await fetch('https://ipwho.is/', { cache: 'default' });
+        const { response, payload } = await lookupJson('https://ipwho.is/', lookup.signal);
+        if (lookup.id !== this.requestSequence) return false;
         if (!response.ok) throw new Error('IP location failed');
 
-        const payload = await response.json();
         const latitude = Number(payload?.latitude);
         const longitude = Number(payload?.longitude);
         if (payload?.success === false || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
           throw new Error('IP location unavailable');
         }
 
-        this.settings.latitude = latitude;
-        this.settings.longitude = longitude;
-        this.settings.locationLabel = [payload.city, payload.country].filter(Boolean).join(', ')
-          || await this.resolveLocationLabel(latitude, longitude);
-        this.settings.locationSource = 'ip';
-        this.manualLocation = this.settings.locationLabel;
-        this.persistSettings();
-        await this.refresh(true);
-        return true;
-      } catch {
-        this.error = this.i18n.$t('weather.errors.locationRequired');
-        this.loading = false;
+        const label = [payload.city, payload.country].filter(Boolean).join(', ')
+          || await this.resolveLocationLabel(latitude, longitude, lookup.signal);
+        if (lookup.id !== this.requestSequence) return false;
+        this.applyLocation({ latitude, longitude, label, source: 'ip' });
+        this.endLookup(lookup);
+        return await this.refresh(true);
+      } catch (error) {
+        if (error?.name === 'AbortError' || lookup.id !== this.requestSequence) return false;
+        this.error = this.lookupFailureMessage(error, 'weather.errors.locationRequired');
+        this.endLookup(lookup);
         return false;
       }
+    },
+
+    applyLocation({ latitude, longitude, label, source }) {
+      this.settings.latitude = latitude;
+      this.settings.longitude = longitude;
+      this.settings.locationLabel = label;
+      this.settings.locationSource = source;
+      this.manualLocation = label;
+      this.persistSettings();
     },
 
     persistSettings() {
@@ -229,6 +298,7 @@ export default {
         this.requestController.abort();
         this.requestController = null;
       }
+      this.loading = false;
     },
 
     async loadWhenVisible() {
@@ -247,37 +317,32 @@ export default {
         return false;
       }
 
-      this.abortRequest();
-      const requestId = this.requestSequence;
-      this.loading = true;
-      this.error = '';
-      this.requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const lookup = this.beginLookup();
       try {
         const forecast = await weatherService.getForecast({
           latitude: this.settings.latitude,
           longitude: this.settings.longitude,
           unit: this.settings.unit,
           forceRefresh,
-          signal: this.requestController?.signal,
+          signal: lookup.signal,
         });
-        if (requestId !== this.requestSequence) return false;
+        if (lookup.id !== this.requestSequence) return false;
         this.forecast = forecast;
+        if (forecast.stale) this.error = this.failureMessage(null, forecast.failureKind || 'unavailable');
         return !forecast.stale;
       } catch (error) {
-        if (error?.name === 'AbortError' || requestId !== this.requestSequence) return false;
-        this.error = this.i18n.$t('weather.errors.unavailable');
+        if (error?.name === 'AbortError' || lookup.id !== this.requestSequence) return false;
+        this.error = this.failureMessage(error);
         return false;
       } finally {
-        if (requestId === this.requestSequence) {
-          this.requestController = null;
-          this.loading = false;
-        }
+        this.endLookup(lookup);
       }
     },
 
-    toggleUnit() {
+    async toggleUnit() {
       this.settings.unit = this.settings.unit === 'metric' ? 'imperial' : 'metric';
       this.persistSettings();
+      await this.showCachedForecast();
       this.refresh(true);
     },
 
@@ -288,9 +353,7 @@ export default {
         return;
       }
 
-      this.loading = true;
-      this.error = '';
-
+      const lookup = this.beginLookup();
       try {
         const position = await new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -299,19 +362,19 @@ export default {
             maximumAge: 10 * 60 * 1000,
           });
         });
+        if (lookup.id !== this.requestSequence) return;
 
-        this.settings.latitude = position.coords.latitude;
-        this.settings.longitude = position.coords.longitude;
-        this.settings.locationLabel = await this.resolveLocationLabel(position.coords.latitude, position.coords.longitude);
-        this.settings.locationSource = 'auto';
-        this.manualLocation = this.settings.locationLabel;
-        this.persistSettings();
+        const label = await this.resolveLocationLabel(position.coords.latitude, position.coords.longitude, lookup.signal);
+        if (lookup.id !== this.requestSequence) return;
+        this.applyLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude, label, source: 'auto' });
+        this.endLookup(lookup);
         await this.refresh(true);
       } catch {
+        if (lookup.id !== this.requestSequence) return;
         this.error = automatic
           ? this.i18n.$t('weather.errors.locationRequired')
           : this.i18n.$t('weather.errors.locationDenied');
-        this.loading = false;
+        this.endLookup(lookup);
       }
     },
 
@@ -319,33 +382,36 @@ export default {
       const city = this.manualLocation.trim();
       if (!city) return;
 
-      this.loading = true;
-      this.error = '';
+      const lookup = this.beginLookup();
       try {
         const endpoint = new URL('https://geocoding-api.open-meteo.com/v1/search');
         endpoint.searchParams.set('name', city);
         endpoint.searchParams.set('count', '1');
 
-        const response = await fetch(endpoint.toString(), { cache: 'default' });
+        const { response, payload } = await lookupJson(endpoint.toString(), lookup.signal);
+        if (lookup.id !== this.requestSequence) return;
         if (!response.ok) throw new Error('Geocode failed');
 
-        const payload = await response.json();
         const result = Array.isArray(payload.results) ? payload.results[0] : null;
         if (!result) {
           this.error = this.i18n.$t('weather.errors.cityNotFound');
+          this.endLookup(lookup);
           return;
         }
 
-        this.settings.latitude = result.latitude;
-        this.settings.longitude = result.longitude;
-        this.settings.locationLabel = [result.name, result.country].filter(Boolean).join(', ');
-        this.settings.locationSource = 'manual';
-        this.persistSettings();
+        this.applyLocation({
+          latitude: result.latitude,
+          longitude: result.longitude,
+          label: [result.name, result.country].filter(Boolean).join(', '),
+          source: 'manual',
+        });
+        await this.showCachedForecast();
+        this.endLookup(lookup);
         await this.refresh(true);
-      } catch {
-        this.error = this.i18n.$t('weather.errors.cityNotFound');
-      } finally {
-        this.loading = false;
+      } catch (error) {
+        if (error?.name === 'AbortError' || lookup.id !== this.requestSequence) return;
+        this.error = this.lookupFailureMessage(error, 'weather.errors.cityNotFound');
+        this.endLookup(lookup);
       }
     },
   },
@@ -402,6 +468,7 @@ export default {
 }
 
 .weather-state {
+  min-height: 5.2rem;
   font-size: 0.8rem;
   color: var(--color-text-muted, #5A9A82);
 }
@@ -414,6 +481,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  min-height: 5.2rem;
 }
 
 .weather-temp {
@@ -432,8 +500,13 @@ export default {
 
 .weather-stale {
   margin: 0;
+  min-height: 1.1em;
   font-size: 0.72rem;
   color: #f4c97b;
+}
+
+.weather-stale--error {
+  color: #ef8f8f;
 }
 
 .weather-footer {

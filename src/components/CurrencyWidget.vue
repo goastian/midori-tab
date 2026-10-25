@@ -2,7 +2,7 @@
   <div class="currency-widget">
     <header class="currency-header" :class="{ 'currency-header--managed': managed }">
       <h3 v-if="!managed" class="currency-title">{{ i18n.$t('currency.title') }}</h3>
-      <button type="button" class="currency-refresh" @click="refresh(true)" :disabled="loading">↻</button>
+      <button type="button" class="currency-refresh" @click="refresh(true)" :disabled="loading" :aria-label="remoteCopy.retry" :title="remoteCopy.retry">↻</button>
     </header>
 
     <div class="currency-grid">
@@ -26,12 +26,10 @@
       </label>
     </div>
 
-    <div class="currency-result">
+    <div class="currency-result" :aria-busy="loading">
       <span class="currency-value">{{ formattedResult }}</span>
       <span class="currency-meta">{{ rateCopy }}</span>
-      <span v-if="isStale" class="currency-stale">{{ i18n.$t('currency.stale') }}</span>
-      <span v-if="loading" class="currency-loading">{{ i18n.$t('currency.loading') }}</span>
-      <span v-else-if="error" class="currency-error">{{ error }}</span>
+      <span class="currency-status" :class="{ 'currency-status--error': Boolean(error) }" role="status">{{ statusText }}</span>
     </div>
   </div>
 </template>
@@ -41,6 +39,8 @@ import useI18nStore from '../stores/useI18nStore.js';
 import currencyService from '../services/CurrencyService.js';
 import { getJson, setJsonDebounced } from '../services/StorageService.js';
 import { WIDGET_COST, createWidgetRuntime } from '../composables/useWidgetRuntime.js';
+import { getWidgetCopy } from '../i18n/widget-copy.js';
+import { classifyRemoteError, describeRemoteState, formatAge } from '../utils/remoteStatus.js';
 
 const SETTINGS_KEY = 'midori_currency_settings_v1';
 const CURRENCY_TTL_MS = 45 * 60 * 1000;
@@ -74,6 +74,7 @@ export default {
       loading: false,
       error: '',
       rates: null,
+      ratesBase: '',
       fetchedAt: null,
       isStale: false,
       from: 'USD',
@@ -89,6 +90,20 @@ export default {
   },
 
   computed: {
+    remoteCopy() {
+      return getWidgetCopy(this.i18n.locale).remoteStatus;
+    },
+    /** Rates are only used for the base currency that is selected now. */
+    activeRates() {
+      return this.ratesBase === this.from ? this.rates : null;
+    },
+    statusText() {
+      if (this.error) return this.error;
+      if (this.loading) return this.i18n.$t('currency.loading');
+      if (!this.isStale || !this.activeRates) return '';
+      const age = formatAge(this.fetchedAt, this.i18n.locale);
+      return age ? this.remoteCopy.savedFrom.replace('{age}', age) : this.i18n.$t('currency.stale');
+    },
     amount() {
       const normalized = String(this.amountInput).replace(',', '.');
       const value = Number(normalized);
@@ -96,8 +111,8 @@ export default {
     },
 
     convertedAmount() {
-      if (!this.rates || this.amount === null) return null;
-      return currencyService.convert(this.amount, this.rates, this.to);
+      if (!this.activeRates || this.amount === null) return null;
+      return currencyService.convert(this.amount, this.activeRates, this.to);
     },
 
     formattedResult() {
@@ -110,7 +125,7 @@ export default {
     },
 
     rateCopy() {
-      const rate = this.rates?.[this.to];
+      const rate = this.activeRates?.[this.to];
       if (!Number.isFinite(rate)) return this.i18n.$t('currency.rateUnavailable');
       const formatted = new Intl.NumberFormat(this.i18n.locale, {
         maximumFractionDigits: 6,
@@ -122,7 +137,8 @@ export default {
   watch: {
     from() {
       this.persistSettings();
-      this.refreshWhenVisible({ force: true });
+      this.error = '';
+      void this.showCachedRates().then(() => this.refreshWhenVisible({ runtimeForce: true }));
     },
     to() {
       this.persistSettings();
@@ -135,16 +151,11 @@ export default {
   async mounted() {
     await this.restoreSettings();
     if (this.disposed) return;
-    const cached = await currencyService.getCachedRates(this.from);
+    await this.showCachedRates();
     if (this.disposed) return;
-    if (cached) {
-      this.rates = cached.rates;
-      this.fetchedAt = cached.fetchedAt;
-      this.isStale = Boolean(cached.stale);
-    }
     this.widgetRuntime = createWidgetRuntime(this, WIDGET_POLICY, {
-      onVisible: () => this.refreshWhenVisible(),
-      onFocus: () => this.refreshWhenVisible(),
+      onVisible: () => this.refreshWhenVisible({ runtimeForce: !this.activeRates }),
+      onFocus: () => this.refreshWhenVisible({ runtimeForce: !this.activeRates }),
       onHidden: () => this.abortRequest(),
     });
     this.$nextTick(() => { if (!this.disposed) this.widgetRuntime?.mount(); });
@@ -186,39 +197,60 @@ export default {
       }
     },
 
+    async showCachedRates() {
+      const base = this.from;
+      const cached = await currencyService.getCachedRates(base);
+      if (this.disposed || base !== this.from) return;
+      this.rates = cached?.rates || null;
+      this.ratesBase = cached ? base : '';
+      this.fetchedAt = cached?.fetchedAt || null;
+      this.isStale = Boolean(cached?.stale);
+    },
+
     abortRequest() {
       this.requestSequence += 1;
       if (this.requestController) {
         this.requestController.abort();
         this.requestController = null;
       }
+      this.loading = false;
     },
 
     refreshWhenVisible(options = {}) {
       if (!this.widgetRuntime) return false;
       if (!this.widgetRuntime.canRun()) return false;
-      return this.widgetRuntime.runWhenVisible(() => this.refresh(Boolean(options.force)), options);
+      return this.widgetRuntime.runWhenVisible(() => this.refresh(Boolean(options.force)),
+        { ...options, force: Boolean(options.runtimeForce ?? options.force) });
+    },
+
+    failureMessage(error, kind = classifyRemoteError(error)) {
+      return describeRemoteState(this.remoteCopy, kind, {
+        fetchedAt: this.activeRates ? this.fetchedAt : null, locale: this.i18n.locale,
+      });
     },
 
     async refresh(forceRefresh = false) {
       this.abortRequest();
       const requestId = this.requestSequence;
+      const base = this.from;
       this.loading = true;
       this.error = '';
       this.requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
       try {
-        const data = await currencyService.getRates(this.from, {
+        const data = await currencyService.getRates(base, {
           forceRefresh,
           signal: this.requestController?.signal,
         });
         if (requestId !== this.requestSequence) return false;
         this.rates = data.rates;
+        this.ratesBase = base;
         this.fetchedAt = data.fetchedAt;
         this.isStale = Boolean(data.stale);
+        if (data.stale) this.error = this.failureMessage(null, data.failureKind || 'unavailable');
         return !data.stale;
       } catch (error) {
         if (error?.name === 'AbortError' || requestId !== this.requestSequence) return false;
-        this.error = this.i18n.$t('currency.errors.unavailable');
+        this.error = this.failureMessage(error);
         return false;
       } finally {
         if (requestId === this.requestSequence) {
@@ -307,18 +339,13 @@ export default {
   color: var(--color-text-muted, #5A9A82);
 }
 
-.currency-stale {
+.currency-status {
+  min-height: 1.1em;
   font-size: 0.72rem;
   color: #f4c97b;
 }
 
-.currency-loading {
-  font-size: 0.72rem;
-  color: var(--color-text-muted, #5A9A82);
-}
-
-.currency-error {
-  font-size: 0.72rem;
+.currency-status--error {
   color: #ef8f8f;
 }
 

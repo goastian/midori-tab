@@ -8,6 +8,14 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 const DEFAULT_TIMEOUT_MS = 2500;
 export const REWARDS_COUNTRY_CODES = Object.freeze(['AR', 'AU', 'BR', 'CA', 'CL', 'CO', 'DE', 'ES', 'FR', 'GB', 'IT', 'JP', 'MX', 'NL', 'PE', 'PT', 'US', 'UY']);
 
+export class RewardsError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = 'RewardsError';
+    this.code = code;
+  }
+}
+
 function abortError() {
   return new DOMException('Rewards request cancelled', 'AbortError');
 }
@@ -44,7 +52,7 @@ export default class RewardsInterestService {
 
   async register(countryCode, { termsAccepted = false, signal } = {}) {
     if (this.registrationPromise) return this.registrationPromise;
-    const operation = this.#register(countryCode, { termsAccepted, signal });
+    const operation = this.#serialized(() => this.#register(countryCode, { termsAccepted, signal }), signal);
     this.registrationPromise = operation;
     try {
       return await operation;
@@ -53,10 +61,21 @@ export default class RewardsInterestService {
     }
   }
 
+  /** Two New Tabs registering at once take turns, so the second one finds the first one's result. */
+  #serialized(task, signal) {
+    const locks = globalThis.navigator?.locks;
+    return typeof locks?.request === 'function'
+      ? locks.request('midori-rewards-register', signal ? { signal } : {}, task)
+      : task();
+  }
+
   async #register(countryCode, { termsAccepted, signal }) {
     const country = String(countryCode || '').trim().toUpperCase();
-    if (!REWARDS_COUNTRY_CODES.includes(country) || !this.fetchFn) throw new Error('Select a valid country or region.');
-    if (!termsAccepted) throw new Error('Accept the Rewards terms and tax declaration to continue.');
+    if (!REWARDS_COUNTRY_CODES.includes(country) || !this.fetchFn) throw new RewardsError('invalid-country', 'Select a valid country or region.');
+    if (!termsAccepted) throw new RewardsError('terms-required', 'Accept the Rewards terms and tax declaration to continue.');
+    if (signal?.aborted) throw abortError();
+    const current = await this.state();
+    if (current?.status === 'active' && current.rewardToken && current.countryCode === country) return current;
     if (signal?.aborted) throw abortError();
     const anonymousId = await this.#anonymousId();
     if (signal?.aborted) throw abortError();
@@ -86,9 +105,7 @@ export default class RewardsInterestService {
       if (signal?.aborted || error?.name === 'AbortError' && error?.message === 'Rewards request cancelled') throw error;
       // The local choice is still useful and contains no account or payment data.
       // Keep it for an explicit retry after Astian Ads is reachable again.
-      if (error?.message === 'Select a valid country or region.' || error?.message === 'Unable to create a local Rewards ID.') {
-        throw error;
-      }
+      if (error instanceof RewardsError && error.code !== 'timeout') throw error;
 
       return this.#savePending(country, termsAccepted);
     }
@@ -108,7 +125,7 @@ export default class RewardsInterestService {
     const timedOut = new Promise((_, reject) => {
       timer = setTimeout(() => {
         controller.abort();
-        reject(new Error('Rewards request timed out.'));
+        reject(new RewardsError('timeout', 'Rewards request timed out.'));
       }, this.timeout);
     });
     try {
@@ -135,15 +152,21 @@ export default class RewardsInterestService {
   async setPayoutDestination(destination, { signal } = {}) {
     const state = await this.state();
     const value = String(destination || '').trim();
-    if (!state?.rewardToken || value.length < 3 || !this.fetchFn) throw new Error('Enter a valid Juky account or address.');
-    const { response } = await this.#request(`${this.baseUrl}/api/v1/public/viewer-rewards-payout-destination`, {
-      method: 'PUT',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Wallet-Token': state.rewardToken },
-      credentials: 'omit',
-      body: JSON.stringify({ destination: value }),
-    }, { signal });
+    if (!state?.rewardToken || value.length < 3 || !this.fetchFn) throw new RewardsError('invalid-destination', 'Enter a valid Juky account or address.');
+    let response;
+    try {
+      ({ response } = await this.#request(`${this.baseUrl}/api/v1/public/viewer-rewards-payout-destination`, {
+        method: 'PUT',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Wallet-Token': state.rewardToken },
+        credentials: 'omit',
+        body: JSON.stringify({ destination: value }),
+      }, { signal }));
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw error;
+      throw new RewardsError(error?.code === 'timeout' ? 'timeout' : 'network', 'We could not reach Astian Ads.');
+    }
     if (signal?.aborted) throw abortError();
-    if (!response.ok) throw new Error('We could not save your Juky destination.');
+    if (!response.ok) throw new RewardsError('payout-failed', 'We could not save your Juky destination.');
     const next = { ...state, payoutDestinationSet: true };
     await this.storage.set(REWARDS_INTEREST_STATE_KEY, next);
     return next;
@@ -153,7 +176,7 @@ export default class RewardsInterestService {
     const stored = await this.storage.get(REWARDS_INTEREST_ID_KEY, null);
     if (typeof stored === 'string' && UUID_PATTERN.test(stored)) return stored.toLowerCase();
     const id = this.idFactory();
-    if (typeof id !== 'string' || !UUID_PATTERN.test(id)) throw new Error('Unable to create a local Rewards ID.');
+    if (typeof id !== 'string' || !UUID_PATTERN.test(id)) throw new RewardsError('id', 'Unable to create a local Rewards ID.');
     await this.storage.set(REWARDS_INTEREST_ID_KEY, id.toLowerCase());
     return id.toLowerCase();
   }
