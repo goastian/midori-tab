@@ -2,6 +2,15 @@ import { getJson, quotaSafeSet } from './StorageService.js';
 
 export const REWARDS_INTEREST_ID_KEY = 'midori:rewards:interest-id:v1';
 export const REWARDS_INTEREST_STATE_KEY = 'midori:rewards:interest-state:v1';
+export const REWARDS_PAYOUT_PROVIDER = 'midori_wallet';
+
+const RESERVED_TAGS = new Set(['admin', 'administrator', 'midori', 'midori-wallet', 'support', 'help', 'official', 'astian', 'system', 'wallet']);
+
+export function normalizeMidoriWalletTag(value) {
+  if (typeof value !== 'string' || value.length > 65) return null;
+  const alias = value.trim().replace(/^@/, '').toLowerCase();
+  return /^[a-z0-9][a-z0-9-]{0,62}$/.test(alias) && !RESERVED_TAGS.has(alias) ? `@${alias}` : null;
+}
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 // A preliminary choice must never make the New Tab wait on a remote service.
@@ -47,7 +56,8 @@ export default class RewardsInterestService {
   }
 
   async state() {
-    return (await this.storage.get(REWARDS_INTEREST_STATE_KEY, null)) || null;
+    const saved = await this.storage.get(REWARDS_INTEREST_STATE_KEY, null);
+    return saved ? { ...saved, payoutDestinationSet: saved.payoutProvider === REWARDS_PAYOUT_PROVIDER && Boolean(saved.payoutDestinationSet) } : null;
   }
 
   async register(countryCode, { termsAccepted = false, signal } = {}) {
@@ -95,7 +105,8 @@ export default class RewardsInterestService {
         // Only a server-issued token confirms an active earning identity.
         status: responseBody.status === 'active' && token !== '' ? 'active' : 'pending_sync',
         rewardToken: token || null,
-        payoutDestinationSet: false,
+        payoutProvider: responseBody.payout_provider || null,
+        payoutDestinationSet: responseBody.payout_provider === REWARDS_PAYOUT_PROVIDER && responseBody.payout_destination_set === true,
         termsAccepted: true,
         registeredAt: Date.now(),
       };
@@ -151,23 +162,24 @@ export default class RewardsInterestService {
 
   async setPayoutDestination(destination, { signal } = {}) {
     const state = await this.state();
-    const value = String(destination || '').trim();
-    if (!state?.rewardToken || value.length < 3 || !this.fetchFn) throw new RewardsError('invalid-destination', 'Enter a valid Juky account or address.');
+    const value = normalizeMidoriWalletTag(destination);
+    if (!state?.rewardToken || !value || !this.fetchFn) throw new RewardsError('invalid-destination', 'Enter a valid Midori Wallet tag, for example @your-tag.');
     let response;
+    let responseBody;
     try {
-      ({ response } = await this.#request(`${this.baseUrl}/api/v1/public/viewer-rewards-payout-destination`, {
+      ({ response, body: responseBody } = await this.#request(`${this.baseUrl}/api/v1/public/viewer-rewards-payout-destination`, {
         method: 'PUT',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Wallet-Token': state.rewardToken },
         credentials: 'omit',
         body: JSON.stringify({ destination: value }),
-      }, { signal }));
+      }, { signal, readJson: true }));
     } catch (error) {
       if (signal?.aborted || error?.name === 'AbortError') throw error;
       throw new RewardsError(error?.code === 'timeout' ? 'timeout' : 'network', 'We could not reach Astian Ads.');
     }
     if (signal?.aborted) throw abortError();
-    if (!response.ok) throw new RewardsError('payout-failed', 'We could not save your Juky destination.');
-    const next = { ...state, payoutDestinationSet: true };
+    if (!response.ok || responseBody?.payout_provider !== REWARDS_PAYOUT_PROVIDER || responseBody?.payout_destination_set !== true) throw new RewardsError('payout-failed', 'We could not save your Midori Wallet tag.');
+    const next = { ...state, payoutProvider: REWARDS_PAYOUT_PROVIDER, payoutDestinationSet: true };
     await this.storage.set(REWARDS_INTEREST_STATE_KEY, next);
     return next;
   }

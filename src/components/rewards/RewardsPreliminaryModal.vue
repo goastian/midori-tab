@@ -58,10 +58,10 @@
           <p class="rewards-kicker">{{ t('rewards.kicker') }}</p>
           <h1 id="rewards-title">{{ t('rewards.payoutTitle') }}</h1>
           <p class="rewards-lede">{{ t('rewards.payoutIntro') }}</p>
-          <label class="rewards-field" for="rewards-juky">{{ t('rewards.payoutLabel') }}</label>
-          <input id="rewards-juky" v-model.trim="payoutDestination" class="rewards-select" type="text" autocomplete="off" :disabled="saving">
+          <label class="rewards-field" for="rewards-wallet-tag">{{ t('rewards.payoutLabel') }}</label>
+          <input id="rewards-wallet-tag" v-model.trim="payoutDestination" class="rewards-select" type="text" autocomplete="off" autocapitalize="none" :spellcheck="false" maxlength="64" placeholder="@your-tag" :disabled="saving">
           <p v-if="error" class="rewards-error" role="alert">{{ error }}</p>
-          <button class="rewards-primary" type="button" :disabled="payoutDestination.length < 3 || saving" @click="savePayoutDestination">{{ saving ? t('rewards.saving') : t('rewards.payoutSave') }}</button>
+          <button class="rewards-primary" type="button" :disabled="!validPayoutTag || saving" @click="savePayoutDestination">{{ saving ? t('rewards.saving') : t('rewards.payoutSave') }}</button>
           <button class="rewards-secondary" type="button" :disabled="saving" @click="step = 'registered'">{{ t('rewards.payoutLater') }}</button>
         </template>
 
@@ -90,7 +90,7 @@
 <script>
 import { markRaw } from 'vue';
 import DashboardIcon from '../icons/DashboardIcon.vue';
-import RewardsInterestService, { REWARDS_COUNTRY_CODES } from '../../services/RewardsInterestService.js';
+import RewardsInterestService, { REWARDS_COUNTRY_CODES, normalizeMidoriWalletTag } from '../../services/RewardsInterestService.js';
 import { getWidgetCopy } from '../../i18n/widget-copy.js';
 
 // A hot-reloaded extension can temporarily combine this lazy view with an
@@ -99,14 +99,14 @@ import { getWidgetCopy } from '../../i18n/widget-copy.js';
 const MISSING_COPY_FALLBACK = Object.freeze({
   'rewards.pendingTitle': 'Registration pending',
   'rewards.pendingIntro': 'Astian Ads could not confirm your preliminary registration.',
-  'rewards.pendingNotice': 'Your country remains only on this device. No payment account or Juky destination has been created.',
+  'rewards.pendingNotice': 'Your country remains only on this device. No payment account or Midori Wallet tag has been linked.',
   'rewards.retry': 'Try again',
   'rewards.changeCountry': 'Change country or region',
   'rewards.termsAccepted': 'I accept the Midori Rewards terms and declare this country as my tax residence.',
-  'rewards.payoutTitle': 'Set your Juky destination',
-  'rewards.payoutIntro': 'Rewards are active. Paste the Juky account or address for an approved withdrawal.',
-  'rewards.payoutLabel': 'Juky account or address',
-  'rewards.payoutSave': 'Save Juky destination',
+  'rewards.payoutTitle': 'Set your Midori Wallet tag',
+  'rewards.payoutIntro': 'Rewards are active. Paste your Midori Wallet tag (for example, @your-tag) for an approved withdrawal.',
+  'rewards.payoutLabel': 'Midori Wallet tag',
+  'rewards.payoutSave': 'Save Midori Wallet tag',
   'rewards.payoutLater': 'I will add it later',
 });
 
@@ -136,6 +136,9 @@ export default {
     };
   },
   computed: {
+    validPayoutTag() {
+      return normalizeMidoriWalletTag(this.payoutDestination) !== null;
+    },
     countries() {
       const names = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames([this.i18n.locale || 'en'], { type: 'region' }) : null;
       return REWARDS_COUNTRY_CODES.map(code => ({ code, name: names?.of(code) || code })).sort((a, b) => a.name.localeCompare(b.name));
