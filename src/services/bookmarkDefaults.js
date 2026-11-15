@@ -14,7 +14,7 @@ export const DEFAULT_BOOKMARKS = {
     { title: 'Trip', url: 'https://www.trip.com/?Allianceid=4479273&SID=57814702&trip_sub1=astian&trip_sub3=D20537295', domain: 'trip.com' },
   ],
   Web3: [
-    { title: 'Midori Wallet', url: 'https://midoriwallet.com', domain: 'midoriwallet.com' },
+    { title: 'MiWallet', url: 'https://midoriwallet.com', domain: 'midoriwallet.com' },
     { title: 'Buy USDC', url: 'https://midoriwallet.com/page/comprar-stablecoins' },
     { title: 'Sell USDC', url: 'https://midoriwallet.com/page/vender-stablecoins' },
   ],
