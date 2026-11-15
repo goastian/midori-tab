@@ -4,6 +4,7 @@ import test from 'node:test';
 import RewardsInterestService, {
   REWARDS_INTEREST_ID_KEY,
   REWARDS_INTEREST_STATE_KEY,
+  normalizeMidoriWalletTag,
   RewardsError,
 } from '../src/services/RewardsInterestService.js';
 
@@ -29,7 +30,7 @@ function create({ fetchFn, storage = memoryStorage(), timeout = 2500 } = {}) {
   return { service, storage, requests };
 }
 
-const active = { status: 'active', reward_token: 'token-123' };
+const active = { status: 'active', reward_token: 'token-123', payout_provider: 'midori_wallet', payout_destination_set: false };
 
 test('a registration sends only the anonymous id, the country and the consent, and keeps the server token', async () => {
   const { service, storage, requests } = create({ fetchFn: () => json(active) });
@@ -165,12 +166,12 @@ const activeState = { countryCode: 'ES', status: 'active', rewardToken: 'token-1
 
 test('the payout destination is saved with the server token and marks the state', async () => {
   const storage = memoryStorage({ [REWARDS_INTEREST_STATE_KEY]: activeState });
-  const { service, requests } = create({ storage, fetchFn: () => new Response(null, { status: 204 }) });
-  const state = await service.setPayoutDestination('  juky:abc  ');
+  const { service, requests } = create({ storage, fetchFn: () => json({ payout_provider: 'midori_wallet', payout_destination_set: true }) });
+  const state = await service.setPayoutDestination('  @Alice  ');
   assert.equal(state.payoutDestinationSet, true);
   assert.equal(requests[0].init.method, 'PUT');
   assert.equal(requests[0].init.headers['X-Wallet-Token'], 'token-123');
-  assert.deepEqual(requests[0].body, { destination: 'juky:abc' });
+  assert.deepEqual(requests[0].body, { destination: '@alice' });
   assert.equal(storage.data.get(REWARDS_INTEREST_STATE_KEY).payoutDestinationSet, true);
 });
 
@@ -183,26 +184,55 @@ test('payout failures are classified, keep the state and can be retried', async 
   ];
   for (const [fetchFn, code] of failures) {
     const { service } = create({ storage, fetchFn, timeout: 40 });
-    await assert.rejects(service.setPayoutDestination('juky:abc'), error => error.code === code, code);
+    await assert.rejects(service.setPayoutDestination('@alice'), error => error.code === code, code);
     assert.equal(storage.data.get(REWARDS_INTEREST_STATE_KEY).payoutDestinationSet, false);
   }
-  const { service } = create({ storage, fetchFn: () => new Response(null, { status: 200 }) });
-  assert.equal((await service.setPayoutDestination('juky:abc')).payoutDestinationSet, true);
+  const { service } = create({ storage, fetchFn: () => json({ payout_provider: 'midori_wallet', payout_destination_set: true }) });
+  assert.equal((await service.setPayoutDestination('@alice')).payoutDestinationSet, true);
 });
 
 test('a payout needs an active registration and a plausible destination, and can be cancelled', async () => {
   const pendingStorage = memoryStorage({ [REWARDS_INTEREST_STATE_KEY]: { countryCode: 'ES', status: 'pending_sync' } });
-  const noToken = create({ storage: pendingStorage, fetchFn: () => new Response(null, { status: 200 }) });
-  await assert.rejects(noToken.service.setPayoutDestination('juky:abc'), error => error.code === 'invalid-destination');
+  const noToken = create({ storage: pendingStorage, fetchFn: () => json({ payout_provider: 'midori_wallet', payout_destination_set: true }) });
+  await assert.rejects(noToken.service.setPayoutDestination('@alice'), error => error.code === 'invalid-destination');
   assert.equal(noToken.requests.length, 0);
   const storage = memoryStorage({ [REWARDS_INTEREST_STATE_KEY]: activeState });
-  const short = create({ storage, fetchFn: () => new Response(null, { status: 200 }) });
-  await assert.rejects(short.service.setPayoutDestination('ab'), error => error.code === 'invalid-destination');
+  const short = create({ storage, fetchFn: () => json({ payout_provider: 'midori_wallet', payout_destination_set: true }) });
+  await assert.rejects(short.service.setPayoutDestination('@invalid_tag'), error => error.code === 'invalid-destination');
   const controller = new AbortController();
   const slow = create({ storage, fetchFn: (_url, init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))) });
-  const pending = slow.service.setPayoutDestination('juky:abc', { signal: controller.signal });
+  const pending = slow.service.setPayoutDestination('@alice', { signal: controller.signal });
   await tick(10);
   controller.abort();
   await assert.rejects(pending, { name: 'AbortError' });
+  assert.equal(storage.data.get(REWARDS_INTEREST_STATE_KEY).payoutDestinationSet, false);
+});
+
+test('Midori Wallet tags follow the wallet rules and invalid tags never reach the network', async () => {
+  for (const [input, expected] of [['  @Alice-123  ', '@alice-123'], ['a', '@a'], ['9-name', '@9-name'], ['@' + 'a'.repeat(63), '@' + 'a'.repeat(63)]]) {
+    assert.equal(normalizeMidoriWalletTag(input), expected);
+  }
+  const { service, requests } = create({ storage: memoryStorage({ [REWARDS_INTEREST_STATE_KEY]: activeState }), fetchFn: () => json({}) });
+  for (const input of ['', '@', '@@alice', '@alice_name', '@alice.name', 'legacy:account', '@alice example', '@álice', '@' + 'a'.repeat(64), '@Admin', '@midori-wallet', '@support', 123, null]) {
+    assert.equal(normalizeMidoriWalletTag(input), null, String(input));
+    await assert.rejects(service.setPayoutDestination(input), error => error.code === 'invalid-destination');
+  }
+  assert.equal(requests.length, 0);
+});
+
+test('a previously saved destination must be linked again for Midori Wallet', async () => {
+  for (const payoutProvider of [undefined, 'legacy_wallet']) {
+    const storage = memoryStorage({ [REWARDS_INTEREST_STATE_KEY]: { ...activeState, payoutProvider, payoutDestinationSet: true } });
+    const { service } = create({ storage, fetchFn: () => json({}) });
+    const state = await service.state();
+    assert.equal(state.payoutDestinationSet, false);
+    assert.equal(state.rewardToken, activeState.rewardToken);
+  }
+});
+
+test('saving a tag requires the API to confirm Midori Wallet as the provider', async () => {
+  const storage = memoryStorage({ [REWARDS_INTEREST_STATE_KEY]: activeState });
+  const { service } = create({ storage, fetchFn: () => json({ payout_provider: 'legacy_wallet', payout_destination_set: true }) });
+  await assert.rejects(service.setPayoutDestination('@alice'), error => error.code === 'payout-failed');
   assert.equal(storage.data.get(REWARDS_INTEREST_STATE_KEY).payoutDestinationSet, false);
 });
