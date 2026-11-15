@@ -89,7 +89,8 @@ export async function startRemoteFixture() {
         billing: { model: 'vcpm', funding_type: 'prepaid', amount_micros: 1_000_000, currency: 'USD' },
         transparency: { data_used: ['language'], frequency_cap_per_day: 3, feedback_enabled: true } };
     }
-    if (service === 'ads' && path === '/api/v1/public/viewer-rewards-interest') return { status: 'active', reward_token: 'fixture-token' };
+    if (service === 'ads' && path === '/api/v1/public/viewer-rewards-interest') return { status: 'active', reward_token: 'fixture-token', payout_provider: 'midori_wallet', payout_destination_set: false };
+    if (service === 'ads' && path === '/api/v1/public/viewer-rewards-payout-destination') return { payout_provider: 'midori_wallet', payout_destination_set: true };
     return request.method === 'GET' ? {} : null;
   }
 
@@ -138,7 +139,6 @@ export async function startRemoteFixture() {
     }
     if (service === 'img') { complete(200, 'image/png', fixturePng(IMG_TINTS[rest[0]?.replace('.png', '')] || [120, 120, 120])); return; }
     if (url.pathname === '/thumb.png') { complete(200, 'image/png', png); return; }
-    if (service === 'ads' && url.pathname.includes('viewer-rewards-payout')) { complete(204, 'application/json', ''); return; }
     if (service === 'ads' && url.pathname.includes('/click/')) { complete(200, 'text/plain', 'ok'); return; }
     if (url.pathname === '/sponsor.png') { complete(200, 'image/png', png); return; }
     const payload = body(service, url, request);
