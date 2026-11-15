@@ -15,8 +15,8 @@ export const DEFAULT_BOOKMARKS = {
   ],
   Web3: [
     { title: 'Midori Wallet', url: 'https://midoriwallet.com', domain: 'midoriwallet.com' },
-    { title: 'Buy Stablecoins', url: 'https://midoriwallet.com/page/comprar-stablecoins' },
-    { title: 'Sell Stablecoins', url: 'https://midoriwallet.com/page/vender-stablecoins' },
+    { title: 'Buy USDC', url: 'https://midoriwallet.com/page/comprar-stablecoins' },
+    { title: 'Sell USDC', url: 'https://midoriwallet.com/page/vender-stablecoins' },
   ],
 };
 
