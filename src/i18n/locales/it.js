@@ -251,7 +251,51 @@ export default {
     download: 'Scarica',
     defer: 'Aggiorna più tardi',
   },
-  dashboard: { actions: { rewards: 'Ricompense' } },
+  dashboard: {
+    "actions": {
+      "rewards": "Ricompense"
+    },
+    "widgetsSheet": {
+      "title": "I tuoi widget",
+      "subtitle": "Scegli cosa vedere nella pagina iniziale.",
+      "close": "Chiudi widget",
+      "reset": "Ripristina ordine",
+      "done": "Fatto",
+      "launcher": "Widget",
+      "activeOne": "{count} widget attivo",
+      "activeMany": "{count} widget attivi",
+      "orderReset": "Ordine ripristinato",
+      "labels": {
+        "weather": "Meteo",
+        "currency": "Valute",
+        "browserBookmarks": "Segnalibri",
+        "privacy": "Privacy",
+        "calendar": "Calendario",
+        "notes": "Note",
+        "todo": "Attività",
+        "rss": "Notizie"
+      },
+      "descriptions": {
+        "weather": "Le previsioni della tua zona",
+        "currency": "Tassi di cambio",
+        "browserBookmarks": "Le tue pagine salvate",
+        "privacy": "La tua protezione in breve",
+        "calendar": "Date ed eventi",
+        "notes": "Spazio alle tue idee",
+        "todo": "Organizza le tue attività",
+        "rss": "Titoli e argomenti"
+      }
+    },
+    "widgetBoard": {
+      "title": "I tuoi widget",
+      "move": "Sposta {widget}",
+      "remove": "Nascondi {widget}",
+      "removed": "{widget} nascosto",
+      "moved": "{widget}: posizione {position} di {total}.",
+      "pairHint": "Trascina la maniglia di spostamento oppure selezionala e usa i tasti freccia.",
+      "gridHint": "Trascina la maniglia di spostamento oppure selezionala e usa i tasti freccia."
+    }
+  },
   rewards: {
     kicker: 'Ricompense Midori', close: 'Chiudi ricompense', title: 'Prepara le ricompense per la tua regione',
     intro: 'Indica il tuo paese per preparare un lancio delle ricompense rispettoso della privacy.',

@@ -1,0 +1,103 @@
+/* Hallmark · Astian ecosystem · settings styles load with the panels */
+:root body .quick-overlay, :root body .panel-overlay { background: var(--control-overlay); z-index: var(--z-modal); }
+:root body .quick-panel { width: 400px; background: var(--surface-raised); border-radius: var(--radius-panel); box-shadow: var(--control-shadow); }
+:root body .quick-header { padding: var(--space-lg); gap: var(--space-md); background: var(--ecosystem-mint); }
+:root body .quick-eyebrow { text-transform: none; font-size: var(--text-sm); font-weight: 400; letter-spacing: 0; color: var(--color-text-secondary); }
+:root body .quick-title { margin-top: var(--space-xs); font-size: var(--text-lg); font-weight: 600; letter-spacing: -.025em; }
+:root body .quick-content { padding-inline: var(--space-lg); }
+:root body .quick-section { padding-block: var(--space-lg); }
+:root body .quick-section h3 { margin-bottom: var(--space-sm); color: var(--color-text); font-size: var(--text-sm); font-weight: 600; letter-spacing: 0; text-transform: none; }
+:root body .quick-row { min-height: 48px; font-size: var(--text-sm); font-weight: 400; gap: var(--space-md); }
+:root body .quick-row > span:first-child { min-width: 0; }
+:root body .quick-row--button { padding-inline: var(--space-sm); border-radius: var(--radius-control); }
+:root body .quick-row--button:hover { background: var(--color-primary-subtle); }
+:root body .quick-footer { background: var(--surface-raised); padding: var(--space-md) var(--space-lg); }
+:root body .quick-footer .open-start-page { min-height: 44px; border-radius: var(--radius-pill); color: var(--control-primary-ink); background: var(--control-primary-bg); font-size: var(--text-sm); font-weight: 600; white-space: nowrap; }
+:root body .quick-footer .open-start-page:hover { background: var(--control-primary-hover); filter: none; }
+:root body :is(.quick-close, .panel-close) { width: 36px; height: 36px; border-radius: var(--radius-pill); color: var(--color-text-secondary); }
+
+:root body .panel { border-radius: var(--radius-panel); box-shadow: var(--control-shadow); }
+:root body .panel-header { padding: var(--space-md) var(--space-lg); min-height: 72px; }
+:root body .panel-title { font-size: var(--text-lg); font-weight: 400; letter-spacing: -.02em; }
+:root body .panel-tabs { padding: var(--space-md); gap: var(--space-xs); background: var(--ecosystem-soft); }
+:root body .panel-tab { min-height: 44px; padding: var(--space-sm) var(--space-md); border-radius: var(--radius-control); }
+:root body .panel-tab .tab-label { font-size: var(--text-sm); font-weight: 400; line-height: 1.4; }
+:root body .panel-tab.active { color: var(--color-primary); background: var(--color-primary-subtle); box-shadow: none; border-color: var(--color-transparent); }
+:root body .panel-tab.active .tab-label { font-weight: 600; }
+:root body .panel-content { padding: var(--space-xl); }
+:root body .panel-content .section-title-main { margin-bottom: var(--space-sm); font-size: var(--text-xl); font-weight: 300; letter-spacing: -.025em; line-height: 1.15; }
+:root body .panel-content .section-subtitle { font-size: var(--text-sm); line-height: 1.6; }
+:root body .panel-content .setting-item { min-height: 76px; gap: var(--space-lg); padding: var(--space-md) 0; }
+:root body .panel-content .setting-item:hover { background: var(--color-transparent); }
+:root body .panel-content .setting-label { font-size: var(--text-sm); font-weight: 600; line-height: 1.5; }
+:root body .panel-content .setting-description { font-size: var(--text-sm); font-weight: 400; line-height: 1.5; }
+:root body .panel-content .settings-list { border: 0; border-radius: 0; }
+:root body .panel-content .settings-group { border: 0; border-radius: 0; background: var(--color-transparent); padding: 0; }
+:root body .panel-content .settings-pair { gap: var(--space-md); }
+:root body .panel-content .setting-field { padding: 0; background: var(--color-transparent); border: 0; border-radius: 0; font-size: var(--text-sm); }
+:root body .panel-content .settings-group__header h4 { font-size: var(--text-md); font-weight: 600; }
+:root body .panel-content .settings-group__header p { font-size: var(--text-sm); line-height: 1.5; }
+:root body .panel-content .settings-group__header { padding-top: var(--space-md); }
+:root body .panel-content .reset-button { border-radius: var(--radius-pill); font-size: var(--text-sm); min-height: 44px; }
+:root body .panel-content :is(.marketplace-shortcut-btn, .marketplace-toggle-btn, .local-folder-btn) { min-height: 40px; border-radius: var(--radius-pill); font-size: var(--text-sm); }
+:root body .panel-content .theme-card { border-radius: var(--radius-control); box-shadow: none; }
+:root body .panel-content .theme-card:hover { transform: none; }
+:root body .panel-content .languages-grid { gap: var(--space-sm); background: var(--color-transparent); border: 0; overflow: visible; }
+:root body .panel-content .lang-card { border: 1px solid var(--color-border); border-radius: var(--radius-control); min-height: 52px; padding: var(--space-md); gap: var(--space-sm); }
+:root body .panel-content .lang-card.active { color: var(--color-text); background: var(--color-primary-subtle); border-color: var(--color-primary); }
+:root body .panel-content .lang-name { font-size: var(--text-sm); white-space: nowrap; }
+:root body .panel-content .lang-indicator { display: block; width: 18px; height: 18px; margin-inline-start: auto; flex-shrink: 0; border: 1px solid var(--color-border-hover); border-radius: var(--radius-pill); background: var(--surface-raised); }
+:root body .panel-content .lang-card.active .lang-indicator { border: 5px solid var(--color-primary); }
+:root body .panel-content .lang-card:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+
+:root body :is(.quick-row, .panel-content) select {
+  min-height: 40px; padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-control);
+  font-family: var(--font-body); font-size: var(--text-sm); line-height: 1.3; color: var(--color-text); background-color: var(--surface-raised);
+  cursor: pointer; transition: border-color var(--transition-fast), background-color var(--transition-fast); color-scheme: light;
+}
+:root body :is(.quick-row, .panel-content) select:hover:not(:disabled) { border-color: var(--color-primary); }
+:root body :is(.quick-row, .panel-content) select:disabled { opacity: .5; cursor: not-allowed; }
+:root[data-theme='dark'] :is(.quick-row, .panel-content) select { color-scheme: dark; }
+
+:root body :is(.quick-switch, .settings-switch) { position: relative; width: 44px; height: 44px; border: 0; border-radius: var(--radius-pill); padding: 0; background: var(--color-transparent); flex-shrink: 0; }
+:root body :is(.quick-switch, .settings-switch)::before { content: ''; position: absolute; width: 44px; height: 24px; inset: 10px 0; border: 1px solid var(--color-border-hover); border-radius: var(--radius-pill); background: var(--control-track); transition: background-color var(--transition-fast); }
+:root body :is(.quick-switch, .settings-switch).is-on::before { background: var(--color-primary); border-color: var(--color-primary); }
+:root body :is(.quick-switch, .settings-switch).is-on { background: var(--color-transparent); border: 0; }
+:root body :is(.quick-switch, .settings-switch) > span { position: absolute; left: 4px; top: 14px; width: 16px; height: 16px; background: var(--control-thumb); box-shadow: none; border-radius: var(--radius-pill); transform: none; transition: transform var(--transition-fast); }
+:root body :is(.quick-switch, .settings-switch).is-on > span { transform: translateX(20px); background: var(--control-thumb-on); }
+:root body :is(.quick-switch, .settings-switch):active:not(:disabled) > span { transform: scale(.9); }
+:root body :is(.quick-switch, .settings-switch).is-on:active:not(:disabled) > span { transform: translateX(20px) scale(.9); }
+
+:root body :is(.quick-panel-enter-active, .settings-dialog-enter-active) { transition: opacity var(--dur-short) var(--ease-out); }
+:root body :is(.quick-panel-leave-active, .settings-dialog-leave-active) { transition: opacity var(--dur-exit) var(--ease-in); }
+:root body .quick-panel-enter-active .quick-panel, :root body .settings-dialog-enter-active .panel { transition: transform var(--dur-short) var(--ease-out), opacity var(--dur-short) var(--ease-out); }
+:root body .quick-panel-leave-active .quick-panel, :root body .settings-dialog-leave-active .panel { transition: transform var(--dur-exit) var(--ease-in), opacity var(--dur-exit) var(--ease-in); }
+:root body .quick-panel-enter-from .quick-panel, :root body .quick-panel-leave-to .quick-panel { transform: translateX(16px); }
+:root body .settings-dialog-enter-from .panel, :root body .settings-dialog-leave-to .panel { transform: translateY(8px); }
+
+@media (max-width: 720px) {
+  :root body .panel { width: 100%; max-width: 100%; border-radius: 0; }
+  :root body .panel-header { padding: var(--space-md); }
+  :root body .panel-main { grid-template-columns: minmax(0, 1fr); }
+  :root body .panel-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-xs); padding: var(--space-sm); }
+  :root body .panel-tab { justify-content: flex-start; padding-inline: var(--space-sm); }
+  :root body .panel-content { padding: var(--space-lg) var(--space-md); }
+  :root body .panel-content .settings-pair { grid-template-columns: minmax(0, 1fr); }
+  :root body .panel-content .setting-item { gap: var(--space-md); }
+  :root body .panel-content .section-header { display: block; }
+  :root body .panel-content .marketplace-shortcut { flex-direction: column; align-items: stretch; }
+}
+@media (max-width: 520px) {
+  :root body .quick-overlay { padding: 0; }
+  :root body .quick-panel { width: 100%; max-width: 100%; border-radius: 0; }
+  :root body .quick-header { padding: var(--space-md); }
+  :root body .quick-content { padding-inline: var(--space-md); }
+  :root body .quick-row { gap: var(--space-sm); }
+  :root body .quick-row select { max-width: 126px; min-width: 96px; }
+  :root body .dashboard .bottom-actions { gap: 0; }
+  :root body .dashboard .action-btn { padding-inline: var(--space-sm); font-size: var(--text-xs); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root body *, :root body *::before, :root body *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
+  :root body :is(.quick-panel, .panel) { transform: none !important; }
+}

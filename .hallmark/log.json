@@ -1,0 +1,11 @@
+[
+  {
+    "date": "2026-11-18",
+    "macrostructure": "Workbench",
+    "theme": "studied-DNA",
+    "source": ["http://localhost/astian.org/", "https://ads.astian.org/"],
+    "enrichment": "none",
+    "scope": "app",
+    "brief": "Midori Tab menus, controls, light/dark palette and motion aligned with the Astian ecosystem"
+  }
+]

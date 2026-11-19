@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <Transition name="quick-panel">
+    <Transition name="quick-panel" appear>
       <div v-if="visible" class="quick-overlay" @click="$emit('close')">
         <aside
           ref="quickPanel"
@@ -51,6 +51,7 @@
                   type="button"
                   role="switch"
                   :aria-checked="tab.showSpeedDials"
+          :aria-label="i18n.$t('dashboard.quickSettings.showSpeedDials')"
                   @click="tab.showSpeedDials = !tab.showSpeedDials"
                 ><span></span></button>
               </div>
@@ -62,6 +63,7 @@
                   type="button"
                   role="switch"
                   :aria-checked="widgetsStore.enabled.search"
+          :aria-label="i18n.$t('dashboard.quickSettings.search')"
                   @click="$emit('toggle-section', 'search')"
                 ><span></span></button>
               </div>
@@ -105,6 +107,7 @@
                   type="button"
                   role="switch"
                   :aria-checked="tab.showSpeedDialDeleteButton"
+          :aria-label="i18n.$t('dashboard.quickSettings.showDeleteButton')"
                   @click="tab.showSpeedDialDeleteButton = !tab.showSpeedDialDeleteButton"
                 ><span></span></button>
               </div>
@@ -116,6 +119,7 @@
                   type="button"
                   role="switch"
                   :aria-checked="tab.showAddSpeedDialButton"
+          :aria-label="i18n.$t('dashboard.quickSettings.showAddButton')"
                   @click="tab.showAddSpeedDialButton = !tab.showAddSpeedDialButton"
                 ><span></span></button>
               </div>
@@ -131,6 +135,7 @@
                   type="button"
                   role="switch"
                   :aria-checked="tab.widgetsEnabled"
+          :aria-label="i18n.$t('dashboard.quickSettings.enableWidgets')"
                   @click="tab.widgetsEnabled = !tab.widgetsEnabled"
                 ><span></span></button>
               </div>
@@ -144,9 +149,9 @@
           </div>
 
           <footer class="quick-footer">
-            <button class="open-start-page" type="button" @click="$emit('open-start-page-settings')">
+            <button class="open-start-page" type="button" :aria-label="i18n.$t('dashboard.quickSettings.openStartPageSettings')" @click="$emit('open-start-page-settings')">
               <DashboardIcon name="settings" :size="16" :stroke-width="1.7" aria-hidden="true" />
-              {{ i18n.$t('dashboard.quickSettings.openStartPageSettings') }}
+              {{ i18n.t.settings.title }}
             </button>
           </footer>
         </aside>
@@ -157,6 +162,8 @@
 
 <script>
 import { nextTick } from 'vue';
+import '../../styles/settings-controls.css';
+import { manageDialogFocus } from '../../utils/dialogFocus.js';
 import DashboardIcon from '../icons/DashboardIcon.vue';
 import { SPEED_DIAL_SIZES, SPEED_DIAL_TITLE_MODES } from '../../utils/startPageSettings.js';
 
@@ -189,16 +196,16 @@ export default {
       immediate: true,
       handler(isVisible) {
         if (isVisible) {
-          nextTick(() => this.$refs.quickPanel?.focus());
+          nextTick(() => {
+            this.releaseDialogFocus?.();
+            this.releaseDialogFocus = manageDialogFocus(this.$refs.quickPanel, { close: () => this.$emit('close') });
+          });
         }
       },
     },
   },
-  mounted() {
-    document.addEventListener('keydown', this.handleEscape);
-  },
   beforeUnmount() {
-    document.removeEventListener('keydown', this.handleEscape);
+    this.releaseDialogFocus?.();
   },
   methods: {
     handleEscape(event) {

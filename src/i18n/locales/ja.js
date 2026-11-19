@@ -251,7 +251,51 @@ export default {
     download: 'ダウンロード',
     defer: 'あとで更新',
   },
-  dashboard: { actions: { rewards: 'リワード' } },
+  dashboard: {
+    "actions": {
+      "rewards": "リワード"
+    },
+    "widgetsSheet": {
+      "title": "ウィジェット",
+      "subtitle": "スタートページに表示する内容を選びます。",
+      "close": "ウィジェットを閉じる",
+      "reset": "並び順を元に戻す",
+      "done": "完了",
+      "launcher": "ウィジェット",
+      "activeOne": "{count} 個のウィジェットが有効",
+      "activeMany": "{count} 個のウィジェットが有効",
+      "orderReset": "並び順を元に戻しました",
+      "labels": {
+        "weather": "天気",
+        "currency": "為替",
+        "browserBookmarks": "ブックマーク",
+        "privacy": "プライバシー",
+        "calendar": "カレンダー",
+        "notes": "メモ",
+        "todo": "タスク",
+        "rss": "ニュース"
+      },
+      "descriptions": {
+        "weather": "地域の天気予報",
+        "currency": "通貨の為替レート",
+        "browserBookmarks": "保存したページ",
+        "privacy": "保護状況をひと目で確認",
+        "calendar": "日付と予定",
+        "notes": "アイデアを書き留める",
+        "todo": "やることを整理",
+        "rss": "見出しとトピック"
+      }
+    },
+    "widgetBoard": {
+      "title": "ウィジェット",
+      "move": "{widget}を移動",
+      "remove": "{widget}を非表示",
+      "removed": "{widget}を非表示にしました",
+      "moved": "{widget}：{total} 個中 {position} 番目。",
+      "pairHint": "移動ハンドルをドラッグするか、ハンドルにフォーカスして矢印キーで並べ替えます。",
+      "gridHint": "移動ハンドルをドラッグするか、ハンドルにフォーカスして矢印キーで並べ替えます。"
+    }
+  },
   rewards: {
     kicker: 'Midori リワード', close: 'リワードを閉じる', title: 'お住まいの地域向けにリワードを準備',
     intro: '国を選択して、プライバシーを尊重したリワードの提供準備にご協力ください。',

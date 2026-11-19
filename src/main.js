@@ -6,6 +6,7 @@ import persistedState from 'pinia-plugin-persistedstate';
 import './styles/tokens.css'
 import './styles/animations.css'
 import './style.css'
+import './styles/ecosystem.css'
 import applyInitialTheme from './bootstrap/applyInitialTheme.js'
 import perfMarks from './bootstrap/perfMarks.js'
 import useI18nStore from './stores/useI18nStore.js'

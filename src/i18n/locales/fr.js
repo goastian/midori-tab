@@ -251,7 +251,51 @@ export default {
     download: 'Télécharger',
     defer: 'Mettre à jour plus tard',
   },
-  dashboard: { actions: { rewards: 'Récompenses' } },
+  dashboard: {
+    "actions": {
+      "rewards": "Récompenses"
+    },
+    "widgetsSheet": {
+      "title": "Vos widgets",
+      "subtitle": "Choisissez le contenu de votre page d’accueil.",
+      "close": "Fermer les widgets",
+      "reset": "Rétablir l’ordre",
+      "done": "Terminé",
+      "launcher": "Widgets",
+      "activeOne": "{count} widget actif",
+      "activeMany": "{count} widgets actifs",
+      "orderReset": "Ordre rétabli",
+      "labels": {
+        "weather": "Météo",
+        "currency": "Devises",
+        "browserBookmarks": "Favoris",
+        "privacy": "Confidentialité",
+        "calendar": "Calendrier",
+        "notes": "Notes",
+        "todo": "Tâches",
+        "rss": "Actualités"
+      },
+      "descriptions": {
+        "weather": "Vos prévisions locales",
+        "currency": "Les taux de change",
+        "browserBookmarks": "Vos pages enregistrées",
+        "privacy": "Votre protection en bref",
+        "calendar": "Dates et événements",
+        "notes": "Une place pour vos idées",
+        "todo": "Organisez vos tâches",
+        "rss": "Titres et sujets"
+      }
+    },
+    "widgetBoard": {
+      "title": "Vos widgets",
+      "move": "Déplacer {widget}",
+      "remove": "Masquer {widget}",
+      "removed": "{widget} masqué",
+      "moved": "{widget} : position {position} sur {total}.",
+      "pairHint": "Faites glisser la poignée de déplacement ou placez le focus dessus et utilisez les flèches.",
+      "gridHint": "Faites glisser la poignée de déplacement ou placez le focus dessus et utilisez les flèches."
+    }
+  },
   rewards: {
     kicker: 'Récompenses Midori', close: 'Fermer les récompenses', title: 'Préparez les récompenses pour votre région',
     intro: 'Indiquez votre pays pour préparer un lancement de récompenses respectueux de votre vie privée.',

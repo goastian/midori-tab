@@ -251,7 +251,51 @@ export default {
     download: 'Baixar',
     defer: 'Atualizar mais tarde',
   },
-  dashboard: { actions: { rewards: 'Recompensas' } },
+  dashboard: {
+    "actions": {
+      "rewards": "Recompensas"
+    },
+    "widgetsSheet": {
+      "title": "Seus widgets",
+      "subtitle": "Escolha o que quer na sua página inicial.",
+      "close": "Fechar widgets",
+      "reset": "Restaurar ordem",
+      "done": "Concluído",
+      "launcher": "Widgets",
+      "activeOne": "{count} widget ativo",
+      "activeMany": "{count} widgets ativos",
+      "orderReset": "Ordem restaurada",
+      "labels": {
+        "weather": "Clima",
+        "currency": "Moedas",
+        "browserBookmarks": "Favoritos",
+        "privacy": "Privacidade",
+        "calendar": "Calendário",
+        "notes": "Notas",
+        "todo": "Tarefas",
+        "rss": "Notícias"
+      },
+      "descriptions": {
+        "weather": "A previsão da sua região",
+        "currency": "Taxas de câmbio",
+        "browserBookmarks": "Suas páginas salvas",
+        "privacy": "Sua proteção em resumo",
+        "calendar": "Datas e eventos",
+        "notes": "Espaço para suas ideias",
+        "todo": "Organize suas tarefas",
+        "rss": "Manchetes e assuntos"
+      }
+    },
+    "widgetBoard": {
+      "title": "Seus widgets",
+      "move": "Mover {widget}",
+      "remove": "Ocultar {widget}",
+      "removed": "{widget} oculto",
+      "moved": "{widget}: posição {position} de {total}.",
+      "pairHint": "Arraste pela alça de movimento ou selecione-a e use as setas para reordenar.",
+      "gridHint": "Arraste pela alça de movimento ou selecione-a e use as setas para reordenar."
+    }
+  },
   rewards: {
     kicker: 'Recompensas Midori', close: 'Fechar recompensas', title: 'Prepare as recompensas para sua região',
     intro: 'Informe seu país para prepararmos um lançamento de recompensas que respeite sua privacidade.',

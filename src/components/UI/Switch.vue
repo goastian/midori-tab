@@ -1,92 +1,45 @@
 <template>
   <button
     type="button"
-    class="container"
+    class="ui-switch"
     :class="{ active: state }"
+    :data-state="status || (loading ? 'loading' : undefined)"
     role="switch"
     :aria-checked="state"
     :aria-label="label || undefined"
+    :aria-busy="loading || undefined"
+    :aria-invalid="status === 'error' || undefined"
+    :disabled="disabled || loading"
   >
-    <span
-      class="switch"
-      :class="state ? 'right' : 'left'"
-      aria-hidden="true"
-    ></span>
+    <span class="switch-track" aria-hidden="true"></span>
+    <span class="switch-thumb" aria-hidden="true"></span>
   </button>
 </template>
 
 <script>
-  export default {
-    data() {
-      return {
-      }
-    },
-
-    props: {
-      state: {
-        type: Boolean,
-        default: false,
-      },
-      label: {
-        type: String,
-        default: '',
-      },
-    }
-  }
+export default {
+  props: {
+    state: { type: Boolean, default: false },
+    label: { type: String, default: '' },
+    disabled: Boolean,
+    loading: Boolean,
+    status: { type: String, default: '' },
+  },
+};
 </script>
 
 <style scoped>
-.container {
-  width: 40px;
-  height: 23px;
-  flex: 0 0 auto;
-  padding: 0;
-  background: var(--surface-overlay, #1E2D3D);
-  border: 1px solid var(--color-border, rgba(126,196,168,0.16));
-  border-radius: 999px;
-  position: relative;
-  cursor: pointer;
-  transition: background 180ms ease, border-color 180ms ease;
-}
-
-.container.active {
-  background: var(--color-primary, #04A469);
-  border-color: var(--color-primary, #04A469);
-}
-
-.switch {
-  position: absolute;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  top: 3px;
-  background: white;
-  left: 3px;
-  box-shadow: 0 1px 3px rgba(7, 31, 23, 0.28);
-  transition: transform 180ms ease;
-}
-
-.switch.right {
-  transform: translateX(17px);
-}
-
-.container:hover {
-  border-color: var(--color-border-hover, rgba(126, 196, 168, 0.28));
-}
-
-.container:active .switch {
-  transform: scale(0.92);
-}
-
-.container.active:active .switch {
-  transform: translateX(17px) scale(0.92);
-}
-
-.container:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary, #0eae5b), transparent 28%);
-  outline-offset: 2px;
-}
+.ui-switch { position: relative; width: 44px; height: 44px; flex: 0 0 auto; padding: 0; border: 0; border-radius: var(--radius-pill); background: var(--color-transparent); cursor: pointer; }
+.switch-track { position: absolute; inset: 10px 0; width: 44px; height: 24px; border: 1px solid var(--color-border-hover); border-radius: var(--radius-pill); background: var(--control-track); transition: background-color var(--transition-fast); }
+.active .switch-track { background: var(--color-primary); border-color: var(--color-primary); }
+.switch-thumb { position: absolute; top: 14px; left: 4px; width: 16px; height: 16px; border-radius: var(--radius-pill); background: var(--control-thumb); transition: transform var(--transition-fast); }
+.active .switch-thumb { transform: translateX(20px); background: var(--control-thumb-on); }
+.ui-switch:hover:not(:disabled) .switch-track { border-color: var(--color-primary); }
+.ui-switch:active:not(:disabled) .switch-thumb { transform: scale(.9); }
+.ui-switch.active:active:not(:disabled) .switch-thumb { transform: translateX(20px) scale(.9); }
+.ui-switch:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ui-switch:disabled { opacity: .5; cursor: not-allowed; }
+.ui-switch[data-state='loading'] { cursor: wait; }
+.ui-switch[data-state='error'] .switch-track { border-color: var(--color-danger); }
+.ui-switch[data-state='success'] .switch-track { border-color: var(--color-success); }
 </style>

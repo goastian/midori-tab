@@ -6,14 +6,17 @@
     </div>
 
     <!-- Theme Grid -->
-    <div class="themes-grid">
+    <div class="themes-grid" role="radiogroup" :aria-label="i18n.t.themes.title">
       <button
-        v-for="theme in themeStore.allThemes"
+        v-for="(theme, index) in themeStore.allThemes"
         :key="theme.id"
         type="button"
         class="theme-card"
         :class="{ active: theme.id === themeStore.activeThemeId }"
-        :aria-pressed="theme.id === themeStore.activeThemeId"
+        role="radio"
+        :aria-checked="theme.id === themeStore.activeThemeId"
+        :tabindex="theme.id === themeStore.activeThemeId ? 0 : -1"
+        @keydown="handleRadioKey($event, index)"
         @click="selectTheme(theme.id)"
       >
         <div class="theme-preview">
@@ -121,6 +124,14 @@ export default {
   },
 
   methods: {
+    handleRadioKey(event, index) {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const themes = this.themeStore.allThemes;
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? themes.length - 1 : (index + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + themes.length) % themes.length;
+      this.selectTheme(themes[next].id);
+      this.$nextTick(() => this.$el.querySelectorAll('.theme-card')[next]?.focus({ preventScroll: true }));
+    },
     selectTheme(id) {
       this.themeStore.setTheme(id);
     },

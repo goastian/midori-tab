@@ -244,8 +244,44 @@ export default {
       rewards: 'Rewards',
     },
     widgetsSheet: {
-      title: 'Add a New Widget',
-      close: 'Close',
+      "title": "Your widgets",
+      "subtitle": "Choose what you want on your start page.",
+      "close": "Close widgets",
+      "reset": "Restore widget order",
+      "done": "Done",
+      "launcher": "Widgets",
+      "activeOne": "{count} widget active",
+      "activeMany": "{count} widgets active",
+      "orderReset": "Widget order restored",
+      "labels": {
+        "weather": "Weather",
+        "currency": "Currency",
+        "browserBookmarks": "Bookmarks",
+        "privacy": "Privacy",
+        "calendar": "Calendar",
+        "notes": "Notes",
+        "todo": "Tasks",
+        "rss": "News"
+      },
+      "descriptions": {
+        "weather": "Your local forecast",
+        "currency": "Exchange rates",
+        "browserBookmarks": "Your saved pages",
+        "privacy": "Protection at a glance",
+        "calendar": "Dates and events",
+        "notes": "Space for your ideas",
+        "todo": "Keep track of your tasks",
+        "rss": "Headlines and topics"
+      }
+    },
+    widgetBoard: {
+      "title": "Your widgets",
+      "move": "Move {widget}",
+      "remove": "Hide {widget}",
+      "removed": "{widget} hidden",
+      "moved": "{widget}: position {position} of {total}.",
+      "pairHint": "Use the move handle to drag a widget, or focus it and use the arrow keys.",
+      "gridHint": "Use the move handle to drag a widget, or focus it and use the arrow keys."
     },
     widgets: {
       weather: 'Weather',

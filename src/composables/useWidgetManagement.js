@@ -53,7 +53,8 @@ export function useWidgetManagement({ widgetsStore, i18n }) {
   function getAvailableWidgets() {
     return WIDGET_META.map(widget => ({
       ...widget,
-      label: i18n.$t(widget.labelKey),
+      label: i18n.$t(`dashboard.widgetsSheet.labels.${widget.key}`),
+      description: i18n.$t(`dashboard.widgetsSheet.descriptions.${widget.key}`),
     }));
   }
 
@@ -75,6 +76,15 @@ export function useWidgetManagement({ widgetsStore, i18n }) {
     widgetsStore.toggle(key);
   }
 
+  function canResetWidgetOrder() {
+    const defaults = GRID_KEYS.filter(key => widgetsStore.enabled[key]);
+    return getActiveGridWidgets().some((key, index) => key !== defaults[index]);
+  }
+
+  function resetWidgetOrder() {
+    widgetsStore.setWidgetSubsetOrder(GRID_KEYS);
+  }
+
   return {
     getActiveGridWidgets,
     getAvailableWidgets,
@@ -82,5 +92,7 @@ export function useWidgetManagement({ widgetsStore, i18n }) {
     getWidgetMetaMap,
     getWidgetPlaceholderHeight,
     toggleWidget,
+    canResetWidgetOrder,
+    resetWidgetOrder,
   };
 }

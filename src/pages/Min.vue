@@ -88,7 +88,7 @@
                 <DashboardIcon name="grip" :size="16" :stroke-width="1.8" aria-hidden="true" />
               </button>
               <span class="widget-card__icon" aria-hidden="true">
-                <DashboardIcon :name="widgetMetaMap[key]?.icon" :size="15" :stroke-width="1.7" />
+                <WidgetIcon :name="widgetMetaMap[key]?.icon" :size="28" />
               </span>
               <h2 class="widget-card__title">{{ widgetMetaMap[key]?.label || key }}</h2>
               <button
@@ -144,6 +144,7 @@
       :widgets="availableWidgets"
       :enabled="widgetsStore.enabled"
       :active-count="activeGridWidgets.length"
+      :can-reset-order="canResetWidgetOrder"
       :i18n="i18n"
       @close="showWidgetSheet = false"
       @toggle="toggleWidget"
@@ -217,6 +218,7 @@ export default {
     TodoWidget: defineAsyncComponent(() => import('../components/TodoWidget.vue')),
     WeatherWidget: defineAsyncComponent(() => import('../components/WeatherWidget.vue')),
     WidgetPicker: defineAsyncComponent(() => import('../components/WidgetPicker.vue')),
+    WidgetIcon: defineAsyncComponent(() => import('../components/icons/WidgetIcon.vue')),
   },
 
   data() {
@@ -289,6 +291,9 @@ export default {
     },
     widgetMetaMap() {
       return this.widgetManagement.getWidgetMetaMap();
+    },
+    canResetWidgetOrder() {
+      return this.widgetManagement.canResetWidgetOrder();
     },
     maxWidgetColumns() {
       const configured = Math.min(4, Math.max(1, Number(this.tab.widgetColumns) || 1));
@@ -374,6 +379,10 @@ export default {
 
     toggleWidget(key) {
       this.widgetManagement.toggleWidget(key);
+    },
+
+    resetWidgetOrder() {
+      this.widgetManagement.resetWidgetOrder();
     },
 
     formatCopy(key, replacements = {}) {

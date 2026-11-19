@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <Transition name="settings-dialog">
+    <Transition name="settings-dialog" appear>
       <div v-if="settings.state" class="panel-overlay" @click.self="closeSettings">
           <section
             ref="settingsDialog"
@@ -22,11 +22,17 @@
           </header>
 
           <div class="panel-main">
-            <nav class="panel-tabs" :aria-label="i18n.t.settings.title">
+            <nav class="panel-tabs" role="tablist" :aria-label="i18n.t.settings.title">
               <button
                 v-for="(item, index) in navs"
                 :key="item.key"
                 type="button"
+                :id="`settings-tab-${item.key}`"
+                role="tab"
+                :aria-selected="index === tab"
+                :tabindex="index === tab ? 0 : -1"
+                aria-controls="settings-tab-content"
+                @keydown="handleTabKey($event, index)"
                 @click="changeTab(index)"
                 :class="['panel-tab', { active: index === tab }]"
                 :aria-current="index === tab ? 'page' : undefined"
@@ -40,7 +46,7 @@
               </button>
             </nav>
 
-            <main class="panel-content">
+            <div id="settings-tab-content" class="panel-content" role="tabpanel" :aria-labelledby="`settings-tab-${navs[tab].key}`" tabindex="0">
               <SettingsGeneralSection
                 v-if="tab === 0"
                 :i18n="i18n"
@@ -70,7 +76,7 @@
               />
 
               <SettingsLanguageSection v-if="tab === 3" />
-            </main>
+            </div>
           </div>
 
           </section>
@@ -81,6 +87,8 @@
 
 <script>
 import { nextTick } from 'vue';
+import '../styles/settings-controls.css';
+import { manageDialogFocus } from '../utils/dialogFocus.js';
 import useTabStore from '../stores/useTabStore.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import useThemeStore from '../stores/useThemeStore.js';
@@ -141,12 +149,13 @@ export default {
 
   mounted() {
     this.loadSettings();
-    document.addEventListener('keydown', this.handleEscape);
-    nextTick(() => this.$refs.settingsDialog?.focus());
+    nextTick(() => {
+      this.releaseDialogFocus = manageDialogFocus(this.$refs.settingsDialog, { close: this.closeSettings });
+    });
   },
 
   beforeUnmount() {
-    document.removeEventListener('keydown', this.handleEscape);
+    this.releaseDialogFocus?.();
   },
 
   computed: {
@@ -161,6 +170,14 @@ export default {
   },
 
   methods: {
+    handleTabKey(event, index) {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const last = this.navs.length - 1;
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? last : (index + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + this.navs.length) % this.navs.length;
+      this.changeTab(next);
+      nextTick(() => document.getElementById(`settings-tab-${this.navs[next].key}`)?.focus({ preventScroll: true }));
+    },
     loadSettings() {
       this.settings = useTabStore();
       this.background = this.settings.background;

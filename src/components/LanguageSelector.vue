@@ -5,22 +5,25 @@
       <p class="section-subtitle">{{ i18n.t.language.subtitle }}</p>
     </div>
 
-    <div class="languages-grid" role="radiogroup" :aria-label="i18n.t.language.title">
+    <div class="languages-grid" role="radiogroup" :aria-label="i18n.t.language.title" :aria-busy="languageLoading || undefined">
       <button
-        v-for="lang in i18n.languages"
+        v-for="(lang, index) in i18n.languages"
         :key="lang.code"
         type="button"
         role="radio"
         class="lang-card"
         :class="{ active: lang.code === i18n.locale }"
         :aria-checked="lang.code === i18n.locale"
+        :tabindex="lang.code === i18n.locale ? 0 : -1"
+        @keydown="handleRadioKey($event, index)"
         @click="selectLang(lang.code)"
       >
         <span class="lang-flag">{{ lang.flag }}</span>
         <span class="lang-name">{{ lang.name }}</span>
-        <span v-if="lang.code === i18n.locale" class="lang-check">✓</span>
+        <span class="lang-indicator" aria-hidden="true"></span>
       </button>
     </div>
+    <p v-if="languageError" class="language-error" role="alert">{{ languageError }}</p>
   </div>
 </template>
 
@@ -32,17 +35,41 @@ export default {
   data() {
     return {
       i18n: useI18nStore(),
+      languageLoading: false,
+      languageError: '',
+      languageRequest: 0,
     };
   },
+  beforeUnmount() { this.languageRequest += 1; },
   methods: {
-    selectLang(code) {
-      this.i18n.setLocale(code);
+    handleRadioKey(event, index) {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const languages = this.i18n.languages;
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? languages.length - 1 : (index + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + languages.length) % languages.length;
+      this.selectLang(languages[next].code);
+      this.$nextTick(() => this.$el.querySelectorAll('[role="radio"]')[next]?.focus({ preventScroll: true }));
+    },
+    async selectLang(code) {
+      const request = ++this.languageRequest;
+      this.languageLoading = true;
+      this.languageError = '';
+      try {
+        await this.i18n.loadLocale(code);
+        if (request === this.languageRequest) await this.i18n.setLocale(code);
+      } catch {
+        if (request === this.languageRequest) this.languageError = this.i18n.locale === 'es'
+          ? 'No se pudo cargar el idioma. Inténtalo de nuevo.' : 'Could not load this language. Try again.';
+      } finally {
+        if (request === this.languageRequest) this.languageLoading = false;
+      }
     },
   },
 };
 </script>
 
 <style scoped>
+.language-error { color: var(--color-danger); font-size: var(--text-sm); }
 .language-selector {
   display: flex;
   flex-direction: column;

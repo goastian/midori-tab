@@ -251,7 +251,51 @@ export default {
     download: 'Herunterladen',
     defer: 'Später aktualisieren',
   },
-  dashboard: { actions: { rewards: 'Prämien' } },
+  dashboard: {
+    "actions": {
+      "rewards": "Prämien"
+    },
+    "widgetsSheet": {
+      "title": "Deine Widgets",
+      "subtitle": "Wähle die Inhalte für deine Startseite.",
+      "close": "Widgets schließen",
+      "reset": "Reihenfolge zurücksetzen",
+      "done": "Fertig",
+      "launcher": "Widgets",
+      "activeOne": "{count} Widget aktiv",
+      "activeMany": "{count} Widgets aktiv",
+      "orderReset": "Reihenfolge zurückgesetzt",
+      "labels": {
+        "weather": "Wetter",
+        "currency": "Währungen",
+        "browserBookmarks": "Lesezeichen",
+        "privacy": "Datenschutz",
+        "calendar": "Kalender",
+        "notes": "Notizen",
+        "todo": "Aufgaben",
+        "rss": "Nachrichten"
+      },
+      "descriptions": {
+        "weather": "Deine lokale Vorhersage",
+        "currency": "Aktuelle Wechselkurse",
+        "browserBookmarks": "Deine gespeicherten Seiten",
+        "privacy": "Dein Schutz im Überblick",
+        "calendar": "Termine und Ereignisse",
+        "notes": "Platz für deine Ideen",
+        "todo": "Behalte Aufgaben im Blick",
+        "rss": "Schlagzeilen und Themen"
+      }
+    },
+    "widgetBoard": {
+      "title": "Deine Widgets",
+      "move": "{widget} verschieben",
+      "remove": "{widget} ausblenden",
+      "removed": "{widget} ausgeblendet",
+      "moved": "{widget}: Position {position} von {total}.",
+      "pairHint": "Ziehe am Verschiebegriff oder wähle ihn mit der Tastatur aus und nutze die Pfeiltasten.",
+      "gridHint": "Ziehe am Verschiebegriff oder wähle ihn mit der Tastatur aus und nutze die Pfeiltasten."
+    }
+  },
   rewards: {
     kicker: 'Midori Prämien', close: 'Prämien schließen', title: 'Prämien für Ihre Region vorbereiten',
     intro: 'Geben Sie Ihr Land an, damit wir einen datenschutzfreundlichen Start der Prämien vorbereiten können.',

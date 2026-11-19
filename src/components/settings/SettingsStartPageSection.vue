@@ -24,6 +24,7 @@
           type="button"
           role="switch"
           :aria-checked="settings.showSpeedDials"
+          :aria-label="i18n.$t('startPage.showSpeedDials')"
           @click="settings.showSpeedDials = !settings.showSpeedDials"
         ><span></span></button>
       </div>
@@ -78,6 +79,7 @@
           type="button"
           role="switch"
           :aria-checked="settings.showSpeedDialDeleteButton"
+          :aria-label="i18n.$t('startPage.showDeleteButton')"
           :disabled="!settings.showSpeedDials"
           @click="settings.showSpeedDialDeleteButton = !settings.showSpeedDialDeleteButton"
         ><span></span></button>
@@ -94,6 +96,7 @@
           type="button"
           role="switch"
           :aria-checked="settings.showAddSpeedDialButton"
+          :aria-label="i18n.$t('startPage.showAddButton')"
           :disabled="!settings.showSpeedDials"
           @click="settings.showAddSpeedDialButton = !settings.showAddSpeedDialButton"
         ><span></span></button>
@@ -119,6 +122,7 @@
           type="button"
           role="switch"
           :aria-checked="widgetsStore.enabled.search"
+          :aria-label="i18n.$t('startPage.showSearch')"
           @click="widgetsStore.toggle('search')"
         ><span></span></button>
       </div>
@@ -134,6 +138,7 @@
           type="button"
           role="switch"
           :aria-checked="settings.widgetsEnabled"
+          :aria-label="i18n.$t('startPage.enableWidgets')"
           @click="settings.widgetsEnabled = !settings.widgetsEnabled"
         ><span></span></button>
       </div>

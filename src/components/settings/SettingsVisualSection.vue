@@ -10,7 +10,7 @@
         <span class="setting-label">{{ i18n.t.visual.background }}</span>
         <span class="setting-description">{{ i18n.t.visual.backgroundDesc }}</span>
       </div>
-      <Dropdown v-model="background.type" :options="backgrounds" :labels="backgroundLabels" @change="$emit('change-background')" />
+      <Dropdown v-model="background.type" :options="backgrounds" :labels="backgroundLabels" :label="i18n.t.visual.background" @change="$emit('change-background')" />
     </div>
 
     <div class="setting-item">

@@ -251,7 +251,51 @@ export default {
     download: '下载',
     defer: '稍后更新',
   },
-  dashboard: { actions: { rewards: '奖励' } },
+  dashboard: {
+    "actions": {
+      "rewards": "奖励"
+    },
+    "widgetsSheet": {
+      "title": "你的组件",
+      "subtitle": "选择要在起始页上显示的内容。",
+      "close": "关闭组件",
+      "reset": "恢复组件顺序",
+      "done": "完成",
+      "launcher": "组件",
+      "activeOne": "已启用 {count} 个组件",
+      "activeMany": "已启用 {count} 个组件",
+      "orderReset": "组件顺序已恢复",
+      "labels": {
+        "weather": "天气",
+        "currency": "汇率",
+        "browserBookmarks": "书签",
+        "privacy": "隐私",
+        "calendar": "日历",
+        "notes": "笔记",
+        "todo": "任务",
+        "rss": "新闻"
+      },
+      "descriptions": {
+        "weather": "本地天气预报",
+        "currency": "货币兑换汇率",
+        "browserBookmarks": "已保存的网页",
+        "privacy": "保护状态一目了然",
+        "calendar": "日期和活动",
+        "notes": "随手记录灵感",
+        "todo": "安排待办事项",
+        "rss": "新闻标题与话题"
+      }
+    },
+    "widgetBoard": {
+      "title": "你的组件",
+      "move": "移动{widget}",
+      "remove": "隐藏{widget}",
+      "removed": "已隐藏{widget}",
+      "moved": "{widget}：第 {position} 项，共 {total} 项。",
+      "pairHint": "拖动移动手柄，或将焦点移至手柄后使用方向键调整顺序。",
+      "gridHint": "拖动移动手柄，或将焦点移至手柄后使用方向键调整顺序。"
+    }
+  },
   rewards: {
     kicker: 'Midori 奖励', close: '关闭奖励', title: '为您的地区准备奖励',
     intro: '请选择您的国家，以便我们准备尊重隐私的奖励计划发布。',

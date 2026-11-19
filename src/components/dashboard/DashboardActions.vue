@@ -1,8 +1,8 @@
 <template>
   <div class="bottom-actions">
-    <button class="action-btn" type="button" @click="$emit('toggle-widgets')" :aria-label="i18n.$t('dashboard.actions.widget')">
+    <button class="action-btn" type="button" @click="$emit('toggle-widgets')" :aria-label="i18n.$t('dashboard.widgetsSheet.title')" aria-haspopup="dialog" :aria-expanded="showWidgetSheet">
       <DashboardIcon :name="showWidgetSheet ? 'minus' : 'plus'" :size="14" aria-hidden="true" />
-      <span>{{ i18n.$t('dashboard.actions.widget') }}</span>
+      <span>{{ i18n.$t('dashboard.widgetsSheet.launcher') }}</span>
     </button>
     <button class="action-btn" type="button" @click="$emit('open-marketplace')" :aria-label="i18n.$t('dashboard.actions.marketplace')">
       <DashboardIcon name="store" :size="14" aria-hidden="true" />

@@ -15,6 +15,7 @@
           title="Astian Apps"
           aria-label="Astian Apps"
           :aria-expanded="appsMenuOpen"
+          aria-haspopup="dialog"
         >
           <span class="hamburger-icon" aria-hidden="true">
             <span></span>
@@ -30,6 +31,7 @@
           :title="i18n.t.settings.title"
           :aria-label="i18n.t.settings.title"
           :aria-expanded="quickSettingsOpen"
+          aria-haspopup="dialog"
         >
           <DashboardIcon name="settings" :size="20" :stroke-width="1.5" aria-hidden="true" />
         </button>

@@ -250,8 +250,44 @@ export default {
       rewards: 'Rewards',
     },
     widgetsSheet: {
-      title: 'Añadir un widget',
-      close: 'Cerrar',
+      "title": "Tus widgets",
+      "subtitle": "Elige qué quieres tener en tu página de inicio.",
+      "close": "Cerrar widgets",
+      "reset": "Restablecer orden",
+      "done": "Listo",
+      "launcher": "Widgets",
+      "activeOne": "{count} widget activo",
+      "activeMany": "{count} widgets activos",
+      "orderReset": "Orden restablecido",
+      "labels": {
+        "weather": "Clima",
+        "currency": "Divisas",
+        "browserBookmarks": "Marcadores",
+        "privacy": "Privacidad",
+        "calendar": "Calendario",
+        "notes": "Notas",
+        "todo": "Tareas",
+        "rss": "Noticias"
+      },
+      "descriptions": {
+        "weather": "El pronóstico de tu zona",
+        "currency": "Tipos de cambio",
+        "browserBookmarks": "Tus páginas guardadas",
+        "privacy": "Tu protección, de un vistazo",
+        "calendar": "Fechas y eventos",
+        "notes": "Espacio para tus ideas",
+        "todo": "Organiza tus pendientes",
+        "rss": "Titulares y temas"
+      }
+    },
+    widgetBoard: {
+      "title": "Tus widgets",
+      "move": "Mover {widget}",
+      "remove": "Ocultar {widget}",
+      "removed": "{widget} oculto",
+      "moved": "{widget}: posición {position} de {total}.",
+      "pairHint": "Arrastra desde el control de movimiento o enfócalo y usa las flechas para reordenar.",
+      "gridHint": "Arrastra desde el control de movimiento o enfócalo y usa las flechas para reordenar."
     },
     widgets: {
       weather: 'Clima',

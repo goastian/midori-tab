@@ -1,24 +1,21 @@
 <template>
   <Teleport to="body">
-    <Transition name="apps-fade">
-      <div v-if="visible" class="apps-overlay" @click="$emit('close')" role="dialog" aria-modal="true" aria-label="Astian Apps">
-        <div class="apps-panel" @click.stop>
+    <Transition name="apps-fade" appear>
+      <div v-if="visible" class="apps-overlay" @click="$emit('close')">
+        <section ref="appsPanel" class="apps-panel" role="dialog" aria-modal="true" :aria-label="copy.title" tabindex="-1" @click.stop>
           <div class="apps-header">
             <div class="apps-header__logo">
-              <svg width="20" height="20" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-                <circle cx="16" cy="16" r="16" fill="var(--color-primary, #04A469)"/>
-                <path d="M10 22 L16 10 L22 22 M12.5 18 H19.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              </svg>
-              <span class="apps-header__title">Astian</span>
+              <img :src="astianLogo" alt="Astian" class="apps-brand" width="103" height="27" />
+              <span class="apps-brand-light" role="img" aria-label="Astian" :style="{ maskImage: `url(${astianLogo})` }"></span>
             </div>
-            <button class="apps-close" type="button" @click="$emit('close')" aria-label="Close apps menu">
+            <button class="apps-close" type="button" @click="$emit('close')" :aria-label="copy.close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                 <path d="M1 1L13 13M13 1L1 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
             </button>
           </div>
 
-          <div class="apps-grid">
+          <nav class="apps-grid" :aria-label="copy.title">
             <a
               v-for="app in astianApps"
               :key="app.id"
@@ -60,7 +57,7 @@
                   <rect x="3" y="5" width="18" height="14" rx="2" />
                   <path d="m4 7 8 6 8-6" />
                 </svg>
-                <svg v-else-if="app.id === 'ads'" viewBox="0 0 24 24" aria-hidden="true">
+                <svg v-else-if="app.id === 'ads' || app.id === 'wallet'" viewBox="0 0 24 24" aria-hidden="true">
                   <rect x="3" y="4" width="18" height="13" rx="2" />
                   <path d="M8 21h8M12 17v4" />
                   <path d="M8 12h8M8 9h5" />
@@ -74,20 +71,25 @@
               </span>
               <span class="app-item__name">{{ app.name }}</span>
             </a>
-          </div>
+          </nav>
 
           <div class="apps-footer">
             <a href="https://astian.org" target="_blank" rel="noopener noreferrer" class="apps-footer__link" @click="$emit('close')">
-              More Astian services →
+              {{ copy.more }} <span aria-hidden="true">↗</span>
             </a>
           </div>
-        </div>
+        </section>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <script>
+import { nextTick } from 'vue';
+import useI18nStore from '../../stores/useI18nStore.js';
+import { manageDialogFocus } from '../../utils/dialogFocus.js';
+import astianLogo from '../../assets/astian-logo.png';
+
 export default {
   name: 'AstianAppsMenu',
   props: {
@@ -97,8 +99,21 @@ export default {
     },
   },
   emits: ['close'],
+  computed: {
+    copy() {
+      return this.i18n.locale === 'es'
+        ? { title: 'Aplicaciones de Astian', close: 'Cerrar aplicaciones', more: 'Explorar el ecosistema Astian' }
+        : { title: 'Astian apps', close: 'Close apps menu', more: 'Explore the Astian ecosystem' };
+    },
+  },
+  mounted() {
+    nextTick(() => { this.releaseDialogFocus = manageDialogFocus(this.$refs.appsPanel, { close: () => this.$emit('close'), restoreTo: '.hamburger-btn' }); });
+  },
+  beforeUnmount() { this.releaseDialogFocus?.(); },
   data() {
     return {
+      astianLogo,
+      i18n: useI18nStore(),
       astianApps: [
         { id: 'cloud', name: 'Astian Cloud', url: 'https://cloud2.astian.org' },
         { id: 'notes', name: 'Astian Notes', url: 'https://notes.astian.org' },
@@ -107,7 +122,8 @@ export default {
         { id: 'browser', name: 'Midori Browser', url: 'https://astian.org/midori-browser' },
         { id: 'search', name: 'AstianGO', url: 'https://astiango.com' },
         { id: 'mail', name: 'Astian Mail', url: 'https://mail.astian.org' },
-        { id: 'ads', name: 'Midori Wallet', url: 'https://midoriwallet.com' },
+        { id: 'wallet', name: 'Midori Wallet', url: 'https://midoriwallet.com' },
+        { id: 'ads', name: 'Astian Ads', url: 'https://ads.astian.org' },
         { id: 'sync', name: 'Midori Sync', url: 'https://sync.astian.org' },
       ],
     };
@@ -116,171 +132,32 @@ export default {
 </script>
 
 <style scoped>
-.apps-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.2);
-  z-index: 8500;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding:
-    max(3.5rem, env(safe-area-inset-top, 0px))
-    max(1rem, env(safe-area-inset-right, 0px))
-    max(1rem, env(safe-area-inset-bottom, 0px))
-    max(1rem, env(safe-area-inset-left, 0px));
-}
-
-.apps-panel {
-  width: 320px;
-  max-width: calc(100vw - 2rem);
-  background: var(--surface-overlay, #ffffff);
-  border: 1px solid var(--color-border, rgba(0,0,0,0.08));
-  border-radius: var(--radius-lg, 16px);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
-}
-
-.apps-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--color-border, rgba(0,0,0,0.08));
-  background: var(--surface-raised, rgba(248, 250, 252, 0.95));
-}
-
-.apps-header__logo {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.apps-header__title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-text, #1a2b26);
-  letter-spacing: -0.01em;
-}
-
-.apps-close {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface-sunken, rgba(0,0,0,0.05));
-  border: 1px solid var(--color-border, rgba(0,0,0,0.08));
-  border-radius: var(--radius-sm, 6px);
-  color: var(--color-text-muted, #6b7280);
-  cursor: pointer;
-  transition: all 0.12s ease;
-}
-
-.apps-close:hover {
-  background: var(--color-primary-subtle, #e6fbf4);
-  color: var(--color-primary, #04A469);
-  border-color: var(--color-primary, #04A469);
-}
-
-
-.apps-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  padding: 1.1rem 0.9rem 0.7rem 0.9rem;
-}
-
-
-.app-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0.7rem 0.2rem 0.3rem 0.2rem;
-  border-radius: 12px;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 0.12s ease;
-  min-width: 72px;
-}
-
-.app-item:hover {
-  background: var(--color-primary-subtle, rgba(4, 164, 105, 0.08));
-}
-
-.app-item__icon--minimal {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: none !important;
-  color: var(--color-text, #1a2b26);
-  opacity: 1;
-  transition: color 0.15s;
-}
-.app-item:hover .app-item__icon--minimal {
-  color: var(--color-primary, #04A469);
-}
-
-.app-item__icon--minimal svg {
-  width: 28px;
-  height: 28px;
-  display: block;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.app-item__name {
-  margin-top: 0.32rem;
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--color-text, #1a2b26);
-  text-align: center;
-  line-height: 1.2;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.92;
-}
-
-.apps-footer {
-  padding: 0.65rem 1rem;
-  border-top: 1px solid var(--color-border, rgba(0,0,0,0.08));
-  background: var(--surface-raised, rgba(248, 250, 252, 0.95));
-  text-align: center;
-}
-
-.apps-footer__link {
-  font-size: 0.78rem;
-  color: var(--color-primary, #04A469);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.apps-footer__link:hover {
-  text-decoration: underline;
-}
-
-/* Transitions */
-.apps-fade-enter-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-.apps-fade-leave-active {
-  transition: opacity 0.12s ease, transform 0.1s ease;
-}
-.apps-fade-enter-from {
-  opacity: 0;
-  transform: translateY(-8px) scale(0.97);
-}
-.apps-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-4px) scale(0.98);
-}
+.apps-overlay { position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: flex-start; justify-content: flex-end; padding: 72px var(--space-lg) var(--space-lg); background: var(--control-overlay); }
+.apps-panel { display: flex; flex-direction: column; width: 360px; max-width: 100%; max-height: calc(100dvh - 96px); overflow: hidden; background: var(--surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-panel); box-shadow: var(--control-shadow); outline: none; }
+.apps-header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-md) var(--space-lg); background: var(--ecosystem-mint); border-bottom: 1px solid var(--color-border); }
+.apps-brand { display: block; width: 103px; height: auto; }
+.apps-brand-light { display: none; width: 103px; height: 27px; background: var(--color-text); mask-size: contain; mask-position: center; mask-repeat: no-repeat; }
+.apps-close { display: grid; width: 36px; height: 36px; place-items: center; background: var(--color-transparent); border: 0; border-radius: var(--radius-pill); color: var(--color-text-secondary); cursor: pointer; transition: background-color var(--transition-fast), transform var(--transition-fast); }
+.apps-close:hover { background: var(--surface-raised); color: var(--color-text); }
+.apps-close:active { transform: scale(.95); }
+.apps-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); padding: var(--space-sm); overflow-y: auto; overscroll-behavior: contain; }
+.app-item { display: flex; align-items: center; gap: var(--space-md); min-height: 48px; padding: var(--space-sm) var(--space-md); color: var(--color-text); text-decoration: none; border-radius: var(--radius-control); transition: background-color var(--transition-fast); }
+.app-item:hover { background: var(--color-primary-subtle); }
+.app-item:active { background: var(--surface-sunken); }
+.app-item__icon { display: grid; flex-shrink: 0; width: 32px; height: 32px; place-items: center; color: var(--color-primary); background: var(--ecosystem-soft); border-radius: var(--radius-control); }
+.app-item__icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.app-item__name { font-size: var(--text-sm); font-weight: 400; white-space: nowrap; }
+.apps-footer { padding: var(--space-md) var(--space-lg); border-top: 1px solid var(--color-border); }
+.apps-footer__link { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); min-height: 32px; color: var(--color-primary); font-size: var(--text-sm); text-decoration: none; white-space: nowrap; }
+.apps-footer__link:hover { text-decoration: underline; text-underline-offset: 4px; }
+.apps-fade-enter-active { transition: opacity var(--dur-short) var(--ease-out); }
+.apps-fade-leave-active { transition: opacity var(--dur-exit) var(--ease-in); }
+.apps-fade-enter-active .apps-panel { transition: opacity var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out); }
+.apps-fade-leave-active .apps-panel { transition: opacity var(--dur-exit) var(--ease-in), transform var(--dur-exit) var(--ease-in); }
+.apps-fade-enter-from, .apps-fade-leave-to { opacity: 0; }
+.apps-fade-enter-from .apps-panel, .apps-fade-leave-to .apps-panel { transform: translateY(-6px); }
+:root[data-theme='dark'] .apps-brand { display: none; }
+:root[data-theme='dark'] .apps-brand-light { display: block; }
+@media (max-width: 520px) { .apps-overlay { padding: 72px var(--space-sm) var(--space-sm); } .apps-panel { max-height: calc(100dvh - 80px); } }
+@media (prefers-reduced-motion: reduce) { .apps-fade-enter-from .apps-panel, .apps-fade-leave-to .apps-panel { transform: none; } }
 </style>
