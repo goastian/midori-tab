@@ -1,55 +1,99 @@
 <template>
-  <div
-    class="transparency-panel"
-    role="dialog"
-    :aria-label="i18n.$t('ads.whyTitle')"
-    @click.stop
-  >
-    <strong>{{ i18n.$t('ads.whyTitle') }}</strong>
-    <p>{{ i18n.$t('ads.whyCopy') }}</p>
-    <p v-if="frequencyCap > 0" class="frequency-copy">{{ frequencyCopy }}</p>
-
-    <div v-if="transparency?.feedback_enabled" class="feedback-actions">
-      <span>{{ i18n.$t('ads.feedbackPrompt') }}</span>
-      <div>
-        <button type="button" :disabled="feedbackPending" @click="$emit('feedback', true)">
-          {{ i18n.$t('ads.relevant') }}
-        </button>
-        <button type="button" :disabled="feedbackPending" @click="$emit('feedback', false)">
-          {{ i18n.$t('ads.notRelevant') }}
-        </button>
-      </div>
-      <small v-if="feedbackMessage" role="status">{{ feedbackMessage }}</small>
+  <Teleport to="body">
+    <div
+      ref="panel"
+      :id="id"
+      class="transparency-panel"
+      :class="{ 'transparency-panel--below': below }"
+      :style="panelStyle"
+      role="tooltip"
+      @click.stop
+    >
+      <p><template v-for="(part, index) in copyParts" :key="index"><strong v-if="part.bold">{{ part.text }}</strong><template v-else>{{ part.text }}</template></template></p>
     </div>
-
-    <button type="button" class="dismiss-action" @click="$emit('dismiss')">
-      {{ i18n.$t('ads.dismiss') }}
-    </button>
-  </div>
+  </Teleport>
 </template>
 
 <script>
 import useI18nStore from '../stores/useI18nStore.js';
 
 export default {
-  emits: ['feedback', 'dismiss'],
+  emits: ['close'],
   props: {
-    transparency: { type: Object, default: null },
-    feedbackPending: { type: Boolean, default: false },
-    feedbackState: { type: String, default: '' },
+    id: { type: String, required: true },
+    anchor: { type: Object, required: true },
   },
-  data() { return { i18n: useI18nStore() }; },
+  data() {
+    return {
+      i18n: useI18nStore(),
+      panelStyle: { visibility: 'hidden' },
+      below: false,
+      resizeObserver: null,
+    };
+  },
   computed: {
-    frequencyCap() {
-      return Number(this.transparency?.frequency_cap_per_day || 0);
+    copyParts() {
+      const labels = {
+        '{partners}': this.i18n.$t('ads.advertisingPartners'),
+        '{privacy}': this.i18n.$t('ads.privacyPolicies'),
+      };
+      return String(this.i18n.$t('ads.whyCopy')).split(/(\{partners\}|\{privacy\})/).map(part => ({
+        text: Object.hasOwn(labels, part) ? labels[part] : part,
+        bold: Object.hasOwn(labels, part),
+      }));
     },
-    frequencyCopy() {
-      return String(this.i18n.$t('ads.frequencyCap')).replace('{count}', String(this.frequencyCap));
+  },
+  mounted() {
+    this.updatePosition();
+    this.resizeObserver = new ResizeObserver(this.updatePosition);
+    this.resizeObserver.observe(this.$refs.panel);
+    this.resizeObserver.observe(this.anchor);
+    document.addEventListener('pointerdown', this.handleOutside, true);
+    document.addEventListener('keydown', this.handleKeydown, true);
+    window.addEventListener('resize', this.updatePosition);
+    window.addEventListener('scroll', this.updatePosition, true);
+  },
+  beforeUnmount() {
+    this.resizeObserver?.disconnect();
+    document.removeEventListener('pointerdown', this.handleOutside, true);
+    document.removeEventListener('keydown', this.handleKeydown, true);
+    window.removeEventListener('resize', this.updatePosition);
+    window.removeEventListener('scroll', this.updatePosition, true);
+  },
+  methods: {
+    updatePosition() {
+      if (!this.anchor?.isConnected || !this.$refs.panel) return;
+      const anchor = this.anchor.getBoundingClientRect();
+      const panel = this.$refs.panel.getBoundingClientRect();
+      const width = document.documentElement.clientWidth;
+      const height = window.innerHeight;
+      if (anchor.bottom < 0 || anchor.top > height || anchor.right < 0 || anchor.left > width) {
+        this.$emit('close');
+        return;
+      }
+      const margin = 12;
+      const gap = 8;
+      const center = anchor.left + anchor.width / 2;
+      const left = Math.max(margin, Math.min(center - panel.width / 2, width - panel.width - margin));
+      const aboveSpace = anchor.top - margin;
+      const belowSpace = height - anchor.bottom - margin;
+      this.below = aboveSpace < panel.height + gap && belowSpace > aboveSpace;
+      const top = this.below ? anchor.bottom + gap : anchor.top - panel.height - gap;
+      this.panelStyle = {
+        left: `${left}px`,
+        top: `${Math.max(margin, Math.min(top, height - panel.height - margin))}px`,
+        '--tooltip-caret-left': `${Math.max(12, Math.min(center - left, panel.width - 12))}px`,
+      };
     },
-    feedbackMessage() {
-      if (this.feedbackState === 'sent') return this.i18n.$t('ads.feedbackThanks');
-      if (this.feedbackState === 'error') return this.i18n.$t('ads.feedbackError');
-      return '';
+    handleOutside(event) {
+      if (!this.$refs.panel?.contains(event.target) && !this.anchor?.contains(event.target)) this.$emit('close');
+    },
+    handleKeydown(event) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.$emit('close');
+      this.anchor?.focus({ preventScroll: true });
     },
   },
 };
@@ -57,74 +101,45 @@ export default {
 
 <style scoped>
 .transparency-panel {
-  width: min(330px, calc(100vw - 2rem));
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 8px;
+  color: #30343b;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font: 400 12px/16px system-ui, sans-serif;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.transparency-panel::after {
+  content: '';
   position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 30;
-  padding: 0.88rem;
-  color: var(--color-text, #1a2b26);
-  background: var(--surface-base, #f5f8f7);
-  border: 1px solid var(--color-border-hover, rgba(34, 75, 61, 0.22));
-  border-radius: var(--nova-panel-radius, 14px);
-  box-shadow: 0 18px 46px rgba(8, 35, 26, 0.22);
-  font-size: 0.74rem;
+  top: 100%;
+  left: var(--tooltip-caret-left);
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-top-color: #fff;
+  transform: translateX(-50%);
+}
+
+.transparency-panel--below::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #fff;
 }
 
 .transparency-panel p {
-  margin: 0.45rem 0 0;
-  color: var(--color-text-muted, #5a7b6d);
-  line-height: 1.45;
+  max-height: calc(100dvh - 40px);
+  margin: 0;
+  overflow-y: auto;
 }
 
-.frequency-copy { font-weight: 600; }
-
-.feedback-actions {
-  display: grid;
-  gap: 0.44rem;
-  margin-top: 0.72rem;
-  padding-top: 0.62rem;
-  border-top: 1px solid var(--color-border, rgba(34, 75, 61, 0.12));
-}
-
-.feedback-actions div { display: flex; gap: 0.38rem; }
-
-.feedback-actions button,
-.dismiss-action {
-  min-height: 29px;
-  padding: 0.32rem 0.5rem;
-  color: var(--color-text, #1a2b26);
-  background: var(--surface-control, rgba(255, 255, 255, 0.78));
-  border: 1px solid var(--color-border, rgba(34, 75, 61, 0.14));
-  border-radius: 7px;
-  font: inherit;
-  font-size: 0.69rem;
-  cursor: pointer;
-}
-
-.feedback-actions button:disabled { cursor: wait; opacity: 0.6; }
-.feedback-actions small { color: var(--color-primary, #047a50); }
-
-.dismiss-action {
-  width: 100%;
-  margin-top: 0.62rem;
-  color: var(--color-text-muted, #5a7b6d);
-  background: transparent;
-}
-
-button:focus-visible {
-  outline: 2px solid var(--color-primary, #04a469);
-  outline-offset: 2px;
-}
-
-@media (max-width: 600px) {
-  .transparency-panel {
-    position: fixed;
-    top: auto;
-    right: 1rem;
-    bottom: 1rem;
-    left: 1rem;
-    width: auto;
-  }
-}
+.transparency-panel strong { font-weight: 700; }
 </style>

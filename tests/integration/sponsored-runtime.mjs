@@ -97,7 +97,7 @@ export async function runSponsoredIntegration({ engine, extensionPath, outputDir
       'All actual Ads HTTP requests must occur after interaction readiness');
     const rendered = await page.evaluate(() => {
       const rect = document.querySelector('.sponsored-card').getBoundingClientRect();
-      return { width: rect.width, height: rect.height, disclosed: Boolean(document.querySelector('.sponsored-badge')),
+      return { width: rect.width, height: rect.height, disclosed: Boolean(document.querySelector('.sponsored-info[aria-label]')),
         rel: document.querySelector('.sponsored-link').rel };
     });
     assert.ok(Math.abs(ready.width - rendered.width) <= 1 && Math.abs(ready.height - rendered.height) <= 1,
@@ -119,9 +119,35 @@ export async function runSponsoredIntegration({ engine, extensionPath, outputDir
     assert.equal(clickedTabs.length, 1, 'One native click must open exactly one tracked destination');
     assert.ok(Number(new URL(clickedTabs[0]).searchParams.get('interaction_ms')) >= 500, 'Click guard must attach the real elapsed interaction time');
     await page.click('.sponsored-info');
-    await page.waitForFunction(() => document.querySelector('.feedback-actions button'));
-    await page.click('.feedback-actions button');
-    await waitUntil(() => requests.some(request => request.body?.event_type === 'feedback_relevant'), 'Real feedback event must reach fixture server');
+    await page.waitForFunction(() => document.querySelector('#sponsored-privacy-notice'));
+    const notice = await page.evaluate(() => {
+      const panel = document.querySelector('#sponsored-privacy-notice');
+      const button = document.querySelector('.sponsored-info');
+      const rect = panel.getBoundingClientRect();
+      return { copy: panel.textContent.trim(), emphasis: [...panel.querySelectorAll('strong')].map(node => node.textContent),
+        expanded: button.getAttribute('aria-expanded'), role: panel.getAttribute('role'),
+        inViewport: rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight };
+    });
+    assert.match(notice.copy, /without sending any personal data to the advertiser/);
+    assert.deepEqual(notice.emphasis, ['advertising partners', 'privacy policies']);
+    assert.equal(notice.expanded, 'true');
+    assert.equal(notice.role, 'tooltip');
+    assert.equal(notice.inViewport, true);
+    assert.equal(await page.locator('.sponsored-badge').count(), 0);
+    if (outputDir) {
+      mkdirSync(outputDir, { recursive: true });
+      await page.screenshot({ path: join(outputDir, 'sponsored-notice.png') });
+    }
+    const clickCount = requests.filter(request => request.path.startsWith('/api/v1/ads/click/')).length;
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('#sponsored-privacy-notice'));
+    assert.equal(await page.locator('.sponsored-info').evaluate(button => document.activeElement === button), true);
+    await page.keyboard.press('Space');
+    await page.waitForFunction(() => document.querySelector('#sponsored-privacy-notice'));
+    await page.click('body', { position: { x: 4, y: 4 } });
+    await page.waitForFunction(() => !document.querySelector('#sponsored-privacy-notice'));
+    assert.equal(requests.filter(request => request.path.startsWith('/api/v1/ads/click/')).length, clickCount,
+      'Opening and closing the privacy notice must not count as a sponsored click');
 
     await page.click('.dashboard-toolbar .top-actions .top-btn:last-child');
     await page.waitForFunction(() => document.querySelector('.open-start-page'));
@@ -136,15 +162,15 @@ export async function runSponsoredIntegration({ engine, extensionPath, outputDir
     await page.waitForFunction(() => document.querySelector('.sponsored-link .speed-dial-title')?.textContent === 'Integration sponsor');
     await page.click('.panel-close');
     await page.waitForFunction(() => !document.querySelector('.panel-overlay'));
-    if (!await page.evaluate(() => Boolean(document.querySelector('.dismiss-action')))) await page.click('.sponsored-info');
-    await page.click('.dismiss-action');
+    await page.hover('.sponsored-card');
+    await page.click('.paid-dismiss');
     await page.waitForFunction(() => !document.querySelector('.sponsored-card'));
     await waitUntil(() => requests.some(request => request.body?.event_type === 'ad_dismissed'), 'Dismissal must retain the real tracking event');
     assert.equal(decision, 1, 'Toggling visibility must preserve the current page decision without another fetch');
     assert.equal(requests.filter(request => request.path === '/api/v1/ads/impression' && request.method === 'POST').length, 1,
       'Visibility toggles must not count the same leased impression twice');
     const report = { passed: true, configuredFiles, fixture: 'Only the Ads API base URL changes in an isolated copy; native HTTP, production contracts, DOM, viewability, tracking and browser tabs remain real',
-      ready, rendered, clickedTabs, requests };
+      ready, rendered, notice, clickedTabs, requests };
     if (outputDir) {
       mkdirSync(outputDir, { recursive: true });
       writeFileSync(join(outputDir, 'sponsored-integration.json'), `${JSON.stringify(report, null, 2)}\n`);

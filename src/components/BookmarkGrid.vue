@@ -114,28 +114,33 @@
         :class="{
           'sponsored-card--pending': !hasAd,
           'sponsored-card--disclosed': requiresDisclosure,
+          'sponsored-card--info-open': showTransparency,
         }"
         :role="requiresDisclosure ? 'complementary' : undefined"
         :aria-label="sponsoredAriaLabel"
         :aria-hidden="!hasAd"
       >
         <template v-if="hasAd">
-          <span v-if="requiresDisclosure" class="sponsored-badge" :title="sponsoredBadge">{{ sponsoredBadge }}</span>
           <button
             v-if="requiresDisclosure"
             type="button"
+            ref="sponsoredInfo"
             class="sponsored-info"
-            :title="i18n.$t('ads.whyTitle')"
             :aria-label="i18n.$t('ads.whyTitle')"
             :aria-expanded="showTransparency"
+            :aria-controls="showTransparency ? 'sponsored-privacy-notice' : undefined"
+            :aria-describedby="showTransparency ? 'sponsored-privacy-notice' : undefined"
             @click.prevent.stop="showTransparency = !showTransparency"
-          >i</button>
+          >
+            <DashboardIcon name="help" :size="15" :stroke-width="1.7" aria-hidden="true" />
+          </button>
           <button
-            v-else-if="showDeleteButton"
+            v-if="showDeleteButton"
             type="button"
             class="house-dismiss"
-            :title="i18n.$t('bookmarks.removeShortcut')"
-            :aria-label="i18n.$t('bookmarks.removeShortcut')"
+            :class="{ 'paid-dismiss': requiresDisclosure }"
+            :title="i18n.$t(requiresDisclosure ? 'ads.dismiss' : 'bookmarks.removeShortcut')"
+            :aria-label="i18n.$t(requiresDisclosure ? 'ads.dismiss' : 'bookmarks.removeShortcut')"
             @click.prevent.stop="dismissSponsored"
           >
             <DashboardIcon name="close" :size="12" :stroke-width="2" aria-hidden="true" />
@@ -169,11 +174,9 @@
 
           <SponsoredTransparency
             v-if="requiresDisclosure && showTransparency"
-            :transparency="ad.transparency"
-            :feedback-pending="feedbackPending"
-            :feedback-state="feedbackState"
-            @feedback="submitFeedback"
-            @dismiss="dismissSponsored"
+            id="sponsored-privacy-notice"
+            :anchor="$refs.sponsoredInfo"
+            @close="showTransparency = false"
           />
         </template>
 
@@ -328,9 +331,6 @@ export default {
     },
     adIconUrl() {
       return this.ad.icon_url || this.ad.image_url || '';
-    },
-    sponsoredBadge() {
-      return this.ad.sponsor_label || this.i18n.$t('ads.badge') || 'Ad';
     },
     sponsoredInitial() {
       return String(this.ad.title || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -1041,8 +1041,7 @@ export default {
 }
 
 .card-action-btn,
-.house-dismiss,
-.sponsored-info {
+.house-dismiss {
   width: 23px;
   height: 23px;
   display: inline-flex;
@@ -1078,32 +1077,6 @@ export default {
   font-size: 0.66rem;
 }
 
-.sponsored-card--disclosed .sponsored-link {
-  padding-top: 1.32rem;
-}
-
-.sponsored-badge {
-  position: absolute;
-  top: 7px;
-  left: 8px;
-  z-index: 4;
-  max-width: calc(100% - 40px);
-  padding: 2px 5px;
-  overflow: hidden;
-  color: var(--color-text-muted, #5a7b6d);
-  background: var(--surface-control, rgba(255, 255, 255, 0.88));
-  border-radius: 4px;
-  font-size: 0.55rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.sponsored-info,
 .house-dismiss {
   position: absolute;
   top: 6px;
@@ -1112,15 +1085,55 @@ export default {
   border-radius: 50%;
 }
 
+.paid-dismiss {
+  right: auto;
+  left: 6px;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.sponsored-card:hover .paid-dismiss,
+.sponsored-card:focus-within .paid-dismiss {
+  opacity: 1;
+  visibility: visible;
+}
+
 .sponsored-info {
-  font: 700 0.68rem/1 sans-serif;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 6;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--color-text-muted, #5a7b6d);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
 }
 
 .sponsored-info:hover,
 .sponsored-info:focus-visible {
-  color: white;
-  background: var(--color-primary, #04a469);
-  border-color: transparent;
+  color: var(--color-text, #1a2b26);
+  background: var(--surface-control-hover, rgba(255, 255, 255, 0.24));
+}
+
+.sponsored-info:focus-visible {
+  outline: 2px solid var(--color-primary, #04a469);
+  outline-offset: 2px;
+}
+
+.sponsored-card--info-open .sponsored-link {
+  background: var(--surface-control-hover, rgba(255, 255, 255, 0.96));
+}
+
+@media (pointer: coarse) {
+  .sponsored-info { width: 36px; height: 36px; }
+  .paid-dismiss { opacity: 1; visibility: visible; }
 }
 
 .sponsored-icon--fallback {
