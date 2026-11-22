@@ -393,10 +393,34 @@ export default class AdsService {
     }
   }
 
+  async trackExposure(ad, event) {
+    if (!this.isConfigured() || !ad?.impression_token || !UUID_PATTERN.test(event?.event_id || '')) return false;
+    const body = { impression_token: ad.impression_token, event_id: event.event_id,
+      event_type: 'exposure_finished', surface: 'new_tab',
+      elapsed_ms: event.elapsed_ms, visible_ms: event.visible_ms, viewable: event.viewable,
+      end_reason: event.end_reason };
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeout);
+      try {
+        const response = await this.fetchFn(`${this.baseUrl}/api/v1/ads/interaction`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          credentials: 'omit', keepalive: true, signal: controller.signal, body: JSON.stringify(body),
+        });
+        try { await response.body?.cancel?.(); } catch (_) { }
+        if (response.ok) return true;
+        if (!isRetryableImpressionStatus(response.status)) return false;
+      } catch (_) { }
+      finally { clearTimeout(timeout); }
+      if (attempt === 0) await this.sleep(500);
+    }
+    return false;
+  }
+
   async #requestAd({ device_type, country, language, signal }) {
     const url = new URL(`${this.baseUrl}${this.path}`);
     if (device_type) url.searchParams.set('device_type', device_type);
-    if (country) url.searchParams.set('country', country);
+    url.searchParams.set('surface', 'new_tab');
     url.searchParams.set('language', normalizeContractLanguage(language));
     const visitorId = await this.#resolveVisitorId();
     // visitor_id is part of the deployed ads.astian.org contract. Never send
@@ -623,6 +647,7 @@ export default class AdsService {
 }
 
 export {
+  createRandomUuid,
   VISITOR_ID_KEY,
   impressionRetryDelayMs,
   isDecisionActive,

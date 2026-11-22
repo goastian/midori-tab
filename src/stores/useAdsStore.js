@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import AdsService, { isDecisionActive } from '../services/AdsService.js';
+import AdsService, { isDecisionActive, createRandomUuid } from '../services/AdsService.js';
 
 /**
  * Detects basic device type from UA. Avoids fingerprinting; only coarse class.
@@ -7,22 +7,9 @@ import AdsService, { isDecisionActive } from '../services/AdsService.js';
 function detectDeviceType() {
   if (typeof navigator === 'undefined') return 'desktop';
   const ua = String(navigator.userAgent || '').toLowerCase();
-  if (/ipad|tablet|playbook|silk|kindle/.test(ua)) return 'tablet';
+  if (/ipad|tablet|playbook|silk|kindle/.test(ua) || (/android/.test(ua) && !/mobile/.test(ua)) || (/macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'tablet';
   if (/mobile|iphone|android.+mobile|ipod/.test(ua)) return 'mobile';
   return 'desktop';
-}
-
-/**
- * Best-effort country code from Intl timezone (privacy-friendly: no geo-IP).
- * Returns ISO-3166-2 letters or empty string.
- */
-function detectCountry() {
-  try {
-    const locale = (typeof navigator !== 'undefined' && navigator.language) || '';
-    const parts = String(locale).split('-');
-    if (parts.length > 1 && parts[1].length === 2) return parts[1].toUpperCase();
-  } catch (_) { /* ignore */ }
-  return '';
 }
 
 function detectLanguage() {
@@ -70,6 +57,7 @@ function getService() {
 const useAdsStore = defineStore('adsStore', {
   state: () => ({
     currentAd: null,
+    currentExposureId: null,
     lastFetchedAt: 0,
     loading: false,
     error: null,
@@ -98,7 +86,6 @@ const useAdsStore = defineStore('adsStore', {
         const service = getService();
         const result = await service.fetchNewTabAds({
           device_type: detectDeviceType(),
-          country: detectCountry(),
           language: detectLanguage(),
           signal: options.signal,
         });
@@ -170,6 +157,10 @@ const useAdsStore = defineStore('adsStore', {
       );
     },
 
+    async trackExposure(ad, event) {
+      return getService().trackExposure(ad, event);
+    },
+
     async trackClientEvent(eventType, metrics = {}, ad = this.currentAd) {
       if (!ad || !isDecisionActive(ad) || !ad.impression_token) return false;
       try {
@@ -228,6 +219,11 @@ const useAdsStore = defineStore('adsStore', {
       if (!decisionId) return false;
 
       let url = this.currentAd.destination_url;
+      const clickUrl = new URL(url);
+      clickUrl.searchParams.set('click_device_type', detectDeviceType());
+      clickUrl.searchParams.set('click_event_id', createRandomUuid());
+      if (this.currentExposureId) clickUrl.searchParams.set('exposure_id', this.currentExposureId);
+      url = clickUrl.toString();
       const latency = Number(interactionLatencyMs);
       if (Number.isSafeInteger(latency) && latency >= 0) {
         try {

@@ -293,6 +293,7 @@ export default {
       reserveAdSlot: true,
       adObserver: null,
       adViewability: null,
+      adExposure: null,
       clickGuard: null,
       iconFailed: false,
       showTransparency: false,
@@ -351,6 +352,7 @@ export default {
     activeTab() {
       if (this.bookmarksReady && !this.bookmarkSavePending) writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
     },
+    showTransparency() { this.handleAdPageVisibility(); },
     showAds(enabled) {
       if (!enabled) {
         cancelRemoteTask('ads-decision');
@@ -402,6 +404,9 @@ export default {
     }).catch(error => console.warn('[Midori] Could not restore cached favicons', error));
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.handleAdPageVisibility);
+      window.addEventListener('focus', this.handleAdPageVisibility);
+      window.addEventListener('blur', this.handleAdPageVisibility);
+      window.addEventListener('pagehide', this.handleAdPageHide);
     }
     this.$nextTick(() => {
       void this.ensureAdRuntime();
@@ -417,6 +422,9 @@ export default {
     cancelRemoteTask('ads-decision');
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.handleAdPageVisibility);
+      window.removeEventListener('focus', this.handleAdPageVisibility);
+      window.removeEventListener('blur', this.handleAdPageVisibility);
+      window.removeEventListener('pagehide', this.handleAdPageHide);
     }
     this.reportPerformance();
     this.teardownAdObserver();
@@ -658,11 +666,19 @@ export default {
     setupAdObserver() {
       this.teardownAdObserver();
       if (!this.showAds || !this.adRuntime || !this.adsStore) return;
-      const { AD_VIEWABILITY_THRESHOLD, createAdViewabilityTracker } = this.adRuntime;
+      const { AD_VIEWABILITY_THRESHOLD, createAdViewabilityTracker, createAdExposureTracker } = this.adRuntime;
       const element = this.$refs.sponsoredCard;
       if (!element) return;
 
       if (this.adsStore.hasAd) {
+        const measuredAd = this.adsStore.currentAd;
+        this.adExposure = createAdExposureTracker({ ad: measuredAd,
+          onStart: id => { this.adsStore.currentExposureId = id; },
+          onFinish: event => {
+            if (this.adsStore.currentExposureId === event.event_id) this.adsStore.currentExposureId = null;
+            void this.adsStore.trackExposure(measuredAd, event);
+          },
+        });
         this.adViewability = createAdViewabilityTracker({
           onViewable: async () => {
             if (!this.showAds || !this.adsStore.hasAd || this.adsStore.impressionTracked) return;
@@ -673,9 +689,7 @@ export default {
             }
           },
         });
-        this.adViewability.setPageVisible(
-          typeof document === 'undefined' || document.visibilityState === 'visible',
-        );
+        this.handleAdPageVisibility();
       }
 
       if (typeof IntersectionObserver === 'undefined') {
@@ -692,10 +706,13 @@ export default {
           return;
         }
         this.adViewability?.update(entry);
+        this.adExposure?.update(entry);
       }, { threshold: [0, AD_VIEWABILITY_THRESHOLD, 1] });
       this.adObserver.observe(element);
     },
     teardownAdObserver() {
+      this.adExposure?.dispose();
+      this.adExposure = null;
       if (this.adObserver) {
         try { this.adObserver.disconnect(); } catch (_) { /* noop */ }
         this.adObserver = null;
@@ -705,15 +722,18 @@ export default {
         this.adViewability = null;
       }
     },
+    handleAdPageHide() {
+      this.adExposure?.finish('navigation');
+    },
     handleAdPageVisibility() {
       if (document.visibilityState === 'visible') {
         this.failedFavicons = {};
         void this.primeFavicons();
-        void this.ensureAdRuntime();
+        if (!this.adsStore?.hasAd) void this.ensureAdRuntime();
       }
-      this.adViewability?.setPageVisible(
-        typeof document === 'undefined' || document.visibilityState === 'visible',
-      );
+      const visible = document.visibilityState === 'visible' && document.hasFocus() && !this.showTransparency;
+      this.adViewability?.setPageVisible(visible);
+      this.adExposure?.setPageVisible(visible);
     },
     async loadAdWhenVisible() {
       if (!this.showAds || !this.adsStore || this.adRequested || this.hasAd) return;
@@ -732,6 +752,7 @@ export default {
     },
     dismissSponsored() {
       this.reserveAdSlot = false;
+      this.adExposure?.finish('removed');
       void this.adsStore?.dismiss();
       this.showTransparency = false;
     },
@@ -755,6 +776,7 @@ export default {
         return;
       }
       if (this.adsStore.trackClick(intent.interactionLatencyMs)) {
+        this.adExposure?.finish('navigation');
         this.$emit('sponsored-click', clickedAd);
       }
     },
