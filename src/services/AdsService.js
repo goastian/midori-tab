@@ -3,7 +3,7 @@
  *
  * Constraints (critical service for New Tab UX):
  * - Must NEVER block render. All network calls happen with a timeout.
- * - Every New Tab load requests a new signed decision/lease.
+ * - Creative content persists locally; each exposure gets a fresh signed lease.
  * - Decisions and impression tokens are never persisted or reused.
  * - Privacy: send only coarse context plus a random, New-Tab-only visitor UUID.
  *   The UUID is generated locally; it is never derived from device attributes.
@@ -11,6 +11,9 @@
 
 const DEFAULT_TIMEOUT_MS = 6000;
 const LEGACY_CACHE_KEY_PREFIX = 'ads:newtab:';
+const CREATIVE_CACHE_PREFIX = 'ads:creative:newtab:v1:';
+const CREATIVE_FIELDS = ['ad_id', 'format_id', 'placement', 'channel', 'interaction_contract', 'bookmark_key',
+  'icon_url', 'image_url', 'title', 'description', 'cta', 'disclosure_required', 'sponsor_label', 'locale'];
 const VISITOR_ID_KEY = 'ads:newtab:visitor_id:v1';
 export const REWARDS_INTEREST_STATE_KEY = 'midori:rewards:interest-state:v1';
 const EXPIRY_SAFETY_MS = 30 * 1000;
@@ -272,7 +275,7 @@ export default class AdsService {
       const ad = await this.#requestAd({ device_type, country, language, signal });
       const latencyMs = Math.max(0, Math.round(Number(this.now()) - startedAt));
       return ad
-        ? { ad, source: 'fresh', latency_ms: latencyMs }
+        ? { ad, source: ad.creative_unchanged ? 'cached' : 'fresh', latency_ms: latencyMs }
         : { ad: null, source: 'none', latency_ms: latencyMs };
     } catch (error) {
       // Keep New Tab rendering non-blocking while preserving the distinction
@@ -423,36 +426,60 @@ export default class AdsService {
     url.searchParams.set('surface', 'new_tab');
     url.searchParams.set('language', normalizeContractLanguage(language));
     const visitorId = await this.#resolveVisitorId();
-    // visitor_id is part of the deployed ads.astian.org contract. Never send
-    // the request without it and keep it in the query string for compatibility.
     url.searchParams.set('visitor_id', visitorId);
+    const cacheKey = `${CREATIVE_CACHE_PREFIX}${this.baseUrl}:${visitorId}:${device_type}:${normalizeContractLanguage(language)}`;
+    let cached = null;
+    try {
+      const stored = await this.storage.get(cacheKey);
+      if (stored?.creative_contract === 'ads-creative-v1'
+        && /^[a-f0-9]{64}$/.test(stored.creative_version || '')
+        && Number.isSafeInteger(stored.ad_id) && stored.ad_id > 0) cached = stored;
+    } catch (_) { }
 
-    const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const onAbort = () => controller?.abort();
     if (signal?.aborted) onAbort();
     else signal?.addEventListener('abort', onAbort, { once: true });
-    const timeoutId = controller
-      ? setTimeout(() => controller.abort(), this.timeout)
-      : null;
-
+    const timeoutId = controller ? setTimeout(() => controller.abort(), this.timeout) : null;
+    const removeCache = async () => { try { await this.storage.remove(cacheKey); } catch (_) { } };
     try {
       const rewardToken = await this.rewardTokenProvider();
-      if (signal?.aborted) throw new DOMException('Ads request cancelled', 'AbortError');
       const headers = { Accept: 'application/json' };
       if (rewardToken) headers['X-Wallet-Token'] = rewardToken;
-      const response = await this.fetchFn(url.toString(), {
-        method: 'GET',
-        headers,
-        credentials: 'omit',
-        signal: controller ? controller.signal : undefined,
-      });
-
-      if (response.status === 204 || response.status === 404) return null;
+      const request = async (useCache) => {
+        if (signal?.aborted) throw new DOMException('Ads request cancelled', 'AbortError');
+        const body = useCache ? { ...Object.fromEntries(url.searchParams), cached_ad_id: cached.ad_id, creative_version: cached.creative_version } : null;
+        return this.fetchFn(useCache ? `${url.origin}${url.pathname}/lease` : url.toString(), {
+          method: useCache ? 'POST' : 'GET',
+          headers: body ? { ...headers, 'Content-Type': 'application/json' } : headers,
+          body: body ? JSON.stringify(body) : undefined,
+          credentials: 'omit', cache: 'no-store', signal: controller?.signal,
+        });
+      };
+      let response = await request(Boolean(cached));
+      if (cached && (response.status === 404 || response.status === 405)) {
+        try { await response.body?.cancel?.(); } catch (_) { }
+        await removeCache(); cached = null;
+        response = await request(false);
+      }
+      if (response.status === 204 || response.status === 404) { await removeCache(); return null; }
       if (!response.ok) throw new Error(`Ads request failed: ${response.status}`);
-
-      const data = this.#normalizeContract(await response.json());
+      let payload = await response.json();
+      if (payload.creative_unchanged === true) {
+        if (!cached || payload.creative_version !== cached.creative_version || Number(payload.ad_id) !== cached.ad_id) {
+          await removeCache();
+          throw new Error('Ads creative cache version mismatch');
+        }
+        const creative = Object.fromEntries(CREATIVE_FIELDS.filter(key => Object.hasOwn(cached, key)).map(key => [key, cached[key]]));
+        payload = { ...creative, ...payload };
+      }
+      const data = this.#normalizeContract(payload);
       if (signal?.aborted) throw new DOMException('Ads request cancelled', 'AbortError');
-      if (!this.#isValidContract(data)) return null;
+      if (!this.#isValidContract(data)) { await removeCache(); return null; }
+      if (data.creative_contract === 'ads-creative-v1' && /^[a-f0-9]{64}$/.test(data.creative_version || '')) {
+        const creative = Object.fromEntries(CREATIVE_FIELDS.filter(key => Object.hasOwn(data, key)).map(key => [key, data[key]]));
+        try { await this.storage.set(cacheKey, { ...creative, creative_contract: data.creative_contract, creative_version: data.creative_version }); } catch (_) { }
+      }
       return data;
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
