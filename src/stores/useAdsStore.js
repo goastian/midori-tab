@@ -1,44 +1,9 @@
 import { defineStore } from 'pinia';
 import AdsService, { isDecisionActive, createRandomUuid } from '../services/AdsService.js';
 
-/**
- * Detects basic device type from UA. Avoids fingerprinting; only coarse class.
- */
-function detectDeviceType() {
-  if (typeof navigator === 'undefined') return 'desktop';
-  const ua = String(navigator.userAgent || '').toLowerCase();
-  if (/ipad|tablet|playbook|silk|kindle/.test(ua) || (/android/.test(ua) && !/mobile/.test(ua)) || (/macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'tablet';
-  if (/mobile|iphone|android.+mobile|ipod/.test(ua)) return 'mobile';
-  return 'desktop';
-}
+import { detectDeviceType, detectLanguage, readDismissed, SESSION_DISMISS_KEY, readCreativeSnapshot, creativeContent, adsApiBase } from '../services/adCreativeSnapshot.js';
 
-function detectLanguage() {
-  try {
-    const lang = (typeof navigator !== 'undefined' && navigator.language) || 'en';
-    return String(lang).split('-')[0].toLowerCase();
-  } catch (_) {
-    return 'en';
-  }
-}
-
-/**
- * Per-session dismissal tracking — uses sessionStorage so a dismissed ad does
- * not reappear in the same browsing session but resets on next session.
- */
-const SESSION_DISMISS_KEY = 'ads:newtab:dismissed';
-
-function readDismissed() {
-  try {
-    if (typeof sessionStorage === 'undefined') return new Set();
-    const raw = sessionStorage.getItem(SESSION_DISMISS_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw);
-    return new Set(Array.isArray(arr) ? arr : []);
-  } catch (_) {
-    return new Set();
-  }
-}
-
+/** Per-session dismissal tracking; resets on the next browsing session. */
 function writeDismissed(set) {
   try {
     if (typeof sessionStorage === 'undefined') return;
@@ -54,14 +19,19 @@ function getService() {
   return _serviceSingleton;
 }
 
+const activeRequests = new WeakMap();
+
 const useAdsStore = defineStore('adsStore', {
   state: () => ({
     currentAd: null,
+    cachedCreative: readCreativeSnapshot(),
+    creativeCacheReady: false,
+    pendingDismissId: null,
     currentExposureId: null,
     lastFetchedAt: 0,
     loading: false,
     error: null,
-    /** 'fresh' | 'none' | 'error' | 'dismissed' | null */
+    /** 'fresh' | 'cached' | 'none' | 'error' | 'dismissed' | null */
     source: null,
     impressionTracked: false,
     impressionTracking: false,
@@ -69,21 +39,36 @@ const useAdsStore = defineStore('adsStore', {
   }),
 
   getters: {
+    displayAd(state) { return state.currentAd || state.cachedCreative; },
     hasAd(state) {
       return Boolean(state.currentAd && state.currentAd.ad_id);
     },
   },
 
   actions: {
-    async loadAd(force = false, options = {}) {
-      if (this.loading) return;
-      if (!force && this.hasAd) return;
+    async restoreCreative() {
+      if (this.creativeCacheReady) return;
+      const creative = await getService().cachedNewTabCreative({ device_type: detectDeviceType(), language: detectLanguage() });
+      this.cachedCreative = creative && !readDismissed().has(String(creative.ad_id)) ? creative : null;
+      this.creativeCacheReady = true;
+    },
 
+    async loadAd(force = false, options = {}) {
+      if (activeRequests.has(this)) return activeRequests.get(this);
+      if (!force && this.hasAd && isDecisionActive(this.currentAd)) return true;
+      const request = this.refreshAd(options);
+      activeRequests.set(this, request);
+      try { return await request; }
+      finally { if (activeRequests.get(this) === request) activeRequests.delete(this); }
+    },
+
+    async refreshAd(options = {}) {
       this.loading = true;
       this.error = null;
 
       try {
         const service = getService();
+        await this.restoreCreative();
         const result = await service.fetchNewTabAds({
           device_type: detectDeviceType(),
           language: detectLanguage(),
@@ -97,11 +82,17 @@ const useAdsStore = defineStore('adsStore', {
         if (result && result.ad) {
           const dismissed = readDismissed();
           if (dismissed.has(String(result.ad.ad_id))) {
+            if (this.pendingDismissId === String(result.ad.ad_id)) {
+              this.pendingDismissId = null;
+              void service.trackClientEvent('ad_dismissed', result.ad.impression_token, { expiresAt: result.ad.expires_at });
+            }
+            this.cachedCreative = null;
             this.currentAd = null;
             this.source = 'dismissed';
             this.impressionTracked = false;
             this.impressionTracking = false;
           } else {
+            this.cachedCreative = creativeContent(result.ad, adsApiBase());
             this.currentAd = result.ad;
             this.source = result.source;
             this.impressionTracked = false;
@@ -109,6 +100,7 @@ const useAdsStore = defineStore('adsStore', {
           }
         } else {
           const failed = result?.source === 'error';
+          if (!failed) this.cachedCreative = null;
           this.currentAd = null;
           this.source = failed ? 'error' : 'none';
           this.error = failed
@@ -132,15 +124,18 @@ const useAdsStore = defineStore('adsStore', {
     },
 
     dismiss() {
-      if (!this.currentAd) return;
-      const dismissedAd = this.currentAd;
-      void this.trackClientEvent('ad_dismissed', {}, dismissedAd);
-      const id = String(this.currentAd.ad_id);
+      const dismissedAd = this.displayAd;
+      if (!dismissedAd) return;
+      const id = String(dismissedAd.ad_id);
+      if (this.currentAd) void this.trackClientEvent('ad_dismissed', {}, this.currentAd);
+      else this.pendingDismissId = id;
+      this.cachedCreative = null;
       const dismissed = readDismissed();
       dismissed.add(id);
       writeDismissed(dismissed);
       this.currentAd = null;
       this.source = 'dismissed';
+      if (this.pendingDismissId) void this.loadAd(true);
       this.impressionTracked = false;
       this.impressionTracking = false;
     },

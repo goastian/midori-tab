@@ -108,7 +108,7 @@
       </article>
 
       <article
-        v-if="showAds && (!adRequestComplete || hasAd)"
+        v-if="showAds && (hasAd || (!adRequestComplete && adsStore?.creativeCacheReady))"
         ref="sponsoredCard"
         class="speed-dial-card sponsored-card"
         :class="{
@@ -147,7 +147,10 @@
           </button>
 
           <a
-            :href="ad.destination_url"
+            :href="ad.destination_url || undefined"
+            :tabindex="ad.destination_url ? undefined : 0"
+            role="link"
+            @keydown.enter.prevent="openSponsored"
             class="speed-dial-link sponsored-link"
             target="_blank"
             :rel="sponsoredRel"
@@ -214,6 +217,7 @@
 
 <script>
 import { defineAsyncComponent } from 'vue';
+import { readCreativeSnapshot } from '../services/adCreativeSnapshot.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
 import { cancelRemoteTask, scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
@@ -291,6 +295,7 @@ export default {
       pendingBookmarkDelete: '',
       undo: null,
       pendingCategoryDelete: '',
+      cachedCreative: readCreativeSnapshot(),
       adRequested: false,
       adRequestComplete: false,
       reserveAdSlot: true,
@@ -324,10 +329,10 @@ export default {
     gridStyle() {
       return this.layoutStyles.grid;
     },
-    hasAd() { return Boolean(this.adsStore?.hasAd); },
-    ad() { return this.adsStore?.currentAd || {}; },
+    hasAd() { return Boolean(this.ad.ad_id); },
+    ad() { return (this.adsStore ? this.adsStore.displayAd : this.cachedCreative) || {}; },
     requiresDisclosure() {
-      return requiresPaidDisclosure(this.ad);
+      return this.ad.creative_preview ? this.ad.disclosure_required === true : requiresPaidDisclosure(this.ad);
     },
     adIconUrl() {
       return this.ad.icon_url || this.ad.image_url || '';
@@ -371,7 +376,7 @@ export default {
       this.iconFailed = false;
       this.showTransparency = false;
       this.feedbackState = '';
-      this.clickGuard?.reset();
+      if (this.adsStore?.source !== 'cached') this.clickGuard?.reset();
       if (this.showAds && ad) {
         this.$nextTick(() => {
           this.setupAdObserver();
@@ -643,8 +648,8 @@ export default {
       ]);
       writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
     },
-    async ensureAdRuntime() {
-      if (!this.showAds || !this.remoteImagesReady || this.adRuntimeLoading || this.faviconsDisposed || document.visibilityState === 'hidden') return;
+    async ensureAdRuntime(interactive = false) {
+      if (!this.showAds || (!this.remoteImagesReady && !interactive) || this.adRuntimeLoading || this.faviconsDisposed || document.visibilityState === 'hidden') return;
       this.adRuntimeLoading = true;
       try {
         if (!this.adRuntime) {
@@ -654,6 +659,7 @@ export default {
           this.clickGuard = runtime.createAdInteractionGuard();
           this.adsStore = runtime.useAdsStore();
         }
+        await this.adsStore.restoreCreative();
         await this.$nextTick();
         if (!this.showAds || this.faviconsDisposed) return;
         this.setupPerformanceObserver();
@@ -736,7 +742,7 @@ export default {
       this.adExposure?.setPageVisible(visible);
     },
     async loadAdWhenVisible() {
-      if (!this.showAds || !this.adsStore || this.adRequested || this.hasAd) return;
+      if (!this.showAds || !this.adsStore || this.adRequested || this.adsStore.hasAd) return;
       this.adRequested = true;
       const completed = await scheduleRemoteTask('ads-decision', signal => this.adsStore.loadAd(false, { signal }), { priority: 1 });
       if (!completed) this.adRequested = false;
@@ -764,18 +770,20 @@ export default {
       this.feedbackState = accepted ? 'sent' : 'error';
       if (accepted) this.$emit('sponsored-feedback', { ad: this.ad, relevant });
     },
-    openSponsored(event) {
-      const clickedAd = this.adsStore?.currentAd;
-      if (!clickedAd || !this.clickGuard) return;
+    async openSponsored(event) {
+      await this.ensureAdRuntime(true);
+      if (!this.adsStore || !this.clickGuard) return;
       const intent = this.clickGuard.evaluate({ keyboard: event?.detail === 0 });
       if (!intent.allowed) {
         void this.adsStore.trackClientEvent('accidental_click_guard', {
           interaction_latency_ms: intent.interactionLatencyMs,
         });
-        this.$emit('accidental-click-blocked', clickedAd);
+        this.$emit('accidental-click-blocked', this.ad);
         return;
       }
-      if (this.adsStore.trackClick(intent.interactionLatencyMs)) {
+      await this.adsStore.loadAd();
+      const clickedAd = this.adsStore.currentAd;
+      if (clickedAd && this.adsStore.trackClick(intent.interactionLatencyMs)) {
         this.adExposure?.finish('navigation');
         this.$emit('sponsored-click', clickedAd);
       }

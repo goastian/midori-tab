@@ -9,11 +9,11 @@
  *   The UUID is generated locally; it is never derived from device attributes.
  */
 
+import { AD_CREATIVE_FIELDS, adsApiBase, creativeContent, readCreativeSnapshot, writeCreativeSnapshot, clearCreativeSnapshot } from './adCreativeSnapshot.js';
+
 const DEFAULT_TIMEOUT_MS = 6000;
 const LEGACY_CACHE_KEY_PREFIX = 'ads:newtab:';
 const CREATIVE_CACHE_PREFIX = 'ads:creative:newtab:v1:';
-const CREATIVE_FIELDS = ['ad_id', 'format_id', 'placement', 'channel', 'interaction_contract', 'bookmark_key',
-  'icon_url', 'image_url', 'title', 'description', 'cta', 'disclosure_required', 'sponsor_label', 'locale'];
 const VISITOR_ID_KEY = 'ads:newtab:visitor_id:v1';
 export const REWARDS_INTEREST_STATE_KEY = 'midori:rewards:interest-state:v1';
 const EXPIRY_SAFETY_MS = 30 * 1000;
@@ -40,12 +40,7 @@ function normalizeContractLanguage(value) {
   return String(value || '').trim().toLowerCase().startsWith('es') ? 'es' : 'en';
 }
 
-function resolveBaseUrl() {
-  const explicit = (typeof import.meta !== 'undefined' && import.meta.env)
-    ? import.meta.env.VITE_ADS_API_BASE
-    : null;
-  return normalizeBaseUrl(explicit || 'https://ads.astian.org');
-}
+function resolveBaseUrl() { return adsApiBase(); }
 
 function resolveNewtabPath() {
   const explicit = (typeof import.meta !== 'undefined' && import.meta.env)
@@ -258,10 +253,22 @@ export default class AdsService {
     return Boolean(this.baseUrl && this.fetchFn);
   }
 
+  async cachedNewTabCreative({ device_type = 'desktop', language = 'en' } = {}) {
+    const context = { baseUrl: this.baseUrl, device_type, language };
+    try {
+      const visitorId = await this.#resolveVisitorId();
+      const stored = await this.storage.get(`${CREATIVE_CACHE_PREFIX}${this.baseUrl}:${visitorId}:${device_type}:${normalizeContractLanguage(language)}`);
+      const creative = creativeContent(stored, this.baseUrl);
+      if (creative) writeCreativeSnapshot(context, creative);
+      else clearCreativeSnapshot(context);
+      return creative;
+    } catch (_) { return readCreativeSnapshot(context); }
+  }
+
   /**
    * Fetch a New Tab ad. Returns { ad, source } where:
    *   - ad: object | null
-   *   - source: 'fresh' | 'none' | 'error'
+   *   - source: 'fresh' | 'cached' | 'none' | 'error'
    */
   async fetchNewTabAds({ device_type = 'desktop', country = '', language = 'en', signal } = {}) {
     await this.#removeLegacyDecisionCache({ country, language });
@@ -441,7 +448,11 @@ export default class AdsService {
     if (signal?.aborted) onAbort();
     else signal?.addEventListener('abort', onAbort, { once: true });
     const timeoutId = controller ? setTimeout(() => controller.abort(), this.timeout) : null;
-    const removeCache = async () => { try { await this.storage.remove(cacheKey); } catch (_) { } };
+    const snapshotContext = { baseUrl: this.baseUrl, device_type, language };
+    const removeCache = async () => {
+      clearCreativeSnapshot(snapshotContext);
+      try { await this.storage.remove(cacheKey); } catch (_) { }
+    };
     try {
       const rewardToken = await this.rewardTokenProvider();
       const headers = { Accept: 'application/json' };
@@ -470,15 +481,17 @@ export default class AdsService {
           await removeCache();
           throw new Error('Ads creative cache version mismatch');
         }
-        const creative = Object.fromEntries(CREATIVE_FIELDS.filter(key => Object.hasOwn(cached, key)).map(key => [key, cached[key]]));
+        const creative = Object.fromEntries(AD_CREATIVE_FIELDS.filter(key => Object.hasOwn(cached, key)).map(key => [key, cached[key]]));
         payload = { ...creative, ...payload };
       }
       const data = this.#normalizeContract(payload);
       if (signal?.aborted) throw new DOMException('Ads request cancelled', 'AbortError');
       if (!this.#isValidContract(data)) { await removeCache(); return null; }
       if (data.creative_contract === 'ads-creative-v1' && /^[a-f0-9]{64}$/.test(data.creative_version || '')) {
-        const creative = Object.fromEntries(CREATIVE_FIELDS.filter(key => Object.hasOwn(data, key)).map(key => [key, data[key]]));
-        try { await this.storage.set(cacheKey, { ...creative, creative_contract: data.creative_contract, creative_version: data.creative_version }); } catch (_) { }
+        const creative = Object.fromEntries(AD_CREATIVE_FIELDS.filter(key => Object.hasOwn(data, key)).map(key => [key, data[key]]));
+        const stored = { ...creative, creative_contract: data.creative_contract, creative_version: data.creative_version };
+        try { await this.storage.set(cacheKey, stored); } catch (_) { }
+        writeCreativeSnapshot(snapshotContext, stored);
       }
       return data;
     } finally {
