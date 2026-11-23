@@ -40,8 +40,8 @@ export function creativeContent(data, baseUrl) {
     creative_contract: data.creative_contract, creative_version: data.creative_version, creative_preview: true };
 }
 
-function snapshotKey({ baseUrl = adsApiBase(), device_type = detectDeviceType(), language = detectLanguage() } = {}) {
-  return `${SNAPSHOT_PREFIX}${baseUrl}:${device_type}:${String(language).toLowerCase().startsWith('es') ? 'es' : 'en'}`;
+function snapshotKey({ baseUrl = adsApiBase(), device_type = detectDeviceType(), language = detectLanguage(), bookmark_key = '' } = {}) {
+  return `${SNAPSHOT_PREFIX}${baseUrl}:${device_type}:${String(language).toLowerCase().startsWith('es') ? 'es' : 'en'}${bookmark_key ? `:${bookmark_key}` : ''}`;
 }
 
 export function readCreativeSnapshot(context = {}) {

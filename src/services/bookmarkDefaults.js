@@ -1,5 +1,7 @@
+import { stableId } from './itemIds.js';
+
 export const DEFAULT_CATEGORIES = ['Personal', 'Travel', 'Web3'];
-export const DEFAULT_BOOKMARKS = {
+const LEGACY_DEFAULT_BOOKMARKS = {
   Personal: [
     { title: 'Support Midori', url: 'https://astian.org/community', domain: 'astian.org' },
     { title: 'Amazon', url: 'https://amzn.to/47IiNIO', domain: 'amazon.com' },
@@ -20,8 +22,28 @@ export const DEFAULT_BOOKMARKS = {
   ],
 };
 
-/** Default shortcuts with stable ids, so every New Tab agrees on them before anything is saved. */
+export const DEFAULT_BOOKMARKS = Object.fromEntries(DEFAULT_CATEGORIES.map(category => [category, []]));
+
 export function cloneDefaults() {
-  return Object.fromEntries(Object.entries(DEFAULT_BOOKMARKS).map(([category, items]) => [category,
-    items.map((item, index) => ({ ...item, id: `default-${category}-${index}`, rev: 1 }))]));
+  return Object.fromEntries(DEFAULT_CATEGORIES.map(category => [category, []]));
+}
+
+export function bookmarkCategories(saved = []) {
+  return [...new Set([...DEFAULT_CATEGORIES, ...(Array.isArray(saved) ? saved : [])
+    .filter(category => typeof category === 'string' && category.trim())])];
+}
+
+export function removeLegacyDefaults(items, category) {
+  return (Array.isArray(items) ? items : []).filter(item => {
+    if (!item || typeof item !== 'object') return false;
+    if (item.updatedAt || Number(item.rev || 1) > 1 || item.conflictOf) return true;
+    const legacy = Object.entries(LEGACY_DEFAULT_BOOKMARKS).flatMap(([name, list]) =>
+      list.map((bookmark, index) => ({ ...bookmark, id: `default-${name}-${index}`, category: name })));
+    return !legacy.some(bookmark => bookmark.title === item.title && bookmark.url === item.url
+      && (item.id === bookmark.id || ((!item.id || item.id === stableId('b', `${category}|${item.url}`, new Map())) && bookmark.category === category)));
+  });
+}
+
+export function migrateDefaultBookmarks(raw) {
+  return Object.fromEntries(Object.entries(raw || {}).map(([category, items]) => [category, removeLegacyDefaults(items, category)]));
 }

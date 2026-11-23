@@ -16,14 +16,15 @@
 
 <script>
 import { readBookmarkSnapshot } from '../bootstrap/bookmarkSnapshot.js';
-import { DEFAULT_BOOKMARKS, DEFAULT_CATEGORIES } from '../services/bookmarkDefaults.js';
+import { DEFAULT_CATEGORIES } from '../services/bookmarkDefaults.js';
+import { readCatalogSnapshot, catalogCategory, hiddenCatalogBookmarks } from '../services/adsBookmarkCatalog.js';
 import { speedDialLayoutStyles } from '../utils/startPageSettings.js';
 import '../styles/bookmark-layout.css';
 
 export default {
   props: { settings: { type: Object, required: true } },
   data() {
-    return { snapshot: readBookmarkSnapshot() };
+    return { snapshot: readBookmarkSnapshot(), catalog: readCatalogSnapshot(), hiddenAds: hiddenCatalogBookmarks() };
   },
   computed: {
     categories() { return this.snapshot?.categories || DEFAULT_CATEGORIES; },
@@ -31,10 +32,11 @@ export default {
       return speedDialLayoutStyles({ size: this.settings.speedDialSize, columns: this.settings.speedDialColumns });
     },
     count() {
-      const count = this.snapshot?.items.length ?? DEFAULT_BOOKMARKS[DEFAULT_CATEGORIES[0]].length;
-      return (this.settings.showSpeedDials ? Math.min(count, this.settings.speedDialLimit)
-        + Number(this.settings.showAddSpeedDialButton && count < this.settings.speedDialLimit) : 0)
-        + Number(this.settings.showAds);
+      const count = this.settings.showSpeedDials ? Math.min(this.snapshot?.items.length || 0, this.settings.speedDialLimit) : 0;
+      const ads = this.settings.showAds ? (this.catalog?.bookmarks || []).filter(bookmark => bookmark.default && !this.hiddenAds.includes(bookmark.key)
+        && (!this.settings.showSpeedDials || catalogCategory(bookmark, this.categories) === (this.snapshot?.activeTab || DEFAULT_CATEGORIES[0]))).length : 0;
+      return count + Math.min(ads, Math.max(0, this.settings.speedDialLimit - count))
+        + Number(this.settings.showSpeedDials && this.settings.showAddSpeedDialButton && count < this.settings.speedDialLimit);
     },
     containerStyle() { return this.layoutStyles.container; },
     gridStyle() { return this.layoutStyles.grid; },

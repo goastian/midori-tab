@@ -21,10 +21,10 @@ function getService() {
 
 const activeRequests = new WeakMap();
 
-const useAdsStore = defineStore('adsStore', {
+const createAdsStore = bookmarkKey => defineStore(`adsStore${bookmarkKey ? `:${bookmarkKey}` : ''}`, {
   state: () => ({
     currentAd: null,
-    cachedCreative: readCreativeSnapshot(),
+    cachedCreative: readCreativeSnapshot({ bookmark_key: bookmarkKey }),
     creativeCacheReady: false,
     pendingDismissId: null,
     currentExposureId: null,
@@ -48,7 +48,7 @@ const useAdsStore = defineStore('adsStore', {
   actions: {
     async restoreCreative() {
       if (this.creativeCacheReady) return;
-      const creative = await getService().cachedNewTabCreative({ device_type: detectDeviceType(), language: detectLanguage() });
+      const creative = await getService().cachedNewTabCreative({ device_type: detectDeviceType(), language: detectLanguage(), bookmark_key: bookmarkKey });
       this.cachedCreative = creative && !readDismissed().has(String(creative.ad_id)) ? creative : null;
       this.creativeCacheReady = true;
     },
@@ -70,6 +70,7 @@ const useAdsStore = defineStore('adsStore', {
         const service = getService();
         await this.restoreCreative();
         const result = await service.fetchNewTabAds({
+          bookmark_key: bookmarkKey,
           device_type: detectDeviceType(),
           language: detectLanguage(),
           signal: options.signal,
@@ -259,4 +260,11 @@ const useAdsStore = defineStore('adsStore', {
   },
 });
 
+const storeDefinitions = new Map();
+function useAdsStore(bookmarkKey = '') {
+  if (!storeDefinitions.has(bookmarkKey)) storeDefinitions.set(bookmarkKey, createAdsStore(bookmarkKey));
+  return storeDefinitions.get(bookmarkKey)();
+}
+
+export { getService as getAdsService };
 export default useAdsStore;

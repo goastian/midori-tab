@@ -9,6 +9,7 @@
  *   The UUID is generated locally; it is never derived from device attributes.
  */
 
+import { readCatalogSnapshot, writeCatalogSnapshot, normalizeCatalog } from './adsBookmarkCatalog.js';
 import { AD_CREATIVE_FIELDS, adsApiBase, creativeContent, readCreativeSnapshot, writeCreativeSnapshot, clearCreativeSnapshot } from './adCreativeSnapshot.js';
 
 const DEFAULT_TIMEOUT_MS = 6000;
@@ -253,11 +254,11 @@ export default class AdsService {
     return Boolean(this.baseUrl && this.fetchFn);
   }
 
-  async cachedNewTabCreative({ device_type = 'desktop', language = 'en' } = {}) {
-    const context = { baseUrl: this.baseUrl, device_type, language };
+  async cachedNewTabCreative({ device_type = 'desktop', language = 'en', bookmark_key = '' } = {}) {
+    const context = { baseUrl: this.baseUrl, device_type, language, bookmark_key };
     try {
       const visitorId = await this.#resolveVisitorId();
-      const stored = await this.storage.get(`${CREATIVE_CACHE_PREFIX}${this.baseUrl}:${visitorId}:${device_type}:${normalizeContractLanguage(language)}`);
+      const stored = await this.storage.get(`${CREATIVE_CACHE_PREFIX}${this.baseUrl}:${visitorId}:${device_type}:${normalizeContractLanguage(language)}${bookmark_key ? `:${bookmark_key}` : ''}`);
       const creative = creativeContent(stored, this.baseUrl);
       if (creative) writeCreativeSnapshot(context, creative);
       else clearCreativeSnapshot(context);
@@ -265,12 +266,46 @@ export default class AdsService {
     } catch (_) { return readCreativeSnapshot(context); }
   }
 
+  async fetchBookmarkCatalog({ device_type = 'desktop', language = 'en', signal } = {}) {
+    const context = { baseUrl: this.baseUrl, device_type, language };
+    const snapshot = readCatalogSnapshot(context);
+    const visitor = await this.#resolveVisitorId();
+    const cacheKey = `ads:catalog:newtab:v1:${this.baseUrl}:${visitor}:${device_type}:${normalizeContractLanguage(language)}`;
+    const stored = await this.storage.get(cacheKey).catch(() => null);
+    const cached = normalizeCatalog(stored, this.baseUrl) || snapshot;
+    const url = new URL(`${this.baseUrl}${this.path}/catalog`);
+    url.search = new URLSearchParams({ visitor_id: visitor, surface: 'new_tab', device_type, language: normalizeContractLanguage(language) });
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (signal?.aborted) abort();
+    else signal?.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(abort, this.timeout);
+    try {
+      const response = await this.fetchFn(url, { headers: { Accept: 'application/json', ...(cached?.etag ? { 'If-None-Match': cached.etag } : {}) },
+        credentials: 'omit', cache: 'no-cache', signal: controller.signal });
+      if (response.status === 304 && cached) {
+        writeCatalogSnapshot(context, cached);
+        return cached;
+      }
+      if (!response.ok) throw new Error(`Ads catalog request failed: ${response.status}`);
+      const catalog = normalizeCatalog({ ...await response.json(), etag: response.headers.get('etag') }, this.baseUrl);
+      if (!catalog) throw new Error('Invalid Ads bookmark catalog');
+      if (signal?.aborted) throw new DOMException('Ads catalog cancelled', 'AbortError');
+      writeCatalogSnapshot(context, catalog);
+      await this.storage.set(cacheKey, catalog).catch(() => undefined);
+      return catalog;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+    }
+  }
+
   /**
    * Fetch a New Tab ad. Returns { ad, source } where:
    *   - ad: object | null
    *   - source: 'fresh' | 'cached' | 'none' | 'error'
    */
-  async fetchNewTabAds({ device_type = 'desktop', country = '', language = 'en', signal } = {}) {
+  async fetchNewTabAds({ device_type = 'desktop', country = '', language = 'en', bookmark_key = '', signal } = {}) {
     await this.#removeLegacyDecisionCache({ country, language });
     const startedAt = Number(this.now());
 
@@ -279,7 +314,7 @@ export default class AdsService {
     }
 
     try {
-      const ad = await this.#requestAd({ device_type, country, language, signal });
+      const ad = await this.#requestAd({ device_type, country, language, bookmark_key, signal });
       const latencyMs = Math.max(0, Math.round(Number(this.now()) - startedAt));
       return ad
         ? { ad, source: ad.creative_unchanged ? 'cached' : 'fresh', latency_ms: latencyMs }
@@ -448,14 +483,15 @@ export default class AdsService {
     return false;
   }
 
-  async #requestAd({ device_type, country, language, signal }) {
+  async #requestAd({ device_type, country, language, bookmark_key, signal }) {
     const url = new URL(`${this.baseUrl}${this.path}`);
     if (device_type) url.searchParams.set('device_type', device_type);
     url.searchParams.set('surface', 'new_tab');
+    if (bookmark_key) url.searchParams.set('bookmark_key', bookmark_key);
     url.searchParams.set('language', normalizeContractLanguage(language));
     const visitorId = await this.#resolveVisitorId();
     url.searchParams.set('visitor_id', visitorId);
-    const cacheKey = `${CREATIVE_CACHE_PREFIX}${this.baseUrl}:${visitorId}:${device_type}:${normalizeContractLanguage(language)}`;
+    const cacheKey = `${CREATIVE_CACHE_PREFIX}${this.baseUrl}:${visitorId}:${device_type}:${normalizeContractLanguage(language)}${bookmark_key ? `:${bookmark_key}` : ''}`;
     let cached = null;
     try {
       const stored = await this.storage.get(cacheKey);
@@ -469,7 +505,7 @@ export default class AdsService {
     if (signal?.aborted) onAbort();
     else signal?.addEventListener('abort', onAbort, { once: true });
     const timeoutId = controller ? setTimeout(() => controller.abort(), this.timeout) : null;
-    const snapshotContext = { baseUrl: this.baseUrl, device_type, language };
+    const snapshotContext = { baseUrl: this.baseUrl, device_type, language, bookmark_key };
     const removeCache = async () => {
       clearCreativeSnapshot(snapshotContext);
       try { await this.storage.remove(cacheKey); } catch (_) { }
@@ -507,7 +543,7 @@ export default class AdsService {
       }
       const data = this.#normalizeContract(payload);
       if (signal?.aborted) throw new DOMException('Ads request cancelled', 'AbortError');
-      if (!this.#isValidContract(data)) { await removeCache(); return null; }
+      if (!this.#isValidContract(data) || (bookmark_key && data.bookmark_key !== bookmark_key)) { await removeCache(); return null; }
       if (data.creative_contract === 'ads-creative-v1' && /^[a-f0-9]{64}$/.test(data.creative_version || '')) {
         const creative = Object.fromEntries(AD_CREATIVE_FIELDS.filter(key => Object.hasOwn(data, key)).map(key => [key, data[key]]));
         const stored = { ...creative, creative_contract: data.creative_contract, creative_version: data.creative_version };
@@ -549,6 +585,11 @@ export default class AdsService {
   }
 
   async #resolveVisitorId() {
+    this.visitorPromise ||= this.#loadVisitorId().catch(error => { this.visitorPromise = null; throw error; });
+    return this.visitorPromise;
+  }
+
+  async #loadVisitorId() {
     let stored = null;
     try {
       stored = await this.storage.get(VISITOR_ID_KEY);

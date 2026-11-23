@@ -9,7 +9,7 @@
       >
         <button class="tab-btn" type="button" :disabled="!bookmarksReady" @click="activeTab = category">{{ category }}</button>
         <button
-          v-if="categories.length > 1 && showDeleteButton"
+          v-if="categories.length > 1 && showDeleteButton && !defaultCategories.includes(category)"
           :disabled="!bookmarksReady"
           class="tab-delete"
           type="button"
@@ -46,7 +46,7 @@
         `speed-dial-grid--title-${titleMode}`,
       ]"
       :style="gridStyle"
-      :aria-busy="showAds && !adRequestComplete"
+      :aria-busy="showAds && catalogLoading && !adCatalog"
     >
       <article
         v-for="(bookmark, index) in visibleBookmarks"
@@ -108,94 +108,87 @@
       </article>
 
       <article
-        v-if="showAds && (hasAd || (!adRequestComplete && adsStore?.creativeCacheReady))"
-        ref="sponsoredCard"
+        v-for="slot in visibleAds"
+        :key="slot.key"
+        :data-ads-bookmark="slot.key"
+        :ref="adRefFor(slot.key)"
         class="speed-dial-card sponsored-card"
         :class="{
-          'sponsored-card--pending': !hasAd,
-          'sponsored-card--disclosed': requiresDisclosure,
-          'sponsored-card--info-open': showTransparency,
+          'sponsored-card--disclosed': slot.disclosure,
+          'sponsored-card--info-open': infoKey === slot.key,
         }"
-        :role="requiresDisclosure ? 'complementary' : undefined"
-        :aria-label="sponsoredAriaLabel"
-        :aria-hidden="!hasAd"
+        :role="slot.disclosure ? 'complementary' : undefined"
+        :aria-label="slot.disclosure ? `${i18n.$t('ads.label')}: ${slot.ad.title}` : slot.ad.title"
       >
-        <template v-if="hasAd">
-          <div v-if="showDeleteButton && ad.bookmark_url" class="card-actions sponsored-edit">
-            <button type="button" class="card-action-btn" :aria-label="`${i18n.$t('bookmarks.edit')}: ${ad.title}`"
-              :title="i18n.$t('bookmarks.edit')" @click.prevent.stop="openSponsoredEditor">
-              <DashboardIcon name="edit" :size="13" :stroke-width="1.8" aria-hidden="true" />
-            </button>
-          </div>
-          <button
-            v-if="requiresDisclosure"
-            type="button"
-            ref="sponsoredInfo"
-            class="sponsored-info"
-            :aria-label="i18n.$t('ads.whyTitle')"
-            :aria-expanded="showTransparency"
-            :aria-controls="showTransparency ? 'sponsored-privacy-notice' : undefined"
-            :aria-describedby="showTransparency ? 'sponsored-privacy-notice' : undefined"
-            @click.prevent.stop="showTransparency = !showTransparency"
-          >
-            <DashboardIcon name="help" :size="15" :stroke-width="1.7" aria-hidden="true" />
+        <div v-if="showDeleteButton && slot.ad.bookmark_url" class="card-actions sponsored-edit">
+          <button type="button" class="card-action-btn" :aria-label="`${i18n.$t('bookmarks.edit')}: ${slot.ad.title}`"
+            :title="i18n.$t('bookmarks.edit')" @click.prevent.stop="openSponsoredEditor(slot)">
+            <DashboardIcon name="edit" :size="13" :stroke-width="1.8" aria-hidden="true" />
           </button>
-          <button
-            v-if="showDeleteButton"
-            type="button"
-            class="house-dismiss"
-            :class="{ 'paid-dismiss': requiresDisclosure }"
-            :title="i18n.$t(requiresDisclosure ? 'ads.dismiss' : 'bookmarks.removeShortcut')"
-            :aria-label="i18n.$t(requiresDisclosure ? 'ads.dismiss' : 'bookmarks.removeShortcut')"
-            @click.prevent.stop="dismissSponsored"
-          >
-            <DashboardIcon name="close" :size="12" :stroke-width="2" aria-hidden="true" />
-          </button>
-
-          <a
-            :href="ad.destination_url || undefined"
-            :tabindex="ad.destination_url ? undefined : 0"
-            role="link"
-            @keydown.enter.prevent="openSponsored"
-            class="speed-dial-link sponsored-link"
-            target="_blank"
-            :rel="sponsoredRel"
-            @click.prevent="openSponsored"
-          >
-            <span
-              class="speed-dial-icon sponsored-icon"
-              :class="{ 'sponsored-icon--fallback': iconFailed }"
-              aria-hidden="true"
-            >
-              <img
-                v-if="!iconFailed"
-                :src="adIconUrl"
-                alt=""
-                loading="lazy"
-                decoding="async"
-                referrerpolicy="no-referrer"
-                @error="iconFailed = true"
-              />
-              <span v-else>{{ sponsoredInitial }}</span>
-            </span>
-            <span class="speed-dial-title" :title="ad.title">{{ ad.title }}</span>
-          </a>
-
-          <SponsoredTransparency
-            v-if="requiresDisclosure && showTransparency"
-            id="sponsored-privacy-notice"
-            :anchor="$refs.sponsoredInfo"
-            @close="showTransparency = false"
-          />
-        </template>
-
-        <div v-else class="sponsored-skeleton" aria-hidden="true">
-          <span></span>
-          <span></span>
         </div>
+        <button
+          v-if="slot.disclosure"
+          type="button"
+          :ref="infoRefFor(slot.key)"
+          class="sponsored-info"
+          :aria-label="i18n.$t('ads.whyTitle')"
+          :aria-expanded="infoKey === slot.key"
+          :aria-controls="infoKey === slot.key ? `sponsored-privacy-${slot.key}` : undefined"
+          :aria-describedby="infoKey === slot.key ? `sponsored-privacy-${slot.key}` : undefined"
+          @click.prevent.stop="infoKey = infoKey === slot.key ? '' : slot.key"
+        >
+          <DashboardIcon name="help" :size="15" :stroke-width="1.7" aria-hidden="true" />
+        </button>
+        <button
+          v-if="showDeleteButton"
+          type="button"
+          class="house-dismiss"
+          :class="{ 'paid-dismiss': slot.disclosure }"
+          :title="i18n.$t(slot.disclosure ? 'ads.dismiss' : 'bookmarks.removeShortcut')"
+          :aria-label="i18n.$t(slot.disclosure ? 'ads.dismiss' : 'bookmarks.removeShortcut')"
+          @click.prevent.stop="dismissSponsored(slot)"
+        >
+          <DashboardIcon name="close" :size="12" :stroke-width="2" aria-hidden="true" />
+        </button>
+
+        <a
+          :href="slot.ad.destination_url || undefined"
+          :tabindex="slot.ad.destination_url ? undefined : 0"
+          role="link"
+          @keydown.enter.prevent="openSponsored(slot, $event)"
+          class="speed-dial-link sponsored-link"
+          target="_blank"
+          :rel="slot.disclosure ? 'noopener noreferrer nofollow sponsored' : 'noopener noreferrer'"
+          @click.prevent="openSponsored(slot, $event)"
+        >
+          <span
+            class="speed-dial-icon sponsored-icon"
+            :class="{ 'sponsored-icon--fallback': failedAdIcons[slot.key] }"
+            aria-hidden="true"
+          >
+            <img
+              v-if="!failedAdIcons[slot.key]"
+              :src="slot.ad.icon_url || slot.ad.image_url"
+              alt=""
+              loading="eager"
+              decoding="async"
+              referrerpolicy="no-referrer"
+              @error="failedAdIcons[slot.key] = true"
+            />
+            <span v-else>{{ bookmarkInitial(slot.ad) }}</span>
+          </span>
+          <span class="speed-dial-title" :title="slot.ad.title">{{ slot.ad.title }}</span>
+        </a>
+
+        <SponsoredTransparency
+          v-if="slot.disclosure && infoKey === slot.key"
+          :id="`sponsored-privacy-${slot.key}`"
+          :anchor="infoElements[slot.key]"
+          @close="infoKey = ''"
+        />
+
       </article>
 
-      <div v-else-if="showAds && reserveAdSlot" class="sponsored-empty-slot" aria-hidden="true"></div>
 
       <article
         v-if="showSpeedDials && showAddButton && currentBookmarks.length < speedDialLimit"
@@ -222,8 +215,9 @@
 </template>
 
 <script>
-import { defineAsyncComponent } from 'vue';
-import { readCreativeSnapshot } from '../services/adCreativeSnapshot.js';
+import { defineAsyncComponent, markRaw } from 'vue';
+import { readCreativeSnapshot, detectDeviceType, detectLanguage } from '../services/adCreativeSnapshot.js';
+import { readCatalogSnapshot, catalogCategory, hiddenCatalogBookmarks, hideCatalogBookmark } from '../services/adsBookmarkCatalog.js';
 import useI18nStore from '../stores/useI18nStore.js';
 import { flushDebounced, getJson, setJsonDebounced } from '../services/StorageService.js';
 import { cancelRemoteTask, scheduleRemoteTask } from '../bootstrap/remoteTaskCoordinator.js';
@@ -231,12 +225,11 @@ import faviconService from '../services/FaviconService.js';
 import { faviconDisplayUrl, readFaviconSnapshot, writeFaviconSnapshot } from '../services/faviconSnapshot.js';
 import { readBookmarkSnapshot, writeBookmarkSnapshot } from '../bootstrap/bookmarkSnapshot.js';
 import {
-  getSpeedDialMetrics,
   requiresPaidDisclosure,
   speedDialLayoutStyles,
 } from '../utils/startPageSettings.js';
 import DashboardIcon from './icons/DashboardIcon.vue';
-import { DEFAULT_CATEGORIES, cloneDefaults } from '../services/bookmarkDefaults.js';
+import { DEFAULT_CATEGORIES, cloneDefaults, bookmarkCategories, migrateDefaultBookmarks } from '../services/bookmarkDefaults.js';
 import '../styles/bookmark-layout.css';
 
 const STORAGE_KEY = 'midori_bookmarks';
@@ -278,8 +271,18 @@ export default {
     const favicons = readFaviconSnapshot();
     return {
       i18n: useI18nStore(),
-      adsStore: null,
+      defaultCategories: DEFAULT_CATEGORIES,
+      adCatalog: readCatalogSnapshot(),
+      catalogLoading: false,
+      catalogRequested: false,
+      adSessions: {},
+      adElements: {},
+      infoElements: {},
+      hiddenAds: hiddenCatalogBookmarks(),
+      infoKey: '',
+      failedAdIcons: {},
       adRuntime: null,
+      adsService: null,
       adRuntimeLoading: false,
       bookmarks: snapshot ? { [snapshot.activeTab]: snapshot.items } : cloneDefaults(),
       bookmarksReady: false,
@@ -302,22 +305,6 @@ export default {
       pendingBookmarkDelete: '',
       undo: null,
       pendingCategoryDelete: '',
-      cachedCreative: readCreativeSnapshot(),
-      adRequested: false,
-      adRequestComplete: false,
-      reserveAdSlot: true,
-      adObserver: null,
-      adViewability: null,
-      adExposure: null,
-      clickGuard: null,
-      iconFailed: false,
-      showTransparency: false,
-      feedbackPending: false,
-      feedbackState: '',
-      performanceObserver: null,
-      layoutShift: 0,
-      performanceReportTimer: null,
-      performanceReported: false,
     };
   },
   computed: {
@@ -336,27 +323,17 @@ export default {
     gridStyle() {
       return this.layoutStyles.grid;
     },
-    hasAd() { return Boolean(this.ad.ad_id); },
-    ad() { return (this.adsStore ? this.adsStore.displayAd : this.cachedCreative) || {}; },
-    requiresDisclosure() {
-      return this.ad.creative_preview ? this.ad.disclosure_required === true : requiresPaidDisclosure(this.ad);
-    },
-    adIconUrl() {
-      return this.ad.icon_url || this.ad.image_url || '';
-    },
-    sponsoredInitial() {
-      return String(this.ad.title || 'A').trim().charAt(0).toUpperCase() || 'A';
-    },
-    sponsoredAriaLabel() {
-      if (!this.hasAd) return undefined;
-      if (!this.requiresDisclosure) return this.ad.title || undefined;
-      const label = this.i18n.$t('ads.label') || 'Sponsored content';
-      return this.ad.title ? `${label}: ${this.ad.title}` : label;
-    },
-    sponsoredRel() {
-      return this.requiresDisclosure
-        ? 'noopener noreferrer nofollow sponsored'
-        : 'noopener noreferrer';
+    visibleAds() {
+      if (!this.showAds) return [];
+      const available = Math.max(0, this.speedDialLimit - this.visibleBookmarks.length);
+      return (this.adCatalog?.bookmarks || []).filter(bookmark => bookmark.default && !this.hiddenAds.includes(bookmark.key)
+        && (!this.showSpeedDials || catalogCategory(bookmark, this.categories) === this.activeTab)
+        && !['none', 'dismissed'].includes(this.adSessions[bookmark.key]?.store.source)).slice(0, available).map(bookmark => {
+          const session = this.adSessions[bookmark.key];
+          const ad = session?.store.displayAd || readCreativeSnapshot({ bookmark_key: bookmark.key }) || {
+            title: bookmark.title, icon_url: bookmark.icon_url, bookmark_url: bookmark.url, disclosure_required: true, creative_preview: true };
+          return { key: bookmark.key, bookmark, ad, disclosure: ad.creative_preview ? ad.disclosure_required === true : requiresPaidDisclosure(ad) };
+        });
     },
   },
   watch: {
@@ -364,37 +341,19 @@ export default {
     activeTab() {
       if (this.bookmarksReady && !this.bookmarkSavePending) writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
     },
-    showTransparency() { this.handleAdPageVisibility(); },
+    infoKey() { this.handleAdPageVisibility(); },
+    visibleAds() { this.$nextTick(() => this.syncAdSessions()); },
     showAds(enabled) {
       if (!enabled) {
-        cancelRemoteTask('ads-decision');
-        this.teardownAdObserver();
-        this.teardownPerformanceObserver();
-        return;
-      }
-      this.reserveAdSlot = true;
-      if (!this.hasAd) {
-        this.adRequested = false;
-        this.adRequestComplete = false;
-      }
-      void this.ensureAdRuntime();
-    },
-    'adsStore.currentAd'(ad) {
-      this.iconFailed = false;
-      this.showTransparency = false;
-      this.feedbackState = '';
-      if (this.adsStore?.source !== 'cached') this.clickGuard?.reset();
-      if (this.showAds && ad) {
-        this.$nextTick(() => {
-          this.setupAdObserver();
-          this.schedulePerformanceReport();
-        });
-      } else {
-        this.teardownAdObserver();
-      }
+        cancelRemoteTask('ads-catalog');
+        this.disposeAdSessions();
+        this.catalogRequested = false;
+      } else void this.ensureAdRuntime();
     },
   },
   created() {
+    this.adRefCallbacks = new Map();
+    this.infoRefCallbacks = new Map();
     this.syncedAt = 0;
     this.bookmarksUnsaved = false;
   },
@@ -431,16 +390,14 @@ export default {
     for (const key of this.faviconTaskKeys) cancelRemoteTask(key);
     this.faviconTaskKeys.clear();
     for (const url of Object.values(this.faviconUrls)) URL.revokeObjectURL(url);
-    cancelRemoteTask('ads-decision');
+    cancelRemoteTask('ads-catalog');
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.handleAdPageVisibility);
       window.removeEventListener('focus', this.handleAdPageVisibility);
       window.removeEventListener('blur', this.handleAdPageVisibility);
       window.removeEventListener('pagehide', this.handleAdPageHide);
     }
-    this.reportPerformance();
-    this.teardownAdObserver();
-    this.teardownPerformanceObserver();
+    this.disposeAdSessions();
     void this.flushBookmarks().catch(() => undefined);
     clearTimeout(this.remoteSyncTimer);
     window.removeEventListener('storage', this.storageListener);
@@ -539,13 +496,13 @@ export default {
       if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('invalid protocol');
       return parsed;
     },
-    async openSponsoredEditor() {
+    async openSponsoredEditor(slot) {
       if (!this.bookmarksReady) return;
       await this.ensureAdRuntime(true);
-      await this.adsStore?.loadAd();
-      const ad = this.adsStore?.currentAd;
-      if (!ad?.bookmark_url) return;
-      this.sponsoredEdit = { ad, bookmark: { title: ad.title, url: new URL(ad.bookmark_url).toString() } };
+      const session = this.adSessions[slot.key];
+      const ad = await session?.decision();
+      if (!ad) return;
+      this.sponsoredEdit = { ad, key: slot.key, bookmark: { title: ad.title, url: new URL(ad.bookmark_url || slot.bookmark.url).toString() } };
       this.editingId = '';
       this.editorMode = 'bookmark';
     },
@@ -580,9 +537,10 @@ export default {
       }
       this.saveBookmarksDebounced();
       if (this.sponsoredEdit) {
-        this.adExposure?.finish('changed');
-        this.adsStore.convertBookmark(this.sponsoredEdit.ad);
-        this.reserveAdSlot = false;
+        const session = this.adSessions[this.sponsoredEdit.key];
+        session?.finish('changed');
+        session?.store.convertBookmark(this.sponsoredEdit.ad);
+        this.hiddenAds = hideCatalogBookmark(this.sponsoredEdit.key);
       }
       this.closeEditor();
     },
@@ -598,7 +556,7 @@ export default {
     confirmDeleteCategory() {
       if (!this.bookmarksReady) return;
       const category = this.pendingCategoryDelete;
-      if (!category || this.categories.length <= 1) return;
+      if (!category || DEFAULT_CATEGORIES.includes(category) || this.categories.length <= 1) return;
       const index = this.categories.indexOf(category);
       const items = this.bookmarks[category] || [];
       this.categories = this.categories.filter(item => item !== category);
@@ -623,23 +581,22 @@ export default {
       ]);
       const stored = savedBookmarks && typeof savedBookmarks === 'object' && !Array.isArray(savedBookmarks);
       const needsIds = stored && Object.values(savedBookmarks).some(list => Array.isArray(list) && list.some(item => !item?.id));
-      // Only shortcuts saved before ids existed need the upgrade code; the result is saved once.
-      this.bookmarks = needsIds ? (await import('../services/bookmarkData.js')).normalizeBookmarks(savedBookmarks)
-        : (stored ? savedBookmarks : cloneDefaults());
-      this.categories = Array.isArray(savedCategories) && savedCategories.length
-        ? savedCategories.filter(category => typeof category === 'string' && category.trim()) : [...DEFAULT_CATEGORIES];
-      if (!this.categories.length) this.categories = [...DEFAULT_CATEGORIES];
+      const migrated = stored ? migrateDefaultBookmarks(savedBookmarks) : cloneDefaults();
+      const removedDefaults = stored && JSON.stringify(migrated) !== JSON.stringify(savedBookmarks);
+      this.bookmarks = needsIds ? (await import('../services/bookmarkData.js')).normalizeBookmarks(migrated) : migrated;
+      this.categories = bookmarkCategories(savedCategories);
       this.activeTab = this.categories.includes(this.activeTab) ? this.activeTab : this.categories[0];
       this.syncedState = this.bookmarkState();
       this.syncedAt = mirrorAt();
       this.bookmarksReady = true;
       this.storageListener = event => {
         if (event.key === STORAGE_KEY || event.key === CATEGORIES_KEY) this.requestRemoteSync();
+        if (event.key?.startsWith('ads:bookmarks:hidden:v1:')) this.hiddenAds = hiddenCatalogBookmarks();
       };
       window.addEventListener('storage', this.storageListener);
       writeBookmarkSnapshot(this.categories, this.activeTab, this.currentBookmarks);
       // Ids must reach storage or each tab would invent its own.
-      if (needsIds) this.saveBookmarksDebounced();
+      if (needsIds || removedDefaults || JSON.stringify(this.categories) !== JSON.stringify(savedCategories)) this.saveBookmarksDebounced();
     },
     requestRemoteSync() {
       void import('../services/bookmarkSync.js').then(sync => sync.requestSync(this, mirrorAt));
@@ -677,185 +634,84 @@ export default {
       this.adRuntimeLoading = true;
       try {
         if (!this.adRuntime) {
-          const runtime = await import('../services/bookmarkAdsRuntime.js');
-          if (this.faviconsDisposed) return;
-          this.adRuntime = runtime;
-          this.clickGuard = runtime.createAdInteractionGuard();
-          this.adsStore = runtime.useAdsStore();
+          this.adRuntime = await import('../services/BookmarkAdSession.js');
+          this.adsService = markRaw((await import('../stores/useAdsStore.js')).getAdsService());
         }
-        await this.adsStore.restoreCreative();
-        await this.$nextTick();
-        if (!this.showAds || this.faviconsDisposed) return;
-        this.setupPerformanceObserver();
-        this.setupAdObserver();
-      } catch (error) {
-        this.adRequestComplete = true;
-        console.warn('[Midori] Could not load sponsored shortcuts', error);
-      } finally { this.adRuntimeLoading = false; }
-    },
-    setupAdObserver() {
-      this.teardownAdObserver();
-      if (!this.showAds || !this.adRuntime || !this.adsStore) return;
-      const { AD_VIEWABILITY_THRESHOLD, createAdViewabilityTracker, createAdExposureTracker } = this.adRuntime;
-      const element = this.$refs.sponsoredCard;
-      if (!element) return;
-
-      if (this.adsStore.hasAd) {
-        const measuredAd = this.adsStore.currentAd;
-        this.adExposure = createAdExposureTracker({ ad: measuredAd,
-          onStart: id => { this.adsStore.currentExposureId = id; },
-          onFinish: event => {
-            if (this.adsStore.currentExposureId === event.event_id) this.adsStore.currentExposureId = null;
-            void this.adsStore.trackExposure(measuredAd, event);
-          },
-        });
-        this.adViewability = createAdViewabilityTracker({
-          onViewable: async () => {
-            if (!this.showAds || !this.adsStore.hasAd || this.adsStore.impressionTracked) return;
-            const trackedAd = this.adsStore.currentAd;
-            const accepted = await this.adsStore.trackImpression();
-            if (accepted && this.adsStore.currentAd?.decision_id === trackedAd?.decision_id) {
-              this.$emit('sponsored-impression', trackedAd);
-            }
-          },
-        });
-        this.handleAdPageVisibility();
-      }
-
-      if (typeof IntersectionObserver === 'undefined') {
-        if (!this.adsStore.hasAd) void this.loadAdWhenVisible();
-        return;
-      }
-
-      this.adObserver = new IntersectionObserver((entries) => {
-        const entry = entries[0];
-        if (!entry) return;
-        const isVisible = entry.isIntersecting && entry.intersectionRatio >= AD_VIEWABILITY_THRESHOLD;
-        if (!this.adsStore.hasAd) {
-          if (isVisible) void this.loadAdWhenVisible();
-          return;
+        this.syncAdSessions();
+        if (!this.catalogRequested) {
+          this.catalogRequested = true;
+          this.catalogLoading = true;
+          const completed = await scheduleRemoteTask('ads-catalog', async signal => {
+            const catalog = await this.adsService.fetchBookmarkCatalog({ device_type: detectDeviceType(), language: detectLanguage(), signal });
+            if (signal.aborted || this.faviconsDisposed) return false;
+            this.adCatalog = catalog;
+            return true;
+          }, { priority: 2 });
+          if (!completed) this.catalogRequested = false;
         }
-        this.adViewability?.update(entry);
-        this.adExposure?.update(entry);
-      }, { threshold: [0, AD_VIEWABILITY_THRESHOLD, 1] });
-      this.adObserver.observe(element);
+      } finally {
+        this.catalogLoading = false;
+        this.adRuntimeLoading = false;
+        if (!this.faviconsDisposed) this.$nextTick(() => this.syncAdSessions());
+      }
     },
-    teardownAdObserver() {
-      this.adExposure?.dispose();
-      this.adExposure = null;
-      if (this.adObserver) {
-        try { this.adObserver.disconnect(); } catch (_) { /* noop */ }
-        this.adObserver = null;
+    adRefFor(key) {
+      if (!this.adRefCallbacks.has(key)) this.adRefCallbacks.set(key, element => this.bindAdElement(key, element));
+      return this.adRefCallbacks.get(key);
+    },
+    infoRefFor(key) {
+      if (!this.infoRefCallbacks.has(key)) this.infoRefCallbacks.set(key, element => {
+        if (element) this.infoElements[key] = element;
+        else delete this.infoElements[key];
+      });
+      return this.infoRefCallbacks.get(key);
+    },
+    bindAdElement(key, element) {
+      if (element) this.adElements[key] = element;
+      else delete this.adElements[key];
+      this.adSessions[key]?.bind(element);
+    },
+    syncAdSessions() {
+      if (!this.adRuntime || this.faviconsDisposed || !this.showAds) return;
+      const keys = new Set(this.visibleAds.map(slot => slot.key));
+      for (const [key, session] of Object.entries(this.adSessions)) if (!keys.has(key)) session.bind(null);
+      for (const slot of this.visibleAds) {
+        if (!this.adSessions[slot.key]) this.adSessions[slot.key] = this.adRuntime.createBookmarkAdSession(slot.key, {
+          isInfoOpen: () => this.infoKey === slot.key,
+          onImpression: ad => this.$emit('sponsored-impression', ad),
+          onClick: ad => this.$emit('sponsored-click', ad),
+          onBlocked: ad => this.$emit('accidental-click-blocked', ad),
+        });
+        this.adSessions[slot.key].bind(this.adElements[slot.key] || null);
       }
-      if (this.adViewability) {
-        this.adViewability.dispose();
-        this.adViewability = null;
-      }
+    },
+    disposeAdSessions() {
+      for (const session of Object.values(this.adSessions)) session.dispose();
+      this.adSessions = {};
     },
     handleAdPageHide() {
-      this.adExposure?.finish('navigation');
+      for (const session of Object.values(this.adSessions)) session.finish('navigation');
     },
     handleAdPageVisibility() {
       if (document.visibilityState === 'visible') {
         this.failedFavicons = {};
         void this.primeFavicons();
-        if (!this.adsStore?.hasAd) void this.ensureAdRuntime();
+        void this.ensureAdRuntime();
       }
-      const visible = document.visibilityState === 'visible' && document.hasFocus() && !this.showTransparency;
-      this.adViewability?.setPageVisible(visible);
-      this.adExposure?.setPageVisible(visible);
+      for (const session of Object.values(this.adSessions)) session.visibility();
     },
-    async loadAdWhenVisible() {
-      if (!this.showAds || !this.adsStore || this.adRequested || this.adsStore.hasAd) return;
-      this.adRequested = true;
-      const completed = await scheduleRemoteTask('ads-decision', signal => this.adsStore.loadAd(false, { signal }), { priority: 1 });
-      if (!completed) this.adRequested = false;
-      if (!this.$el?.isConnected) return;
-      // A decision interrupted by hiding the tab stays pending and is asked again on return;
-      // closing the slot here would drop the sponsored shortcut for the rest of the page.
-      if (!completed) return;
-      this.adRequestComplete = true;
-      if (!this.adsStore.hasAd) {
-        this.teardownAdObserver();
-        this.teardownPerformanceObserver();
-      }
-    },
-    dismissSponsored() {
-      this.reserveAdSlot = false;
-      this.adExposure?.finish('removed');
-      void this.adsStore?.dismiss();
-      this.showTransparency = false;
-    },
-    async submitFeedback(relevant) {
-      if (!this.adsStore || !this.requiresDisclosure || this.feedbackPending || this.feedbackState === 'sent') return;
-      this.feedbackPending = true;
-      const accepted = await this.adsStore.submitFeedback(relevant);
-      this.feedbackPending = false;
-      this.feedbackState = accepted ? 'sent' : 'error';
-      if (accepted) this.$emit('sponsored-feedback', { ad: this.ad, relevant });
-    },
-    async openSponsored(event) {
+    async dismissSponsored(slot) {
       await this.ensureAdRuntime(true);
-      if (!this.adsStore || !this.clickGuard) return;
-      const intent = this.clickGuard.evaluate({ keyboard: event?.detail === 0 });
-      if (!intent.allowed) {
-        void this.adsStore.trackClientEvent('accidental_click_guard', {
-          interaction_latency_ms: intent.interactionLatencyMs,
-        });
-        this.$emit('accidental-click-blocked', this.ad);
-        return;
-      }
-      await this.adsStore.loadAd();
-      const clickedAd = this.adsStore.currentAd;
-      if (clickedAd && this.adsStore.trackClick(intent.interactionLatencyMs)) {
-        this.adExposure?.finish('navigation');
-        this.$emit('sponsored-click', clickedAd);
-      }
+      const session = this.adSessions[slot.key];
+      await session?.decision();
+      session?.finish('removed');
+      session?.store.dismiss();
+      this.hiddenAds = hideCatalogBookmark(slot.key);
+      this.infoKey = '';
     },
-    setupPerformanceObserver() {
-      if (!this.showAds || !this.adRuntime || this.performanceObserver || typeof PerformanceObserver === 'undefined') return;
-      try {
-        this.performanceObserver = new PerformanceObserver((list) => {
-          const root = this.$refs.sponsoredCard;
-          for (const entry of list.getEntries()) {
-            if (entry.hadRecentInput || !root) continue;
-            const affectsSlot = !Array.isArray(entry.sources)
-              || entry.sources.length === 0
-              || entry.sources.some(source => (
-                source.node === root || (source.node && root.contains(source.node))
-              ));
-            if (affectsSlot) this.layoutShift += Number(entry.value || 0);
-          }
-        });
-        this.performanceObserver.observe({ type: 'layout-shift', buffered: true });
-      } catch (_) {
-        this.performanceObserver = null;
-      }
-    },
-    schedulePerformanceReport() {
-      if (this.performanceReported || this.performanceReportTimer) return;
-      this.performanceReportTimer = setTimeout(() => {
-        this.performanceReportTimer = null;
-        this.reportPerformance();
-      }, 2000);
-    },
-    reportPerformance() {
-      if (this.performanceReported || !this.hasAd) return;
-      this.performanceReported = true;
-      void this.adsStore.trackClientEvent('client_performance', {
-        request_latency_ms: Math.max(0, Math.round(this.adsStore.requestLatencyMs || 0)),
-        layout_shift_micros: Math.max(0, Math.round(this.layoutShift * 1_000_000)),
-      });
-    },
-    teardownPerformanceObserver() {
-      if (this.performanceReportTimer) {
-        clearTimeout(this.performanceReportTimer);
-        this.performanceReportTimer = null;
-      }
-      if (this.performanceObserver) {
-        try { this.performanceObserver.disconnect(); } catch (_) { /* noop */ }
-        this.performanceObserver = null;
-      }
+    async openSponsored(slot, event) {
+      await this.ensureAdRuntime(true);
+      await this.adSessions[slot.key]?.open(event);
     },
   },
 };

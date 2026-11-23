@@ -1,6 +1,7 @@
 import { getJson } from './StorageService.js';
 import { mergeById } from './listMerge.js';
 import { normalizeBookmarks } from './bookmarkData.js';
+import { bookmarkCategories } from './bookmarkDefaults.js';
 import { writeBookmarkSnapshot } from '../bootstrap/bookmarkSnapshot.js';
 
 /**
@@ -63,7 +64,7 @@ async function run(grid, mirrorAt) {
 async function syncBookmarks(grid, mirrorAt) {
   const [rawBookmarks, rawCategories] = await Promise.all([getJson(STORAGE_KEY, null), getJson(CATEGORIES_KEY, null)]);
   if (grid.faviconsDisposed || !rawBookmarks || !Array.isArray(rawCategories)) return false;
-  const remote = { bookmarks: normalizeBookmarks(rawBookmarks), categories: rawCategories.filter(name => typeof name === 'string' && name.trim()) };
+  const remote = { bookmarks: normalizeBookmarks(rawBookmarks), categories: bookmarkCategories(rawCategories) };
   const local = grid.bookmarkState();
   const { state } = mergeBookmarkState(grid.syncedState, local, remote);
   if (!state.categories.length) return false;
