@@ -140,6 +140,21 @@ const useAdsStore = defineStore('adsStore', {
       this.impressionTracking = false;
     },
 
+    convertBookmark(ad) {
+      if (!ad?.ad_id || !ad.impression_token) return;
+      void getService().trackBookmarkAction(ad, 'bookmark_changed');
+      const dismissed = readDismissed();
+      dismissed.add(String(ad.ad_id));
+      writeDismissed(dismissed);
+      if (String(this.displayAd?.ad_id) === String(ad.ad_id)) {
+        this.currentAd = null;
+        this.cachedCreative = null;
+        this.source = 'dismissed';
+        this.impressionTracked = false;
+        this.impressionTracking = false;
+      }
+    },
+
     async recordOptOut() {
       if (!this.currentAd) return false;
       return this.trackClientEvent('ad_opt_out');

@@ -403,6 +403,27 @@ export default class AdsService {
     }
   }
 
+  async trackBookmarkAction(ad, eventType) {
+    if (!this.isConfigured() || !ad?.impression_token || !['bookmark_changed', 'bookmark_removed'].includes(eventType)) return false;
+    const body = { event_id: this.eventIdFactory(), event_type: eventType, impression_token: ad.impression_token, surface: 'new_tab' };
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), this.timeout);
+      try {
+        const response = await this.fetchFn(`${this.baseUrl}/api/v1/ads/interaction`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          credentials: 'omit', keepalive: true, signal: controller.signal, body: JSON.stringify(body),
+        });
+        try { await response.body?.cancel?.(); } catch (_) { }
+        if (response.ok) return true;
+        if (!isRetryableImpressionStatus(response.status)) return false;
+      } catch (_) { }
+      finally { clearTimeout(timer); }
+      if (attempt === 0) await this.sleep(500);
+    }
+    return false;
+  }
+
   async trackExposure(ad, event) {
     if (!this.isConfigured() || !ad?.impression_token || !UUID_PATTERN.test(event?.event_id || '')) return false;
     const body = { impression_token: ad.impression_token, event_id: event.event_id,

@@ -121,6 +121,12 @@
         :aria-hidden="!hasAd"
       >
         <template v-if="hasAd">
+          <div v-if="showDeleteButton && ad.bookmark_url" class="card-actions sponsored-edit">
+            <button type="button" class="card-action-btn" :aria-label="`${i18n.$t('bookmarks.edit')}: ${ad.title}`"
+              :title="i18n.$t('bookmarks.edit')" @click.prevent.stop="openSponsoredEditor">
+              <DashboardIcon name="edit" :size="13" :stroke-width="1.8" aria-hidden="true" />
+            </button>
+          </div>
           <button
             v-if="requiresDisclosure"
             type="button"
@@ -205,7 +211,7 @@
     <BookmarkEditor
       v-if="editorMode"
       :mode="editorMode"
-      :bookmark="currentBookmarks.find(bookmark => bookmark.id === editingId) || null"
+      :bookmark="sponsoredEdit?.bookmark || currentBookmarks.find(bookmark => bookmark.id === editingId) || null"
       :categories="categories"
       :normalize-url="normalizeBookmarkUrl"
       @close="closeEditor"
@@ -290,6 +296,7 @@ export default {
       faviconCacheLoading: false,
       faviconsDisposed: false,
       faviconTaskKeys: new Set(),
+      sponsoredEdit: null,
       editorMode: '',
       editingId: '',
       pendingBookmarkDelete: '',
@@ -532,6 +539,16 @@ export default {
       if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('invalid protocol');
       return parsed;
     },
+    async openSponsoredEditor() {
+      if (!this.bookmarksReady) return;
+      await this.ensureAdRuntime(true);
+      await this.adsStore?.loadAd();
+      const ad = this.adsStore?.currentAd;
+      if (!ad?.bookmark_url) return;
+      this.sponsoredEdit = { ad, bookmark: { title: ad.title, url: new URL(ad.bookmark_url).toString() } };
+      this.editingId = '';
+      this.editorMode = 'bookmark';
+    },
     openBookmarkEditor(id = '') {
       if (!this.bookmarksReady) return;
       this.editingId = id;
@@ -543,11 +560,13 @@ export default {
       this.editorMode = 'category';
     },
     closeEditor() {
+      this.sponsoredEdit = null;
       this.editorMode = '';
       this.editingId = '';
     },
     saveEditor(value) {
       if (!this.bookmarksReady) return;
+      if (this.sponsoredEdit && value.title === this.sponsoredEdit.bookmark.title && value.url === this.sponsoredEdit.bookmark.url) { this.closeEditor(); return; }
       if (this.editorMode === 'category') {
         this.categories.push(value);
         this.bookmarks[value] = [];
@@ -560,6 +579,11 @@ export default {
         else list.push({ id: crypto.randomUUID(), rev: 1, updatedAt: Date.now(), ...value });
       }
       this.saveBookmarksDebounced();
+      if (this.sponsoredEdit) {
+        this.adExposure?.finish('changed');
+        this.adsStore.convertBookmark(this.sponsoredEdit.ad);
+        this.reserveAdSlot = false;
+      }
       this.closeEditor();
     },
     confirmDeleteBookmark(id) {
@@ -1105,6 +1129,8 @@ export default {
   opacity: 1;
   visibility: visible;
 }
+
+.sponsored-edit { top: 34px; left: 6px; right: auto; }
 
 .sponsored-info {
   position: absolute;

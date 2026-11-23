@@ -1,6 +1,6 @@
 const SNAPSHOT_PREFIX = 'ads:creative:visible:v1:';
 export const AD_CREATIVE_FIELDS = ['ad_id', 'format_id', 'placement', 'channel', 'interaction_contract', 'bookmark_key',
-  'icon_url', 'image_url', 'title', 'description', 'cta', 'disclosure_required', 'sponsor_label', 'locale'];
+  'icon_url', 'image_url', 'bookmark_url', 'title', 'description', 'cta', 'disclosure_required', 'sponsor_label', 'locale'];
 export const SESSION_DISMISS_KEY = 'ads:newtab:dismissed';
 
 export function adsApiBase() {
