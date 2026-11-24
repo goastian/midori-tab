@@ -42,7 +42,7 @@ export function catalogCategory(bookmark, categories) {
   if (categories.includes(bookmark.category)) return bookmark.category;
   const category = bookmark.category.toLowerCase();
   if (category === 'travel') return 'Travel';
-  if (['web3', 'crypto'].includes(category)) return 'Web3';
+  if (['finance', 'web3', 'crypto'].includes(category)) return 'Web3';
   return 'Personal';
 }
 
